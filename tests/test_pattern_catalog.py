@@ -101,7 +101,7 @@ def test_admin_reads_a_pattern_type_with_all_its_details(
     assert [sign["id"] for sign in conflict.pop("signs_against")] == ["D1", "D2"]
     assert conflict == {
         "id": "CONF.AVOID.BELONG",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "area": "conflict",
         "name": "Softening disagreement to protect belonging",
         "if_situation": "Disagreement with a valued other",
@@ -141,8 +141,14 @@ def test_admin_reads_a_pattern_type_with_all_its_details(
         ],
         "approved_wording": "You seem to protect closeness by keeping "
         "disagreements small, even when they matter to you.",
-        "prediction_wording": "Next time {person} asks for something you'd "
-        "rather not do, notice whether you say yes before you've decided.",
+        "prediction_wordings": [
+            "Next time {person} asks for something you'd rather not do, "
+            "notice whether you say yes before you've decided.",
+            "Next time you go along with {person} on something, notice how "
+            "you feel about it a few hours later.",
+            "Next time you disagree with someone you're not close to, like "
+            "{person}, notice whether saying so feels any easier.",
+        ],
         "numbers": {"situations_needed": 3, "base_rate": 0.2},
         "status": "approved",
         "approved_by": "Zaf",
@@ -338,7 +344,7 @@ def test_a_pattern_type_taken_out_of_the_files_leaves_the_catalog_but_is_kept(
     assert [pattern_type["id"] for pattern_type in catalog(client, headers)] == [
         "TEST.ONE"
     ]
-    assert ("CONF.AVOID.BELONG", "0.3.0", False) in stored_versions(engine)
+    assert ("CONF.AVOID.BELONG", "0.4.0", False) in stored_versions(engine)
 
 
 def test_a_plain_user_cannot_read_the_pattern_catalog(

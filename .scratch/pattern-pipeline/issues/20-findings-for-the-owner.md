@@ -717,6 +717,74 @@ Closes four findings of section 19: "A case with nothing ready passes" (it now f
 - **Impact:** an edited copy on production keeps the old script, with no warning.
 - **Suggested fix:** none needed unless the owner edited that case.
 
+## 30, 35 to 39 — The owner's decisions before Pattern sharing is on (2026-11-25)
+
+Settles from the sections above: 02 "Curiosity Check-ins ignore pace and backing off" (the owner chose to leave it), 07 the ruled-out topics and "Scoring counts evidence against that only narrows", 08 and 32 "the Read says a Pattern code never offered", 09 one story counting twice, the closing rule, the same Prediction twice, the unanswered Prediction and the 300, 13 "a deleted quote could come back" (it did: fixed), 18 both findings, 32 "One comparing line switches off narrowing".
+
+### The owner corrects the 45 drafted Prediction wordings
+
+- **Kind:** risk
+- **What:** each Pattern Type now has three `prediction_wordings`, drafted by Claude (issue 38).
+- **Impact:** a weak Prediction tests nothing, and two of them now confirm a Pattern.
+- **Suggested fix:** follow "Writing and correcting Predictions" in `docs/pattern-catalog/README.md`.
+- [ ] Owner corrected the Prediction wordings
+
+### The gate when asked is not live on production until the Reply Plan prompt is merged
+
+- **Kind:** risk
+- **What:** migration 0109 keeps an Admin-edited `reply_plan_prompt`, and production's is edited. The new fields `asked_for_patterns` and `named_pattern` are only in the new seed text.
+- **Impact:** on production a User who asks for their patterns still gets what they got before, and replies never name a told Pattern, until the new text is merged in.
+- **Suggested fix:** after the deploy, merge the two new field descriptions and the two JSON lines into the stored prompt on Prompts & models (`docs/PROMPT_EDITS_AND_DEPLOYS_GUIDE.md`). Do it before Pattern sharing is switched on for anyone.
+
+### Stronger models read something into the ask itself
+
+- **Kind:** failure
+- **What:** in Eval Run `898e711d`, asked "what patterns do you see in me?" by a User who had told no story, deepseek-v4-pro and claude-fable-5.2 declined to name a pattern but added a view of the asking ("you'd rather hear something true than something nice"); 1 of 3 passed each. Flash and claude-opus-5.5 passed 3 of 3. The fixed section now says to give no view when no situation was told; that wasn't run again.
+- **Impact:** small: no Pattern is claimed, but the reply still says something about who they are.
+- **Suggested fix:** if the reply model is changed, run `make eval CASES=asked-for-patterns-nothing-ready` with Repeats first. The Judge rule `says_no_pattern_when_asked` is a draft for the owner to correct.
+
+### An Eval estimate doesn't price a Variant's dearer model
+
+- **Kind:** failure
+- **What:** the three-model run was estimated at S$0.07 and cost about S$1.2. The same finding as sections 14, 27 and 32.
+- **Suggested fix:** price each Variant's rough figure on the models it overrides (`core/evals/costs.py`).
+
+### A new Prediction's wording number is worked out twice
+
+- **Kind:** potential failure
+- **What:** the offer Curiosity is written with the next wording, and the number is worked out again when the reply that gave it is checked (`PredictionKeeper._check_and_record`). A catalog version that reorders the list in between would number it wrongly.
+- **Impact:** rare; a Prediction could count as a different test than the one given.
+- **Suggested fix:** keep the number on the offer Curiosity. Until then, never reorder `prediction_wordings` (the guide says so).
+
+### The early follow-up is found through Life Threads only
+
+- **Kind:** limit
+- **What:** a follow-up is due early when a Life Thread in mind is one the Pattern showed in, or has a person in it that the Pattern's Observations are about. A person who is in no Life Thread doesn't bring it forward.
+- **Suggested fix:** watch in real use.
+
+### The stop after unanswered Predictions also lifts when Zeph names the Pattern
+
+- **Kind:** limit
+- **What:** offers start again when a reaction (agreed or pushed back) is read after the last unanswered Prediction. Since replies may now name a told Pattern, that reaction can follow Zeph bringing it up, not the User.
+- **Suggested fix:** leave unless Users are offered Predictions they keep ignoring.
+
+### Told Patterns are read on every reply
+
+- **Kind:** risk
+- **What:** for a User with a told Pattern, each reply reads all their Observations and Life Threads again (`PatternSharing.told_patterns`), and a waiting follow-up reads Observations and Predictions (`follow_ups_due_early`).
+- **Impact:** none at today's size; a cost per reply once Users have hundreds of Observations.
+- **Suggested fix:** read only the Observations of the told Pattern Types, in one query, when it shows up in reply times.
+
+### The migrations were not run on a copy of real data
+
+- **Kind:** note
+- **What:** 0105 to 0109 ran on a fresh stack database and in tests that downgrade and migrate again. The main stack wasn't running, so `make db-copy` wasn't used.
+
+### Design files changed by the agent again
+
+- **Kind:** note
+- **What:** `web/design/reference/AdminPatternCatalog.html` and its baseline now show the new catalog versions and three Prediction lines per card ("Prediction 1" to "Prediction 3", from the existing line part).
+
 ## Comments
 
 ### 25 Nov 2026 — first triage with the owner (sections 01 to 19)

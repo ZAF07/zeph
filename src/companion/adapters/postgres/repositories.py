@@ -42,6 +42,7 @@ from companion.adapters.postgres.tables import (
     curiosities,
     daily_usage,
     day_summaries,
+    deleted_quotes,
     exploration_tries,
     explorations,
     feature_switches,
@@ -64,6 +65,7 @@ from companion.adapters.postgres.tables import (
     pattern_types,
     patterns,
     patterns_in_mind,
+    patterns_never_again,
     pending_auth_account_deletions,
     personal_stickers,
     platform_settings,
@@ -117,6 +119,7 @@ from companion.core.models import (
     CuriosityTreatment,
     DailyUsage,
     DaySummary,
+    DeletedQuote,
     Directness,
     EvidenceKind,
     ExcludedEvidence,
@@ -2725,7 +2728,12 @@ def _reply_plan_form_values(form: ReplyPlanForm) -> dict[str, Any]:
         {**item, "pattern_id": str(item["pattern_id"])}
         for item in values["patterns_used"]
     ]
-    for field_name in ("pattern_offered", "pattern_to_share", "pattern_raised"):
+    for field_name in (
+        "pattern_offered",
+        "pattern_to_share",
+        "pattern_raised",
+        "pattern_named",
+    ):
         if values[field_name] is not None:
             values[field_name] = {
                 **values[field_name],
@@ -2834,6 +2842,12 @@ def _to_reply_plan_form(stored: dict[str, Any]) -> ReplyPlanForm:
             if stored.get("pattern_raised")
             else None
         ),
+        pattern_named=(
+            _to_pattern_picked(stored["pattern_named"])
+            if stored.get("pattern_named")
+            else None
+        ),
+        asked_for_patterns=stored.get("asked_for_patterns", False),
         curiosity_not_asked_why=stored.get("curiosity_not_asked_why", ""),
         curiosity_taken=(
             ThreadReaction(stored["curiosity_taken"])
@@ -3539,7 +3553,7 @@ class PostgresObservationRepository:
             )
 
     def delete_for_user(self, user_id: UUID) -> None:
-        """Delete all of a User's Observations and exclusion flags.
+        """Delete a User's Observations, exclusion flags and deleted-quote records.
 
         Args:
             user_id: The User's ID.
@@ -3553,6 +3567,64 @@ class PostgresObservationRepository:
                     pattern_exclusion_flags.c.user_id == user_id
                 )
             )
+            connection.execute(
+                delete(deleted_quotes).where(deleted_quotes.c.user_id == user_id)
+            )
+
+    def note_deleted_quotes(self, deleted: Sequence[DeletedQuote]) -> None:
+        """Keep a record of quotes a User deleted, so none is kept again.
+
+        Args:
+            deleted: The records; one already kept is left as it is.
+        """
+        if not deleted:
+            return
+        with self._database.begin() as connection:
+            connection.execute(
+                insert(deleted_quotes).on_conflict_do_nothing(),
+                [
+                    {
+                        "user_id": record.user_id,
+                        "conversation_id": record.conversation_id,
+                        "text_hash": record.text_hash,
+                        "span_start": record.span_start,
+                        "span_end": record.span_end,
+                        "deleted_at": record.deleted_at,
+                    }
+                    for record in deleted
+                ],
+            )
+
+    def list_deleted_quotes(
+        self, user_id: UUID, conversation_id: UUID
+    ) -> list[DeletedQuote]:
+        """List the records of quotes a User deleted from one Conversation.
+
+        Args:
+            user_id: The User's ID.
+            conversation_id: The Conversation the quotes were said in.
+
+        Returns:
+            The records; none when they deleted no quote from it.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(deleted_quotes).where(
+                    deleted_quotes.c.user_id == user_id,
+                    deleted_quotes.c.conversation_id == conversation_id,
+                )
+            ).all()
+        return [
+            DeletedQuote(
+                user_id=row.user_id,
+                conversation_id=row.conversation_id,
+                text_hash=row.text_hash,
+                span_start=row.span_start,
+                span_end=row.span_end,
+                deleted_at=row.deleted_at,
+            )
+            for row in rows
+        ]
 
     def replace_exclusion_flags(
         self, user_id: UUID, flags: Sequence[ExclusionFlag]
@@ -3964,6 +4036,7 @@ class PostgresPatternRepository:
                 other_side_asked_at=row.other_side_asked_at,
                 other_side_found_better=row.other_side_found_better,
                 shared_at=row.shared_at,
+                shared_wording=row.shared_wording,
             )
             for row in rows
         ]
@@ -3981,7 +4054,8 @@ class PostgresPatternRepository:
             added: Patterns noticed for the first time.
             changed: Patterns that moved or that the ready gate judged, with
                 their state, blocking check, narrowings, when the other
-                side was last argued and when they were shared.
+                side was last argued, when they were shared and the
+                wording they were told in.
             deleted_ids: Patterns with no Observations left; their moves stay.
             moves: The moves, added to the log in order.
         """
@@ -4023,6 +4097,7 @@ class PostgresPatternRepository:
                             "new_other_side_found_better"
                         ),
                         shared_at=bindparam("new_shared_at"),
+                        shared_wording=bindparam("new_shared_wording"),
                     ),
                     [
                         {
@@ -4043,6 +4118,7 @@ class PostgresPatternRepository:
                                 pattern.other_side_found_better
                             ),
                             "new_shared_at": pattern.shared_at,
+                            "new_shared_wording": pattern.shared_wording,
                         }
                         for pattern in changed
                     ],
@@ -4172,6 +4248,8 @@ class PostgresPatternRepository:
                     made_at=prediction.made_at,
                     outcome=_value_or_none(prediction.outcome),
                     outcome_at=prediction.outcome_at,
+                    outcome_conversation_id=prediction.outcome_conversation_id,
+                    wording_number=prediction.wording_number,
                 )
             )
 
@@ -4191,12 +4269,14 @@ class PostgresPatternRepository:
                 .values(
                     outcome=bindparam("new_outcome"),
                     outcome_at=bindparam("new_outcome_at"),
+                    outcome_conversation_id=bindparam("new_conversation_id"),
                 ),
                 [
                     {
                         "prediction_id": prediction.id,
                         "new_outcome": _value_or_none(prediction.outcome),
                         "new_outcome_at": prediction.outcome_at,
+                        "new_conversation_id": prediction.outcome_conversation_id,
                     }
                     for prediction in settled
                 ],
@@ -4226,6 +4306,8 @@ class PostgresPatternRepository:
                 made_at=row.made_at,
                 outcome=PredictionOutcome(row.outcome) if row.outcome else None,
                 outcome_at=row.outcome_at,
+                outcome_conversation_id=row.outcome_conversation_id,
+                wording_number=row.wording_number,
             )
             for row in rows
         ]
@@ -4287,7 +4369,7 @@ class PostgresPatternRepository:
         ]
 
     def delete_for_user(self, user_id: UUID) -> None:
-        """Delete every one of a User's Patterns, and the log of their moves.
+        """Delete a User's Patterns, the log of their moves and "never again" marks.
 
         Args:
             user_id: The User's ID.
@@ -4297,6 +4379,49 @@ class PostgresPatternRepository:
             connection.execute(
                 delete(pattern_moves).where(pattern_moves.c.user_id == user_id)
             )
+            connection.execute(
+                delete(patterns_never_again).where(
+                    patterns_never_again.c.user_id == user_id
+                )
+            )
+
+    def mark_never_again(
+        self, user_id: UUID, pattern_type_id: str, marked_at: datetime
+    ) -> None:
+        """Mark a Pattern Type as never to be noted or shared for a User again.
+
+        Args:
+            user_id: The User's ID.
+            pattern_type_id: The Pattern Type's ID.
+            marked_at: When it was marked; one already marked stays as it is.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                insert(patterns_never_again)
+                .values(
+                    user_id=user_id,
+                    pattern_type_id=pattern_type_id,
+                    marked_at=marked_at,
+                )
+                .on_conflict_do_nothing()
+            )
+
+    def list_never_again(self, user_id: UUID) -> frozenset[str]:
+        """List the Pattern Types never to be noted or shared for a User again.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            Their IDs; none when the User marked none.
+        """
+        with self._database.connect() as connection:
+            marked = connection.execute(
+                select(patterns_never_again.c.pattern_type_id).where(
+                    patterns_never_again.c.user_id == user_id
+                )
+            ).scalars()
+            return frozenset(marked)
 
 
 def _delete_patterns_without_evidence(connection: Connection, user_id: UUID) -> None:

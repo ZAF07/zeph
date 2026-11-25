@@ -174,11 +174,12 @@ class _Fields:
             self.note(f"{field} is {value}; it must be one of {', '.join(allowed)}.")
         return next(iter(choices))
 
-    def texts(self, field: str) -> tuple[str, ...]:
+    def texts(self, field: str, at_least_one: bool = False) -> tuple[str, ...]:
         """Read a required list of texts.
 
         Args:
             field: The field's name.
+            at_least_one: Whether an empty list is a problem.
 
         Returns:
             The texts; empty when the list is not valid.
@@ -191,6 +192,8 @@ class _Fields:
         ):
             self.note(f"{field} must be a list of texts.")
             return ()
+        if at_least_one and not value:
+            self.note(f"{field} must hold at least one text.")
         return tuple(item.strip() for item in value)
 
     def optional_choices[Choice: StrEnum](
@@ -454,6 +457,22 @@ def _read_anyone_would_when(fields: _Fields) -> tuple[SituationMatch, ...]:
     return tuple(matches)
 
 
+def _read_prediction_wordings(fields: _Fields) -> tuple[str, ...]:
+    """Read the ways a Pattern Type's Prediction may be worded.
+
+    Args:
+        fields: The Pattern Type's fields.
+
+    Returns:
+        The `prediction_wordings` list, which needs at least one; for a
+        version stored before there were several, its one
+        `prediction_wording`.
+    """
+    if not fields.has("prediction_wordings") and fields.has("prediction_wording"):
+        return (fields.text("prediction_wording"),)
+    return fields.texts("prediction_wordings", at_least_one=True)
+
+
 def _read_numbers(group: _Fields) -> PatternTypeNumbers:
     """Read a Pattern Type's own numbers.
 
@@ -509,7 +528,7 @@ def _read_pattern_type(
         anyone_would_when=_read_anyone_would_when(fields),
         exclusions=_read_exclusions(fields.groups("exclusions")),
         approved_wording=fields.text("approved_wording"),
-        prediction_wording=fields.text("prediction_wording"),
+        prediction_wordings=_read_prediction_wordings(fields),
         numbers=_read_numbers(fields.group("numbers")),
         status=status,
         approved_by=approved_by,

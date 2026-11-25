@@ -33,7 +33,6 @@ from tests.test_moves_migration import downgrade_to
 from tests.test_pattern_sharing import (
     APPROVED_WORDING,
     PREDICTION,
-    PREDICTION_WORDING,
     predictions_of,
     ready_to_share,
     share,
@@ -47,7 +46,8 @@ FOLLOW_UP = "You asked them to watch for this"
 GIVE_NEW = "watching for one new thing"
 OPEN_PREDICTIONS_HEADER = "Predictions Zeph gave them, still open:"
 PORTRAIT_PATTERNS_HEADER = "Patterns they agreed with:"
-SECOND_PREDICTION = "This week, notice what you do when Jun asks a favour."
+SECOND_PREDICTION = "This week, notice how you feel after going along with Jun."
+SECOND_WORDING = "notice how you feel about it a few hours later"
 FOLLOW_UP_SETTINGS = (
     "prediction_follow_up_wait_days",
     "prediction_follow_up_drop_days",
@@ -192,6 +192,44 @@ def test_a_prediction_gets_a_follow_up_curiosity_not_before_the_admin_set_wait(
     assert len(waiting(client.engine, user_id)) == 1
 
 
+def test_a_follow_up_is_offered_early_once_they_talk_about_where_the_pattern_shows(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    user_id = share_and_end(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+    )
+    [follow_up] = waiting(client.engine, user_id)
+    threads = build_postgres_repositories(client.engine).life_threads.list_for_user(
+        UUID(user_id)
+    )
+    shows_in = {
+        observation.thread_id for observation in observations_of(client.engine, user_id)
+    }
+    named = next(thread for thread in threads if thread.id in shows_in)
+
+    clock.advance(timedelta(days=2))
+    about_something_else = talk(client, chat_model, clock, "what a week")
+    about_it = talk(client, chat_model, clock, f"so, about {named.title}")
+
+    assert follow_up.not_before is not None
+    assert follow_up.not_before > clock.now().date()
+    assert FOLLOW_UP not in about_something_else
+    assert FOLLOW_UP in about_it
+    assert waiting(client.engine, user_id)[0].not_before == follow_up.not_before
+
+
 def test_a_follow_up_not_asked_within_the_longer_time_is_closed(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
@@ -271,14 +309,16 @@ def test_predictions_that_came_true_confirm_a_pattern_and_it_joins_the_portrait(
     plan_saw = ask_and_answer(client, chat_model, clock, "ok, I'll watch for that")
 
     assert GIVE_NEW in plan_saw
-    assert PREDICTION_WORDING in plan_saw
+    assert SECOND_WORDING in plan_saw
     [check] = chat_model.given_check_calls
     assert check.instructions == GIVEN_CHECK_PROMPT
     assert check.model == seeded_settings["check_in_model"]
     assert check.thinking is False
     assert "mm, tell me more" in check.history[0].text
+    assert SECOND_WORDING in check.history[0].text
     second = predictions_of(client.engine, user_id)[-1]
     assert (second.wording, second.outcome) == (SECOND_PREDICTION, None)
+    assert (first.wording_number, second.wording_number) == (1, 2)
 
     end(chat_model, clock, scheduler, seeded_settings)
     [second_follow_up] = waiting(client.engine, user_id)
@@ -419,6 +459,103 @@ def test_a_prediction_that_didnt_is_a_strong_sign_against_and_can_close_the_patt
 
     assert belonging(client.engine, user_id).state == PatternState.CLOSED
     assert moves_of(client.engine, user_id)[-1].id == move.id
+
+
+def test_a_story_that_settles_a_prediction_and_is_tagged_too_counts_once(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    user_id = share_and_end(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+    )
+    shared_at_points = moves_of(client.engine, user_id)[-1].points
+    set_platform_setting(client.engine, "pattern_half_life_days", 100000)
+    set_platform_setting(
+        client.engine, "pattern_closed_under_points", int(shared_at_points) - 100
+    )
+    clock.advance(timedelta(days=7))
+    quotes_before = len(observations_of(client.engine, user_id))
+
+    ask_and_answer(client, chat_model, clock, "no, I actually said no to her")
+    end(
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+        DID_NOT,
+        observations=[
+            observation_entry(
+                sign="D1",
+                direction="against",
+                quote="I actually said no to her",
+                thread=None,
+            )
+        ],
+    )
+
+    [prediction] = predictions_of(client.engine, user_id)
+    kept = observations_of(client.engine, user_id)
+    assert len(kept) == quotes_before + 1
+    assert prediction.outcome_conversation_id == kept[-1].conversation_id
+    move = moves_of(client.engine, user_id)[-1]
+    assert states_and_causes([move]) == [("shared", "closed", "conversation_tagged")]
+    assert move.points == pytest.approx(shared_at_points - 140, abs=1)
+
+
+def test_enough_predictions_that_didnt_come_true_close_a_shared_pattern(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    user_id = share_and_end(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+    )
+    set_platform_setting(client.engine, "predictions_to_close", 1)
+    clock.advance(timedelta(days=7))
+
+    ask_and_answer(client, chat_model, clock, "no, I actually said no to her")
+    end(chat_model, clock, scheduler, seeded_settings, DID_NOT)
+
+    assert belonging(client.engine, user_id).state == PatternState.CLOSED
+    move = moves_of(client.engine, user_id)[-1]
+    assert move.reason == PatternMoveReason.PREDICTIONS_DID_NOT
+    assert move.points > -150
+    assert waiting(client.engine, user_id) == []
+
+
+def test_the_closing_and_stopping_numbers_are_settings_with_hints_and_eval_overrides(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    keys = ("predictions_to_close", "predictions_unanswered_to_stop")
+
+    settings = client.get("/api/admin/settings", headers=admin).json()["settings"]
+    choices = client.get("/api/admin/setting-override-choices", headers=admin).json()
+
+    assert {key: settings[key]["value"] for key in keys} == dict.fromkeys(keys, 2)
+    assert all(settings[key]["hint"] for key in keys)
+    assert set(keys) <= {setting["key"] for setting in choices["settings"]}
 
 
 def test_strong_evidence_after_sharing_confirms_a_shared_pattern(

@@ -3,7 +3,7 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: APPR.GIVE.NEEDED
-version: 0.1.0
+version: 0.2.0
 area: approval
 name: Saying yes and over-giving to feel needed
 status: approved
@@ -84,9 +84,18 @@ exclusions:
 approved_wording: >-
   Being the one people turn to seems to matter a lot to you, so yes comes
   easily, even when it costs you.
-prediction_wording: >-
-  Next time {person} asks you for something, notice whether you say yes before
-  you've checked what it will cost you.
+# Three Predictions, each testing a different side of the Pattern. Code gives
+# the first when the Pattern is shared, then one the User hasn't had.
+prediction_wordings:
+  - >-
+    Next time {person} asks you for something, notice whether you say yes
+    before you've checked what it will cost you.
+  - >-
+    Next time you help {person}, notice whether you do more than they asked
+    for, and how you feel if they don't mention it.
+  - >-
+    Next time {person} sorts something out without asking you, notice what
+    you feel first.
 
 numbers:
   situations_needed: 3

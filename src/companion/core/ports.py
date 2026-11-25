@@ -28,6 +28,7 @@ from companion.core.models import (
     CuriosityChanges,
     DailyUsage,
     DaySummary,
+    DeletedQuote,
     EmbeddedChunk,
     ExclusionFlag,
     Exploration,
@@ -1396,10 +1397,32 @@ class ObservationRepository(Protocol):
         ...
 
     def delete_for_user(self, user_id: UUID) -> None:
-        """Delete all of a User's Observations and exclusion flags.
+        """Delete a User's Observations, exclusion flags and deleted-quote records.
 
         Args:
             user_id: The User's ID.
+        """
+        ...
+
+    def note_deleted_quotes(self, deleted: Sequence[DeletedQuote]) -> None:
+        """Keep a record of quotes a User deleted, so none is kept again.
+
+        Args:
+            deleted: The records; one already kept is left as it is.
+        """
+        ...
+
+    def list_deleted_quotes(
+        self, user_id: UUID, conversation_id: UUID
+    ) -> list[DeletedQuote]:
+        """List the records of quotes a User deleted from one Conversation.
+
+        Args:
+            user_id: The User's ID.
+            conversation_id: The Conversation the quotes were said in.
+
+        Returns:
+            The records; none when they deleted no quote from it.
         """
         ...
 
@@ -1656,10 +1679,33 @@ class PatternRepository(Protocol):
         ...
 
     def delete_for_user(self, user_id: UUID) -> None:
-        """Delete every one of a User's Patterns, and the log of their moves.
+        """Delete a User's Patterns, the log of their moves and "never again" marks.
 
         Args:
             user_id: The User's ID.
+        """
+        ...
+
+    def mark_never_again(
+        self, user_id: UUID, pattern_type_id: str, marked_at: datetime
+    ) -> None:
+        """Mark a Pattern Type as never to be noted or shared for a User again.
+
+        Args:
+            user_id: The User's ID.
+            pattern_type_id: The Pattern Type's ID.
+            marked_at: When it was marked; one already marked stays as it is.
+        """
+        ...
+
+    def list_never_again(self, user_id: UUID) -> frozenset[str]:
+        """List the Pattern Types never to be noted or shared for a User again.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            Their IDs; none when the User marked none.
         """
         ...
 

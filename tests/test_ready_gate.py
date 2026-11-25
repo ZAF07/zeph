@@ -202,7 +202,7 @@ def test_a_pattern_becomes_ready_once_all_ten_checks_pass_and_the_log_says_what_
     move = moves_of(client.engine, user_id)[-1]
     assert states_and_causes([move]) == [("suspected", "ready", "conversation_tagged")]
     assert move.blocked_by == ReadyCheck.SITUATIONS
-    assert (move.points, move.situations) == (pytest.approx(280, abs=5), 3)
+    assert (move.points, move.situations) == (pytest.approx(420, abs=5), 3)
     [call] = chat_model.other_side_calls
     described = call.history[0].text
     assert "Softening disagreement to protect belonging" in described
@@ -414,7 +414,7 @@ def test_an_exclusion_whose_evidence_is_ignored_stops_scoring_and_ready(
     move = moves_of(client.engine, user_id)[-1]
     assert states_and_causes([move]) == [("ready", "suspected", "conversation_tagged")]
     assert move.blocked_by == ReadyCheck.SAFE
-    assert move.points == pytest.approx(280, abs=5)
+    assert move.points == pytest.approx(416, abs=5)
 
     end_tagged(client, chat_model, clock, scheduler, seeded_settings, [], "hello again")
 
@@ -722,6 +722,9 @@ def test_the_gate_numbers_and_the_other_side_call_are_settings_with_hints(
             "sexual trauma",
             "self-harm or suicide",
             "eating and body image",
+            "addiction",
+            "sexuality and gender",
+            "mental health diagnoses",
         ],
     }
     assert all(settings[key]["hint"] for key in (*GATE_SETTINGS, *OTHER_SIDE_SETTINGS))

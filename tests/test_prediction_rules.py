@@ -1,6 +1,7 @@
 import json
 from dataclasses import replace
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -10,12 +11,16 @@ from companion.core.models import (
     Curiosity,
     CuriosityAim,
     CuriosityState,
+    LifeThread,
     ObservationDirection,
     PatternMoveCause,
     PatternMoveReason,
+    PatternReaction,
     PatternState,
     Prediction,
     PredictionOutcome,
+    ReactionToPattern,
+    Relationship,
     ThreadReaction,
 )
 from companion.core.observations import (
@@ -35,7 +40,10 @@ from companion.core.predictions import (
     GivenCheck,
     PlannedFollowUps,
     SharedPatternFacts,
+    counted_once,
     follow_up_window,
+    follow_ups_due_early,
+    next_prediction_wording,
     plan_follow_ups,
     read_given_check,
     shared_move,
@@ -50,9 +58,12 @@ from tests.test_ready_gate_rules import (
     story,
 )
 
-NUMBERS = FollowUpNumbers(wait=timedelta(days=7), drop_after=timedelta(days=21))
+NUMBERS = FollowUpNumbers(
+    wait=timedelta(days=7), drop_after=timedelta(days=21), unanswered_to_stop=2
+)
 BARS = ConfirmBars(
     predictions_to_confirm=2,
+    predictions_to_close=2,
     confirmed_at_points_after_sharing=300,
     closed_under_points=-150,
 )
@@ -97,6 +108,7 @@ def planned(
     predictions: list[Prediction],
     curiosities: list[Curiosity] | None = None,
     now: datetime = NOW,
+    reactions: list[ReactionToPattern] | None = None,
 ) -> PlannedFollowUps:
     """Plan the Curiosities about a User's Predictions."""
     return plan_follow_ups(
@@ -108,6 +120,7 @@ def planned(
             pattern_types=PATTERN_TYPES,
             predictions=predictions,
             curiosities=curiosities or [],
+            reactions=reactions or [],
         ),
         NUMBERS,
     )
@@ -127,12 +140,14 @@ def facts(
     points: float = 300,
     came_true: int = 0,
     points_after_sharing: float = 0,
+    did_not: int = 0,
 ) -> SharedPatternFacts:
     """What a shared Pattern is confirmed or closed from."""
     return SharedPatternFacts(
         pattern=pattern,
         scored=PatternScore(points=points, situations=3),
         came_true=came_true,
+        did_not=did_not,
         points_after_sharing=points_after_sharing,
     )
 
@@ -255,7 +270,7 @@ def test_a_shared_pattern_gets_a_new_prediction_once_the_last_is_settled(
         None,
     )
     assert give.not_before is None
-    assert PATTERN_TYPES[BELONG].prediction_wording in give.question
+    assert PATTERN_TYPES[BELONG].prediction_wordings[1] in give.question
     assert planned([pattern], [settled], [give]).curiosities.added == []
 
 
@@ -319,7 +334,7 @@ def test_a_new_prediction_they_let_pass_is_not_offered_again_before_the_wait() -
 
 def test_a_drop_time_shorter_than_the_wait_never_ends_before_the_first_day() -> None:
     pattern = shared_pattern()
-    numbers = FollowUpNumbers(wait=timedelta(days=7), drop_after=timedelta(days=3))
+    numbers = replace(NUMBERS, drop_after=timedelta(days=3))
 
     window = follow_up_window(prediction(pattern), numbers, "UTC")
 
@@ -381,6 +396,134 @@ def test_enough_predictions_that_came_true_confirm_a_shared_pattern() -> None:
     )
 
 
+def test_predictions_confirm_only_when_more_came_true_than_did_not() -> None:
+    pattern = shared_pattern()
+
+    assert shared_move(facts(pattern, came_true=2, did_not=2), BARS) is None
+    assert shared_move(facts(pattern, came_true=3, did_not=2), BARS) == (
+        PatternState.CONFIRMED,
+        PatternMoveReason.PREDICTIONS_CAME_TRUE,
+    )
+
+
+def test_enough_predictions_that_did_not_come_true_close_a_shared_pattern() -> None:
+    pattern = shared_pattern()
+
+    assert shared_move(facts(pattern, did_not=1), BARS) is None
+    assert shared_move(facts(pattern, did_not=2), BARS) == (
+        PatternState.CLOSED,
+        PatternMoveReason.PREDICTIONS_DID_NOT,
+    )
+    assert shared_move(facts(pattern, did_not=2, came_true=1), BARS) == (
+        PatternState.CLOSED,
+        PatternMoveReason.PREDICTIONS_DID_NOT,
+    )
+    assert shared_move(facts(pattern, did_not=3, came_true=3), BARS) is None
+
+
+def test_a_story_that_settles_a_prediction_moves_the_score_once() -> None:
+    pattern = shared_pattern()
+    said_in = uuid4()
+    same_story = story(
+        about="Dana", direction=ObservationDirection.AGAINST, conversation=said_in
+    )
+    another_day = story(about="Priya")
+    did_not = replace(
+        prediction(pattern, outcome=PredictionOutcome.DID_NOT),
+        outcome_conversation_id=said_in,
+    )
+    not_yet = replace(
+        prediction(pattern, outcome=PredictionOutcome.NOT_COME_UP),
+        outcome_conversation_id=another_day.conversation_id,
+    )
+
+    found = shared_pattern_facts(
+        pattern, [same_story, another_day], [], [did_not, not_yet], WEIGHING, "UTC"
+    )
+
+    assert counted_once([same_story, another_day], [did_not, not_yet]) == [another_day]
+    assert found.scored.points == pytest.approx(140 - 140)
+    assert found.points_after_sharing == pytest.approx(140)
+    assert (found.came_true, found.did_not) == (0, 1)
+
+
+def test_evidence_that_only_narrows_a_shared_pattern_does_not_count_against_it() -> (
+    None
+):
+    pattern = shared_pattern()
+    not_with_friends = story(
+        about="Jun, a friend",
+        direction=ObservationDirection.AGAINST,
+        relationship=Relationship.FRIEND,
+    )
+
+    found = shared_pattern_facts(
+        pattern, [story(), not_with_friends], [], [], WEIGHING, "UTC"
+    )
+
+    assert found.scored.points == pytest.approx(140)
+    assert found.points_after_sharing == pytest.approx(140)
+
+
+def reaction(
+    pattern: CatalogPattern, kind: PatternReaction, days_ago: int = 0
+) -> ReactionToPattern:
+    """How the User took a Pattern some days ago."""
+    return ReactionToPattern(
+        id=uuid4(),
+        user_id=USER,
+        pattern_id=pattern.id,
+        reaction=kind,
+        conversation_id=uuid4(),
+        reacted_at=NOW - timedelta(days=days_ago),
+    )
+
+
+def test_no_new_prediction_is_offered_after_two_in_a_row_got_no_answer() -> None:
+    pattern = shared_pattern()
+    answered = prediction(pattern, 80, outcome=PredictionOutcome.CAME_TRUE)
+    first = prediction(pattern, 60, PredictionOutcome.NOT_FOLLOWED_UP, 39)
+    second = prediction(pattern, 22)
+    [offer] = planned([pattern], [answered, first]).curiosities.added
+    [follow_up] = planned(
+        [pattern], [answered, first, second], now=NOW - timedelta(days=10)
+    ).curiosities.added
+
+    plan = planned([pattern], [answered, first, second], [follow_up])
+    one_unanswered = planned([pattern], [answered, second], [follow_up])
+
+    assert offer.prediction_id is None
+    assert [item.id for item in plan.not_followed_up] == [second.id]
+    assert plan.curiosities.added == []
+    assert [item.id for item in plan.curiosities.updated] == [follow_up.id]
+    assert [item.prediction_id for item in one_unanswered.curiosities.added] == [None]
+
+
+@pytest.mark.parametrize(
+    ("kind", "days_ago", "offered"),
+    [
+        (PatternReaction.AGREED, 1, True),
+        (PatternReaction.PUSHED_BACK, 1, True),
+        (PatternReaction.BRUSHED_OFF, 1, False),
+        (PatternReaction.AGREED, 20, False),
+    ],
+)
+def test_predictions_are_offered_again_once_the_user_brings_the_pattern_up(
+    kind: PatternReaction, days_ago: int, offered: bool
+) -> None:
+    pattern = shared_pattern()
+    unanswered = [
+        prediction(pattern, 60, PredictionOutcome.NOT_FOLLOWED_UP, 39),
+        prediction(pattern, 31, PredictionOutcome.NOT_FOLLOWED_UP, 10),
+    ]
+
+    plan = planned([pattern], unanswered, reactions=[reaction(pattern, kind, days_ago)])
+
+    assert [item.prediction_id for item in plan.curiosities.added] == (
+        [None] if offered else []
+    )
+
+
 def test_strong_evidence_after_sharing_confirms_a_shared_pattern() -> None:
     pattern = shared_pattern()
 
@@ -413,9 +556,15 @@ def test_a_shared_patterns_score_counts_reactions_and_prediction_outcomes() -> N
     earlier = [replace(story(about=name), day=shared_on) for name in ("Mei", "Jun")]
     later = [story(about="Priya")]
     predictions = [
-        prediction(pattern, outcome=PredictionOutcome.CAME_TRUE),
-        prediction(pattern, outcome=PredictionOutcome.DID_NOT),
-        prediction(pattern, outcome=PredictionOutcome.CAME_TRUE),
+        replace(prediction(pattern, outcome=outcome), wording_number=number)
+        for number, outcome in enumerate(
+            [
+                PredictionOutcome.CAME_TRUE,
+                PredictionOutcome.DID_NOT,
+                PredictionOutcome.CAME_TRUE,
+            ],
+            start=1,
+        )
     ]
     faded = 140 * 0.5 ** (30 / 75)
 
@@ -501,12 +650,15 @@ def test_an_outcome_is_kept_once_per_prediction_shown() -> None:
         "came_true",
     ]
 
-    kept = plan_prediction_outcomes(entries, shown, NOW)
+    said_in = uuid4()
+
+    kept = plan_prediction_outcomes(entries, shown, said_in, NOW)
 
     assert [(item.id, item.outcome, item.outcome_at) for item in kept] == [
         (shown[1].id, PredictionOutcome.CAME_TRUE, NOW),
         (shown[2].id, PredictionOutcome.NOT_COME_UP, NOW),
     ]
+    assert {item.outcome_conversation_id for item in kept} == {said_in}
 
 
 def test_the_tagging_model_reads_each_open_prediction_with_its_day() -> None:
@@ -527,3 +679,126 @@ def test_the_given_check_reads_whether_a_prediction_was_given() -> None:
     assert read_given_check('{"given": false}') == GivenCheck(False, "")
     assert read_given_check('{"given": "yes"}') is None
     assert read_given_check("no idea") is None
+
+
+def numbered(pattern: CatalogPattern, number: int | None, **changes: Any) -> Prediction:
+    """A Prediction given from one of its Pattern Type's wordings."""
+    return replace(prediction(pattern, **changes), wording_number=number)
+
+
+def test_a_new_prediction_uses_a_wording_the_pattern_has_not_had() -> None:
+    pattern = shared_pattern()
+    belonging = PATTERN_TYPES[BELONG]
+    wordings = belonging.prediction_wordings
+
+    first = next_prediction_wording(belonging, [])
+    second = next_prediction_wording(belonging, [numbered(pattern, 1)])
+    third = next_prediction_wording(
+        belonging, [numbered(pattern, 1), numbered(pattern, 2)]
+    )
+    before_they_were_numbered = next_prediction_wording(
+        belonging, [numbered(pattern, None)]
+    )
+
+    assert first == (1, wordings[0])
+    assert second == (2, wordings[1])
+    assert third == (3, wordings[2])
+    assert before_they_were_numbered == (2, wordings[1])
+
+
+def test_once_every_wording_was_given_the_one_given_longest_ago_comes_again() -> None:
+    pattern = shared_pattern()
+    belonging = PATTERN_TYPES[BELONG]
+    given = [numbered(pattern, number) for number in (1, 2, 3, 1)]
+
+    assert next_prediction_wording(belonging, given)[0] == 2
+
+
+def test_the_offer_of_a_new_prediction_carries_the_next_wording() -> None:
+    pattern = shared_pattern()
+    settled = numbered(pattern, 1, made_days_ago=8, outcome=PredictionOutcome.CAME_TRUE)
+
+    [give] = planned([pattern], [settled]).curiosities.added
+
+    wordings = PATTERN_TYPES[BELONG].prediction_wordings
+    assert wordings[1] in give.question
+    assert wordings[0] not in give.question
+
+
+def test_the_same_wording_coming_true_twice_is_one_test_passed() -> None:
+    pattern = shared_pattern()
+    came_true = PredictionOutcome.CAME_TRUE
+    same_twice = [numbered(pattern, 1, outcome=came_true) for _ in range(2)]
+    two_sides = [numbered(pattern, number, outcome=came_true) for number in (1, 2)]
+    not_numbered = [numbered(pattern, None, outcome=came_true) for _ in range(2)]
+
+    def came_true_of(predictions: list[Prediction]) -> int:
+        return shared_pattern_facts(
+            pattern, [], [], predictions, WEIGHING, "UTC"
+        ).came_true
+
+    assert came_true_of(same_twice) == 1
+    assert came_true_of(two_sides) == 2
+    assert came_true_of(not_numbered) == 1
+
+
+def test_the_same_wording_failing_twice_is_one_test_failed() -> None:
+    pattern = shared_pattern()
+    did_not = PredictionOutcome.DID_NOT
+    came_true = PredictionOutcome.CAME_TRUE
+    first_twice_true = [numbered(pattern, 1, outcome=came_true) for _ in range(2)]
+    two_failed = [numbered(pattern, number, outcome=did_not) for number in (2, 3)]
+    same_failed_twice = [numbered(pattern, 2, outcome=did_not) for _ in range(2)]
+
+    two_sides_failed = shared_pattern_facts(
+        pattern, [], [], [*first_twice_true, *two_failed], WEIGHING, "UTC"
+    )
+    one_side_failed = shared_pattern_facts(
+        pattern, [], [], same_failed_twice, WEIGHING, "UTC"
+    )
+
+    assert (two_sides_failed.came_true, two_sides_failed.did_not) == (1, 2)
+    assert one_side_failed.did_not == 1
+
+
+def life_thread(people: tuple[str, ...] = (), thread_id: Any = None) -> LifeThread:
+    """A Life Thread a reply has in mind."""
+    return LifeThread(
+        id=thread_id or uuid4(),
+        user_id=USER,
+        title="A part of their life",
+        story="Something going on.",
+        people=people,
+        is_open=True,
+        started_at=NOW,
+        updated_at=NOW,
+    )
+
+
+def test_a_follow_up_is_due_early_when_a_thread_of_the_pattern_is_in_mind() -> None:
+    pattern = shared_pattern()
+    with_mei = story(about="Mei, their sister")
+    given = prediction(pattern, made_days_ago=2)
+    [follow_up] = planned([pattern], [given]).curiosities.added
+    same_thread = life_thread(thread_id=with_mei.thread_id)
+    same_person = life_thread(people=("mei", "moving flat"))
+    something_else = life_thread(people=("Jun",))
+
+    def due_early(
+        threads: list[LifeThread], today: date = TODAY, asked: Prediction = given
+    ) -> frozenset[Any]:
+        return follow_ups_due_early(
+            [follow_up], [pattern], [with_mei], [asked], threads, today, "UTC"
+        )
+
+    said_not_yet_today = replace(
+        given, outcome=PredictionOutcome.NOT_COME_UP, outcome_at=NOW
+    )
+    assert follow_up.not_before is not None
+    assert follow_up.not_before > TODAY
+    assert due_early([same_thread]) == frozenset({follow_up.id})
+    assert due_early([same_person]) == frozenset({follow_up.id})
+    assert due_early([something_else]) == frozenset()
+    assert due_early([]) == frozenset()
+    assert due_early([same_thread], TODAY - timedelta(days=2)) == frozenset()
+    assert due_early([same_thread], asked=said_not_yet_today) == frozenset()

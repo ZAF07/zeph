@@ -1,7 +1,7 @@
 import json
 import logging
 import re
-from collections.abc import Sequence
+from collections.abc import Sequence, Set
 from dataclasses import dataclass, replace
 from datetime import date, datetime
 from typing import Any
@@ -198,7 +198,9 @@ def format_date(day: date) -> str:
 
 
 def due_curiosities(
-    waiting: Sequence[Curiosity], snapshot: UserSnapshot
+    waiting: Sequence[Curiosity],
+    snapshot: UserSnapshot,
+    due_early_ids: Set[UUID] = frozenset(),
 ) -> list[Curiosity]:
     """Keep the waiting Curiosities whose day has come, code-written ones first.
 
@@ -208,11 +210,14 @@ def due_curiosities(
             Exploration or a starter Thought Experiment wrote is kept; a
             starter is kept only while starters are still offered to them;
             one about a Prediction is kept only while Pattern sharing works.
+        due_early_ids: The Curiosities that may be asked before their
+            "not before" day, since the User is talking about what they
+            ask about.
 
     Returns:
-        Those with no "not before" day or whose day has come, and whose
-        last day, if any, hasn't passed: the ones code wrote first, then
-        the rest, each in order.
+        Those with no "not before" day, whose day has come or that are
+        due early, and whose last day, if any, hasn't passed: the ones
+        code wrote first, then the rest, each in order.
     """
     exploring = snapshot.works(Feature.PATTERN_EXPLORING)
     starters = exploring and starters_offered(
@@ -229,7 +234,11 @@ def due_curiosities(
     due = [
         curiosity
         for curiosity in waiting
-        if (curiosity.not_before is None or curiosity.not_before <= snapshot.today)
+        if (
+            curiosity.not_before is None
+            or curiosity.not_before <= snapshot.today
+            or curiosity.id in due_early_ids
+        )
         and (curiosity.not_after is None or snapshot.today <= curiosity.not_after)
         and may_be_asked.get(curiosity.aim, True)
     ]
@@ -495,7 +504,11 @@ class CuriosityRaiser:
         self._clock = clock
 
     def due(
-        self, snapshot: UserSnapshot, conversation_id: UUID, struggling: bool
+        self,
+        snapshot: UserSnapshot,
+        conversation_id: UUID,
+        struggling: bool,
+        due_early_ids: Set[UUID] = frozenset(),
     ) -> DueCuriosities:
         """List the Curiosities the Reply Plan may bring up now.
 
@@ -503,6 +516,9 @@ class CuriosityRaiser:
             snapshot: The User being answered.
             conversation_id: The Conversation the Message is in.
             struggling: Whether the Understanding found them struggling.
+            due_early_ids: The Curiosities that may be asked before their
+                "not before" day, since the User is talking about what
+                they ask about.
 
         Returns:
             The due Curiosities, oldest first; none when Curiosities doesn't
@@ -535,7 +551,9 @@ class CuriosityRaiser:
             or not self._pace_allows(snapshot, conversation_id)
         ):
             return due_here
-        waiting = due_curiosities(store.list_waiting(snapshot.user.id), snapshot)
+        waiting = due_curiosities(
+            store.list_waiting(snapshot.user.id), snapshot, due_early_ids
+        )
         return replace(
             due_here,
             offered=tuple(

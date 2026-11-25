@@ -1744,6 +1744,11 @@ class ReplyPlanForm:
         pattern_raised: The Pattern the User disagreed with and has now
             raised themselves, which the reply may talk about; None for
             none.
+        pattern_named: The Pattern the Companion told them before (being
+            tested or confirmed) that the reply links today's story to;
+            None for none.
+        asked_for_patterns: Whether their latest message asks what
+            patterns the Companion sees in them.
         curiosity_not_asked_why: Why no Curiosity is asked, when the Need
             asks them by default and one was offered; "" otherwise.
         curiosity_taken: How the User took the Curiosity Zeph asked in its
@@ -1774,6 +1779,8 @@ class ReplyPlanForm:
     pattern_offered: PatternPicked | None = None
     pattern_to_share: PatternPicked | None = None
     pattern_raised: PatternPicked | None = None
+    pattern_named: PatternPicked | None = None
+    asked_for_patterns: bool = False
     curiosity_not_asked_why: str = ""
     curiosity_taken: ThreadReaction | None = None
 
@@ -3132,8 +3139,9 @@ class PatternType:
             when an Observation is situational.
         exclusions: When it must not be shared.
         approved_wording: How Zeph may word it to a User.
-        prediction_wording: How Zeph words its Prediction, with `{name}`
-            placeholders.
+        prediction_wordings: How Zeph words its Predictions, each testing
+            a different side of the Pattern, with `{name}` placeholders;
+            at least one.
         numbers: Its own numbers.
         status: Where it stands in review.
         approved_by: Who approved it; None unless approved.
@@ -3155,7 +3163,7 @@ class PatternType:
     anyone_would: str
     exclusions: tuple[PatternExclusion, ...]
     approved_wording: str
-    prediction_wording: str
+    prediction_wordings: tuple[str, ...]
     numbers: PatternTypeNumbers
     status: PatternTypeStatus
     approved_by: str | None
@@ -3357,6 +3365,8 @@ class CatalogPattern:
             explanation; None if never asked.
         shared_at: When the Companion first told the User about it; None
             if it never did.
+        shared_wording: The approved wording it was told in; None if it
+            was never told, or was told before the wording was kept.
     """
 
     id: UUID
@@ -3370,6 +3380,7 @@ class CatalogPattern:
     other_side_asked_at: datetime | None = None
     other_side_found_better: bool | None = None
     shared_at: datetime | None = None
+    shared_wording: str | None = None
 
 
 class ShareVia(StrEnum):
@@ -3415,6 +3426,11 @@ class Prediction:
         made_at: When it was given.
         outcome: How it went; None until the User says or code closes it.
         outcome_at: When the outcome was read or set; None without one.
+        outcome_conversation_id: The Conversation the User said how it
+            went in; None when code set the outcome or there is none.
+        wording_number: Which of its Pattern Type's Prediction wordings it
+            was given from, counted from 1; None for one given before
+            they were numbered.
     """
 
     id: UUID
@@ -3424,6 +3440,8 @@ class Prediction:
     made_at: datetime
     outcome: PredictionOutcome | None = None
     outcome_at: datetime | None = None
+    outcome_conversation_id: UUID | None = None
+    wording_number: int | None = None
 
     @property
     def is_open(self) -> bool:
@@ -3491,6 +3509,31 @@ class ExclusionFlag:
     flagged_at: datetime
 
 
+@dataclass(frozen=True)
+class DeletedQuote:
+    """A record that a User deleted a quote kept as evidence, so it is never kept again.
+
+    It holds none of their words: only which Conversation the quote was
+    from, a hash of the text it was in and where in that text it sat, so
+    a longer or shorter quote of the same words is known too.
+
+    Attributes:
+        user_id: The User.
+        conversation_id: The Conversation the quote was said in.
+        text_hash: A hash of the User's text the quote was in, evened out.
+        span_start: Where the quote starts in that text, evened out.
+        span_end: Where it ends.
+        deleted_at: When they deleted it.
+    """
+
+    user_id: UUID
+    conversation_id: UUID
+    text_hash: str
+    span_start: int
+    span_end: int
+    deleted_at: datetime
+
+
 class PatternMoveCause(StrEnum):
     """What made code look at a User's Patterns again, so one moved."""
 
@@ -3509,6 +3552,7 @@ class PatternMoveReason(StrEnum):
     PREDICTIONS_CAME_TRUE = "predictions_came_true"
     STRONG_EVIDENCE_AFTER_SHARING = "strong_evidence_after_sharing"
     SCORE_UNDER_FLOOR = "score_under_floor"
+    PREDICTIONS_DID_NOT = "predictions_did_not"
 
 
 @dataclass(frozen=True)

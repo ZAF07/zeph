@@ -3,7 +3,7 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: REL.CHECK.SECURE
-version: 0.1.0
+version: 0.2.0
 area: relationships
 name: Reading silence as something wrong and reaching out to check
 status: approved
@@ -89,9 +89,18 @@ exclusions:
 approved_wording: >-
   When someone close goes quiet, you seem to read it as something wrong
   between you, and you need to check before you can settle.
-prediction_wording: >-
-  Next time {person} takes a while to reply, notice what story you tell
-  yourself about why, and what you do with it.
+# Three Predictions, each testing a different side of the Pattern. Code gives
+# the first when the Pattern is shared, then one the User hasn't had.
+prediction_wordings:
+  - >-
+    Next time {person} takes a while to reply, notice what story you tell
+    yourself about why, and what you do with it.
+  - >-
+    Next time you reach out to check on things with {person}, notice how
+    long the relief lasts after they answer.
+  - >-
+    Next time someone you're less close to goes quiet, like {person}, notice
+    whether you read anything into it.
 
 numbers:
   situations_needed: 3

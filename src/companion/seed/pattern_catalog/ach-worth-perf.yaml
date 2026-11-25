@@ -3,7 +3,7 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: ACH.WORTH.PERF
-version: 0.2.0
+version: 0.3.0
 area: achievement
 name: Performance-contingent self-worth
 status: approved
@@ -88,9 +88,18 @@ exclusions:
 approved_wording: >-
   How well you perform seems to decide how much you allow yourself to feel
   okay.
-prediction_wording: >-
-  After the next piece of feedback on {domain}, notice whether your first
-  thought is about the work or about you.
+# Three Predictions, each testing a different side of the Pattern. Code gives
+# the first when the Pattern is shared, then one the User hasn't had.
+prediction_wordings:
+  - >-
+    After the next piece of feedback on {domain}, notice whether your first
+    thought is about the work or about you.
+  - >-
+    Next time you have {task} coming up that will be judged, notice how you
+    get ready for it: more than it needs, or putting it off.
+  - >-
+    Next time something goes well in {domain}, notice how long the good
+    feeling lasts, and what ends it.
 
 numbers:
   situations_needed: 3

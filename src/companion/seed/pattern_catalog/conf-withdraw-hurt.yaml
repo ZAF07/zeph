@@ -3,7 +3,7 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: CONF.WITHDRAW.HURT
-version: 0.1.0
+version: 0.2.0
 area: conflict
 name: Going quiet and pulling away when hurt
 status: approved
@@ -87,9 +87,18 @@ exclusions:
 approved_wording: >-
   When someone close hurts you, you seem to go quiet and keep your distance
   rather than let them see it landed.
-prediction_wording: >-
-  Next time {person} lets you down, notice whether you tell them, or wait for
-  them to work it out.
+# Three Predictions, each testing a different side of the Pattern. Code gives
+# the first when the Pattern is shared, then one the User hasn't had.
+prediction_wordings:
+  - >-
+    Next time {person} lets you down, notice whether you tell them, or wait
+    for them to work it out.
+  - >-
+    Next time you go quiet on {person}, notice what you're hoping they will
+    do.
+  - >-
+    Next time someone you're not close to lets you down, like {person},
+    notice whether it's easier to say so.
 
 numbers:
   situations_needed: 3

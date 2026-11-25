@@ -352,6 +352,10 @@ PATTERN_SHARE_WAIT = Setting("pattern_share_wait_days", read_days)
 PREDICTION_FOLLOW_UP_WAIT = Setting("prediction_follow_up_wait_days", read_days)
 PREDICTION_FOLLOW_UP_DROP = Setting("prediction_follow_up_drop_days", read_days)
 PREDICTIONS_TO_CONFIRM = Setting("predictions_to_confirm", read_whole_number)
+PREDICTIONS_TO_CLOSE = Setting("predictions_to_close", read_whole_number)
+PREDICTIONS_UNANSWERED_TO_STOP = Setting(
+    "predictions_unanswered_to_stop", read_whole_number
+)
 PATTERN_CONFIRM_POINTS_AFTER_SHARING = Setting(
     "pattern_confirm_points_after_sharing", read_whole_number
 )
@@ -1660,8 +1664,32 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         maximum=10,
         hint=(
             "A shared Pattern is confirmed once this many of its Predictions "
-            "came true, as the User reported. A confirmed Pattern goes into "
-            "their User Portrait."
+            "came true, as the User reported, and more came true than didn’t. "
+            "A confirmed Pattern goes into their User Portrait."
+        ),
+    ),
+    EditableSetting(
+        PREDICTIONS_TO_CLOSE.key,
+        "Predictions that didn’t come true to close a Pattern",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=10,
+        hint=(
+            "A shared Pattern is closed once this many of its Predictions "
+            "didn’t come true, as the User reported, and more didn’t than "
+            "did. The User sees it under “Didn’t hold up”."
+        ),
+    ),
+    EditableSetting(
+        PREDICTIONS_UNANSWERED_TO_STOP.key,
+        "Unanswered Predictions in a row before Zeph stops offering",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=10,
+        hint=(
+            "After this many Predictions in a row got no answer, Zeph offers "
+            "no new one for that Pattern until the User brings the Pattern "
+            "up themselves. Lower means Zeph gives up sooner."
         ),
     ),
     EditableSetting(

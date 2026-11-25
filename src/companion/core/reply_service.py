@@ -169,7 +169,12 @@ class ReplyService:
             snapshot, message.conversation_id, understanding.form.means, reminded
         )
         due = self._curiosity_raiser.due(
-            snapshot, message.conversation_id, understanding.form.struggling
+            snapshot,
+            message.conversation_id,
+            understanding.form.struggling,
+            self._prediction_keeper.follow_ups_due_early(
+                snapshot, [item.thread for item in reminded]
+            ),
         )
         move_outcomes = self._move_outcome_finder.find(
             snapshot, message.conversation_id
@@ -189,6 +194,9 @@ class ReplyService:
                 snapshot, understanding.form.struggling
             ),
             self._pattern_sharing.contested_patterns(snapshot),
+            self._pattern_sharing.told_patterns(
+                snapshot, understanding.form.struggling
+            ),
         )
         plan = planned.reply_plan.form
         attempt.raise_if_dropped()

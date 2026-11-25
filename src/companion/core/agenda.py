@@ -37,6 +37,7 @@ from companion.core.pattern_scoring import (
     score_observations,
     scoring_numbers,
     sign_strengths_of,
+    without_narrowing,
 )
 from companion.core.platform_settings import (
     AGENDA_SIZE,
@@ -1044,7 +1045,7 @@ def pattern_scores(
     numbers = scoring_numbers(settings)
     return {
         pattern_type_id: score_observations(
-            its_observations, sign_strengths, numbers, today
+            without_narrowing(its_observations), sign_strengths, numbers, today
         )
         for pattern_type_id, its_observations in observations_by_pattern_type(
             observations

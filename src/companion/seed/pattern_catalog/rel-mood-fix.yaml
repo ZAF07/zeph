@@ -3,7 +3,7 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: REL.MOOD.FIX
-version: 0.1.0
+version: 0.2.0
 area: relationships
 name: Taking on other people's moods as theirs to fix
 status: approved
@@ -86,9 +86,18 @@ exclusions:
 approved_wording: >-
   When someone close is having a hard time, you seem to feel it's yours to
   fix, as if things aren't safe until they're calm again.
-prediction_wording: >-
-  Next time {person} is in a low mood, notice how quickly you step in, and
-  whether they asked you to.
+# Three Predictions, each testing a different side of the Pattern. Code gives
+# the first when the Pattern is shared, then one the User hasn't had.
+prediction_wordings:
+  - >-
+    Next time {person} is in a low mood, notice how quickly you step in, and
+    whether they asked you to.
+  - >-
+    Next time {person} is upset and you can't do anything about it, notice
+    what that is like for you.
+  - >-
+    Next time the low mood belongs to someone you're not close to, like
+    {person}, notice whether you feel the same pull to fix it.
 
 numbers:
   situations_needed: 3

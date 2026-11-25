@@ -3,7 +3,7 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: CONF.DEFEND.SELF
-version: 0.1.0
+version: 0.2.0
 area: conflict
 name: Pushing back at once when criticised
 status: approved
@@ -81,9 +81,18 @@ exclusions:
 approved_wording: >-
   When someone finds fault with you, you seem to answer it straight away,
   before you've had a chance to weigh whether any of it is fair.
-prediction_wording: >-
-  Next time {person} points out something you did, notice what you say in the
-  first few seconds, and whether it's an answer or a question.
+# Three Predictions, each testing a different side of the Pattern. Code gives
+# the first when the Pattern is shared, then one the User hasn't had.
+prediction_wordings:
+  - >-
+    Next time {person} points out something you did, notice what you say in
+    the first few seconds, and whether it's an answer or a question.
+  - >-
+    Next time {person} points out something you did, notice what you think
+    about it an hour later, once it has cooled.
+  - >-
+    Next time you spot a mistake of your own before anyone else does, notice
+    how you talk to yourself about it.
 
 numbers:
   situations_needed: 3

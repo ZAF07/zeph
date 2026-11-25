@@ -1571,7 +1571,7 @@ export type PatternType = {
   anyone_would: string;
   exclusions: PatternExclusion[];
   approved_wording: string;
-  prediction_wording: string;
+  prediction_wordings: string[];
   numbers: { situations_needed: number; base_rate: number };
   status: PatternTypeStatus;
   approved_by: string | null;

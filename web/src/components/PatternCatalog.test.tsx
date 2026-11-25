@@ -134,6 +134,13 @@ describe("PatternCatalog", () => {
     expect(
       wording.getByText("Next time {person} asks, notice what you say."),
     ).toBeVisible();
+    expect(wording.getByText("Prediction 1")).toBeVisible();
+    expect(wording.getByText("Prediction 2")).toBeVisible();
+    expect(
+      wording.getByText(
+        "Next time you go along with {person}, notice how you feel later.",
+      ),
+    ).toBeVisible();
 
     const status = groupOf(card, "Numbers and status");
     expect(status.getByText("3 needed")).toBeVisible();

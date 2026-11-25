@@ -3,7 +3,7 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: APPR.CONFIRM.CHOICE
-version: 0.1.0
+version: 0.2.0
 area: approval
 name: Asking others to confirm a choice already made
 status: approved
@@ -84,9 +84,18 @@ exclusions:
 approved_wording: >-
   Once you've chosen, you seem to need someone else to say it was right
   before you can settle.
-prediction_wording: >-
-  After your next {decision}, notice whether you ask anyone if it was right,
-  and how long the relief lasts if they say yes.
+# Three Predictions, each testing a different side of the Pattern. Code gives
+# the first when the Pattern is shared, then one the User hasn't had.
+prediction_wordings:
+  - >-
+    After your next {decision}, notice whether you ask anyone if it was
+    right, and how long the relief lasts if they say yes.
+  - >-
+    Next time you decide something small, like {decision}, notice whether
+    you can leave it alone without telling anyone.
+  - >-
+    Next time someone doubts a choice you've made about {decision}, notice
+    what happens to how sure you felt a minute before.
 
 numbers:
   situations_needed: 3

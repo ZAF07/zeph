@@ -11,6 +11,7 @@ from sqlalchemy import Engine, text
 from companion.adapters.clerk.accounts import ClerkAccounts
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.core.models import PatternReaction, Prediction, ReactionToPattern
+from companion.core.observations import deleted_quotes_of, users_own_texts
 from companion.core.user_data import UserDataService
 from tests.conftest import DASHBOARD_URL
 from tests.fakes import (
@@ -61,7 +62,8 @@ def set_up_user_with_every_kind_of_data(
     """Give a User messages, User Memory, a Check-in and a Telegram Connection.
 
     Their User Memory holds a Memory Item, a Day Summary, a Shared
-    Photo, two Life Threads, an Observation, an exclusion flag, a Pattern
+    Photo, two Life Threads, an Observation, a record of a deleted quote,
+    a "never again" mark, an exclusion flag, a Pattern
     with a Prediction and a reaction to it, a Move Outcome and a User
     Portrait, and they have a Personal Sticker, a Curiosity and an
     Exploration with its aimed Curiosity.
@@ -194,7 +196,30 @@ def set_up_user_with_every_kind_of_data(
     send_to_webhook(client, telegram_text_update("doing well, thanks"))
     user_id: str = client.get("/api/me", headers=headers).json()["id"]
     add_prediction_and_reaction(client.engine, user_id, clock)
+    note_a_deleted_quote(client.engine, user_id, clock)
+    mark_a_pattern_type_never_again(client.engine, user_id, clock)
     return headers, user_id
+
+
+def note_a_deleted_quote(engine: Engine, user_id: str, clock: FakeClock) -> None:
+    """Keep a record that a User deleted one of their kept quotes."""
+    repositories = build_postgres_repositories(engine)
+    [kept, *_] = repositories.observations.list_for_user(UUID(user_id))
+    texts = users_own_texts(
+        repositories.conversations.list_messages(kept.conversation_id)
+    )
+    repositories.observations.note_deleted_quotes(
+        deleted_quotes_of([kept], {kept.conversation_id: texts}, clock.now())
+    )
+
+
+def mark_a_pattern_type_never_again(
+    engine: Engine, user_id: str, clock: FakeClock
+) -> None:
+    """Mark a Pattern Type as never to be noted for a User again."""
+    build_postgres_repositories(engine).patterns.mark_never_again(
+        UUID(user_id), "CONF.AVOID.BELONG", clock.now()
+    )
 
 
 def add_prediction_and_reaction(engine: Engine, user_id: str, clock: FakeClock) -> None:

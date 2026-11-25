@@ -3,7 +3,7 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: CTRL.SELF.RELY
-version: 0.1.0
+version: 0.2.0
 area: control
 name: Doing it all themselves rather than leaning on others
 status: approved
@@ -81,9 +81,18 @@ exclusions:
 approved_wording: >-
   You seem to carry things yourself rather than lean on others, as if relying
   on someone is the bigger risk.
-prediction_wording: >-
-  Next time someone offers to help with {task}, notice whether you say yes,
-  and what you expect would happen if you did.
+# Three Predictions, each testing a different side of the Pattern. Code gives
+# the first when the Pattern is shared, then one the User hasn't had.
+prediction_wordings:
+  - >-
+    Next time someone offers to help with {task}, notice whether you say
+    yes, and what you expect would happen if you did.
+  - >-
+    Next time you hand {task} to someone else, notice whether you check on
+    it or redo part of it.
+  - >-
+    Next time you're stretched thin, notice whether asking {person} for help
+    crosses your mind, and what you tell yourself about it.
 
 numbers:
   situations_needed: 3

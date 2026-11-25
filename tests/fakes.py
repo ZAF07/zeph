@@ -561,6 +561,8 @@ def reply_plan_answer(
     curiosity_taken: object = None,
     share_pattern: object = False,
     raised_pattern: object = None,
+    named_pattern: object = None,
+    asked_for_patterns: object = False,
 ) -> str:
     """Build the form the Reply Plan model answers with.
 
@@ -606,6 +608,11 @@ def reply_plan_answer(
             anything else a model might write there.
         raised_pattern: The number of the Pattern they disagreed with and
             raised themselves, or anything else a model might write there.
+        named_pattern: The number of the Pattern Zeph told them that the
+            reply links today's story to, or anything else a model might
+            write there.
+        asked_for_patterns: Whether they ask what patterns Zeph sees in
+            them, or anything else a model might write there.
 
     Returns:
         The form as JSON.
@@ -640,6 +647,8 @@ def reply_plan_answer(
         "curiosity_taken": curiosity_taken,
         "share_pattern": share_pattern,
         "raised_pattern": raised_pattern,
+        "named_pattern": named_pattern,
+        "asked_for_patterns": asked_for_patterns,
     }
     if ask_why is not None:
         answer["ask_why"] = ask_why

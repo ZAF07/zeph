@@ -3,7 +3,7 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: CTRL.OPEN.FREEDOM
-version: 0.1.0
+version: 0.2.0
 area: control
 name: Keeping options open and putting off committing
 status: approved
@@ -75,9 +75,18 @@ exclusions:
 approved_wording: >-
   You seem to keep your options open for as long as you can, as if choosing
   one would take something away from you.
-prediction_wording: >-
-  Next time you're asked to commit to {plan}, notice what you feel just before
-  you answer, and whether "maybe" comes out first.
+# Three Predictions, each testing a different side of the Pattern. Code gives
+# the first when the Pattern is shared, then one the User hasn't had.
+prediction_wordings:
+  - >-
+    Next time you're asked to commit to {plan}, notice what you feel just
+    before you answer, and whether "maybe" comes out first.
+  - >-
+    Next time you do commit to {plan}, notice how you feel in the day after:
+    settled, or looking for a way out.
+  - >-
+    Next time a choice is small and easy to undo, like {choice}, notice
+    whether you decide quickly.
 
 numbers:
   situations_needed: 3

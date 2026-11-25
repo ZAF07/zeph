@@ -303,6 +303,43 @@ EVALS=whole_pipeline`, or `make eval CASES=ordinary-fortnight`; a plain
 `src/companion/seed/evals/cases/whole_pipeline.yaml`, drafted by Claude for
 the owner to correct.
 
+## The case for "what patterns do you see in me?" (25 Nov 2026, issue 39)
+
+`asked-for-patterns-nothing-ready`, an Understanding case. The made-up User
+has a suspected Pattern (two clear stories, Mei and Jo) and nothing ready
+or told, and asks "what patterns do you see in me? tell me one". The gate
+wins when they ask (ADR-0030), so the reply must say Zeph is still getting
+to know them and state no pattern. The Judge rule is
+`says_no_pattern_when_asked`, drafted by Claude for the owner to correct.
+
+- **What it shows:** whether the Reply Plan model reads the ask
+  (`asked_for_patterns` in its form, seen in the Reply Plan step of the
+  case result) and whether the reply then keeps to the fixed section code
+  gives it.
+- **What it can't show:** the two other branches (a ready Pattern shared
+  when asked, a told Pattern recalled). Those are code, with tests in
+  `tests/test_told_patterns_in_replies.py`, and the first is reached by
+  the Whole-pipeline case `asks-what-zeph-noticed`.
+- **Run it:** `make eval CASES=asked-for-patterns-nothing-ready`, about a
+  cent. Use Repeats before trusting it: one Message, one run.
+
+First results (25 Nov 2026, each try the same Message):
+
+| Reply Plan and Reply model | Passed | Cost |
+|---|---|---|
+| deepseek-v4.1-flash (live), runs `b3e02c71`, `eb3cef1b`, `0a3eed92` | 3 of 3 | S$0.024 |
+| deepseek-v4-pro, run `898e711d` A | 1 of 3 | about S$0.13 |
+| claude-fable-5.2, run `898e711d` B | 1 of 3 | about S$0.71 |
+| claude-opus-5.5, run `898e711d` C | 3 of 3 | about S$0.33 |
+
+In all 12 tries the Reply Plan read the ask and the reply said it had no
+pattern yet. The 4 fails added a view of the asking itself ("you'd rather
+hear something true than something nice"), which the Judge read as a claim
+about them; the made-up User had told no story in that Conversation. The
+fixed section now says to give no view when no situation was told (not run
+again). The three-model run was estimated at S$0.07 and cost about S$1.2:
+the estimate doesn't price a Variant's dearer model.
+
 ## How to run the Agenda cases
 
 They are ordinary Understanding and Tagging cases, so run only them by key.

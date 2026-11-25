@@ -583,9 +583,23 @@ patterns = Table(
     Column("other_side_asked_at", DateTime(timezone=True)),
     Column("other_side_found_better", Boolean),
     Column("shared_at", DateTime(timezone=True)),
+    Column("shared_wording", Text),
     UniqueConstraint(
         "user_id", "pattern_type_id", name="uq_patterns_user_id_pattern_type_id"
     ),
+)
+
+patterns_never_again = Table(
+    "patterns_never_again",
+    metadata,
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("pattern_type_id", Text, primary_key=True),
+    Column("marked_at", DateTime(timezone=True), nullable=False),
 )
 
 predictions = Table(
@@ -610,6 +624,12 @@ predictions = Table(
     Column("made_at", DateTime(timezone=True), nullable=False),
     Column("outcome", Text),
     Column("outcome_at", DateTime(timezone=True)),
+    Column(
+        "outcome_conversation_id",
+        Uuid,
+        ForeignKey("conversations.id", ondelete="SET NULL"),
+    ),
+    Column("wording_number", Integer),
 )
 
 pattern_reactions = Table(
@@ -748,6 +768,27 @@ observations = Table(
     Column("excluded", Boolean, nullable=False, server_default="false"),
     Column("ruled_out_topic", Text),
     Column("raised_by_user", Boolean, nullable=False, server_default="false"),
+)
+
+deleted_quotes = Table(
+    "deleted_quotes",
+    metadata,
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "conversation_id",
+        Uuid,
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("text_hash", Text, primary_key=True),
+    Column("span_start", Integer, primary_key=True),
+    Column("span_end", Integer, primary_key=True),
+    Column("deleted_at", DateTime(timezone=True), nullable=False),
 )
 
 pattern_exclusion_flags = Table(

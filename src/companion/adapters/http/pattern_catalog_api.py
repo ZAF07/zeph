@@ -70,7 +70,7 @@ class PatternTypeResponse(BaseModel):
     anyone_would: str
     exclusions: list[PatternExclusionResponse]
     approved_wording: str
-    prediction_wording: str
+    prediction_wordings: list[str]
     numbers: PatternTypeNumbersResponse
     status: PatternTypeStatus
     approved_by: str | None
@@ -142,7 +142,7 @@ def to_pattern_catalog_response(
                     for exclusion in entry.pattern_type.exclusions
                 ],
                 approved_wording=entry.pattern_type.approved_wording,
-                prediction_wording=entry.pattern_type.prediction_wording,
+                prediction_wordings=list(entry.pattern_type.prediction_wordings),
                 numbers=PatternTypeNumbersResponse(
                     situations_needed=entry.pattern_type.numbers.situations_needed,
                     base_rate=entry.pattern_type.numbers.base_rate,

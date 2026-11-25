@@ -3,7 +3,7 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: APPR.HIDE.BURDEN
-version: 0.1.0
+version: 0.2.0
 area: approval
 name: Saying "I'm fine" and hiding what's hard
 status: approved
@@ -82,9 +82,18 @@ exclusions:
 approved_wording: >-
   When things are hard, you seem to keep them to yourself so you don't weigh
   on the people around you.
-prediction_wording: >-
-  Next time someone asks how you are on a hard day, notice what you say, and
-  what you'd have said if you weren't worried about weighing on them.
+# Three Predictions, each testing a different side of the Pattern. Code gives
+# the first when the Pattern is shared, then one the User hasn't had.
+prediction_wordings:
+  - >-
+    Next time someone asks how you are on a hard day, notice what you say,
+    and what you'd have said if you weren't worried about weighing on them.
+  - >-
+    Next time {person} offers to help or to listen, notice what you say
+    first, and whether you change the subject.
+  - >-
+    Next time something small goes wrong, like {thing}, notice whether you
+    tell anyone, and who.
 
 numbers:
   situations_needed: 3
