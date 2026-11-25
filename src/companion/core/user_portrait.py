@@ -57,7 +57,7 @@ def describe_user_memory(
         items: The User's Memory Items.
         threads: The User's Life Threads, open first.
         confirmed_patterns: The Patterns the User agreed with; never
-            unmatched or closed ones, since the User reads the Portrait.
+            unmatched ones, since the User reads the Portrait.
         move_outcomes: The User's Move Outcomes, newest first.
         summaries: Their newest Day Summaries, newest first.
         now: The current time.

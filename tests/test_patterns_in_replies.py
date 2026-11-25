@@ -200,70 +200,6 @@ def test_a_pattern_in_mind_stays_in_mind_for_the_conversation(
     assert f"[1] (unmatched) {GOES_QUIET}" in seen_later
 
 
-def test_a_closed_pattern_never_reaches_the_reply_plan(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    chat_model: ScriptedChatModel,
-    clock: FakeClock,
-    scheduler: FakeScheduler,
-    seeded_settings: dict[str, Any],
-) -> None:
-    have_goes_quiet_pattern(
-        client,
-        auth_verifier,
-        chat_channel,
-        chat_model,
-        clock,
-        scheduler,
-        seeded_settings,
-    )
-    set_pattern_state(client.engine, PatternState.CLOSED)
-    clock.advance(timedelta(days=365))
-
-    seen = reply_plan_sees(client, chat_model, NAMES_MUM)
-
-    assert "Mum's visit" in seen
-    assert GOES_QUIET not in seen
-
-
-def test_a_pushed_back_pattern_waits_the_admin_set_days_before_it_comes_back(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    chat_model: ScriptedChatModel,
-    clock: FakeClock,
-    scheduler: FakeScheduler,
-    seeded_settings: dict[str, Any],
-) -> None:
-    have_goes_quiet_pattern(
-        client,
-        auth_verifier,
-        chat_channel,
-        chat_model,
-        clock,
-        scheduler,
-        seeded_settings,
-    )
-    set_settings(client, auth_verifier, {"pattern_pushed_back_wait_days": 10})
-    with client.engine.begin() as connection:
-        connection.execute(
-            text(
-                "UPDATE patterns SET last_reaction = 'pushed_back', "
-                "last_offered_at = :now"
-            ),
-            {"now": clock.now()},
-        )
-
-    clock.advance(timedelta(days=9))
-    seen_while_waiting = reply_plan_sees(client, chat_model, NAMES_MUM)
-    clock.advance(timedelta(days=2))
-    seen_after = reply_plan_sees(client, chat_model, NAMES_MUM)
-
-    assert GOES_QUIET not in seen_while_waiting
-    assert GOES_QUIET in seen_after
-
-
 def test_an_offered_pattern_reaches_the_reply_as_zephs_view(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
@@ -420,27 +356,6 @@ def test_the_model_call_log_shows_whether_a_pattern_was_used_or_offered(
     assert (none["pattern_used"], none["pattern_offered"]) == (False, False)
     assert (used["pattern_used"], used["pattern_offered"]) == (True, False)
     assert (offered["pattern_used"], offered["pattern_offered"]) == (True, True)
-
-
-def test_the_push_back_wait_is_admin_editable_with_a_hint(
-    client: TestClient, auth_verifier: FakeAuthVerifier
-) -> None:
-    headers = owner_headers(client, auth_verifier)
-
-    response = client.patch(
-        "/api/admin/settings",
-        json={"values": {"pattern_pushed_back_wait_days": 45}},
-        headers=headers,
-    )
-
-    assert response.status_code == 200
-    setting = response.json()["settings"]["pattern_pushed_back_wait_days"]
-    assert setting["value"] == 45
-    assert (
-        setting["hint"]
-        == EDITABLE_SETTINGS_BY_KEY["pattern_pushed_back_wait_days"].hint
-    )
-    assert "pushed back" in setting["hint"]
 
 
 def test_the_pattern_bar_is_admin_editable_with_a_hint_and_seeded_at_52(

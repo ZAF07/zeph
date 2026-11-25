@@ -30,9 +30,7 @@ from tests.test_patterns import (
     GOES_QUIET,
     MUM,
     PROJECT,
-    end_with_pattern_answer,
     patterns_of,
-    start_goes_quiet_pattern,
 )
 from tests.test_user_portrait import REWRITTEN, end_conversation_with_portrait
 
@@ -414,32 +412,3 @@ def test_the_migration_keeps_a_portrait_prompt_and_hero_line_an_admin_edited(
         migrate(database_url)
 
     assert stored_texts(engine) == ("Admin's own Portrait prompt.", "Admin's own line.")
-
-
-def test_the_migration_dates_confirmed_patterns_to_when_they_were_last_offered(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    chat_model: ScriptedChatModel,
-    clock: FakeClock,
-    scheduler: FakeScheduler,
-    seeded_settings: dict[str, Any],
-    database_url: str,
-) -> None:
-    connect_telegram(client, auth_verifier, chat_channel)
-    user_id = maya_id(client, auth_verifier)
-    start_goes_quiet_pattern(client, chat_model, clock, scheduler, seeded_settings)
-    end_with_pattern_answer(
-        client,
-        chat_model,
-        clock,
-        scheduler,
-        seeded_settings,
-        {"pattern": 1, "reaction": "agreed", "state": "confirmed"},
-    )
-
-    downgrade_to(database_url, "0068")
-    migrate(database_url)
-
-    [pattern] = patterns_of(client.engine, user_id)
-    assert pattern.confirmed_at == pattern.last_offered_at

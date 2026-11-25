@@ -90,10 +90,6 @@ const settings: AdminSettings = {
     52,
     "How close in meaning a Pattern must be for Recall to bring it to mind with no Thread.",
   ),
-  pattern_pushed_back_wait_days: seeded(
-    30,
-    "Days before a Pattern the User pushed back on comes to mind for the Reply Plan again.",
-  ),
   pattern_weak_sign_points: seeded(30),
   pattern_moderate_sign_points: seeded(70),
   pattern_strong_sign_points: seeded(140),
@@ -361,31 +357,6 @@ describe("PlatformSettingsForm", () => {
       life_threads_texts_to_search: 12,
       life_threads_closeness_percent: 70,
       life_thread_brushed_off_wait_days: 21,
-    });
-  });
-
-  it("shows and saves the wait after a pushed-back Pattern, with its hint", async () => {
-    const user = userEvent.setup();
-    renderWithQueries(<PlatformSettingsForm />);
-    const wait = await screen.findByLabelText(
-      "Wait after a pushed-back Pattern",
-    );
-    expect(wait).toHaveValue(30);
-    expect(
-      screen.getByText(
-        "Days before a Pattern the User pushed back on comes to mind for the Reply Plan again.",
-      ),
-    ).toBeVisible();
-    expect(screen.getByRole("region", { name: "Memory" })).toContainElement(
-      wait,
-    );
-
-    await user.clear(wait);
-    await user.type(wait, "45");
-    await user.click(screen.getByRole("button", { name: "Save settings" }));
-
-    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
-      pattern_pushed_back_wait_days: 45,
     });
   });
 

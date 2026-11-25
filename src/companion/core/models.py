@@ -361,8 +361,7 @@ class PatternState(StrEnum):
     Code moves a Pattern of a Pattern Type between the first seven
     (ADR-0024). Unmatched is apart from them: the state of a Pattern the
     keeping step wrote that fits no Pattern Type, which code never moves.
-    A Pattern kept before the Pattern Catalog, with no Pattern Type, is
-    unmatched, confirmed or closed.
+    A Pattern with no Pattern Type is always unmatched.
     """
 
     NOTICED = "noticed"
@@ -1198,14 +1197,6 @@ class LifeThreadToSave:
     embedding: list[float] | None
 
 
-class PatternReaction(StrEnum):
-    """How the User took a view the Companion offered from a Pattern."""
-
-    AGREED = "agreed"
-    PUSHED_BACK = "pushed_back"
-    BRUSHED_OFF = "brushed_off"
-
-
 @dataclass(frozen=True)
 class PatternEvidence:
     """One time a Pattern showed up in a User's life.
@@ -1236,13 +1227,11 @@ class Pattern:
         id: Our ID for the Pattern.
         user_id: The User it is about.
         pattern: The pattern in a sentence or two.
-        state: Unmatched, confirmed or closed.
+        state: Unmatched. Confirmed is read where a Pattern is offered or
+            shown, but none is confirmed until sharing is built.
         evidence: Each time it showed up, oldest first.
         started_at: When it was first kept.
         updated_at: When it last changed.
-        last_offered_at: When the Companion last offered a view from it;
-            None if never.
-        last_reaction: How the User took that view; None if never offered.
         confirmed_at: When the User agreed with it, so it became confirmed;
             None while it is not confirmed.
         matched_pattern_type_id: The Pattern Type the matching pass found
@@ -1262,8 +1251,6 @@ class Pattern:
     evidence: tuple[PatternEvidence, ...]
     started_at: datetime
     updated_at: datetime
-    last_offered_at: datetime | None = None
-    last_reaction: PatternReaction | None = None
     confirmed_at: datetime | None = None
     matched_pattern_type_id: str | None = None
     general_description: str | None = None

@@ -134,14 +134,13 @@ class DayToTagAgain:
 
 
 def describe_pattern_to_match(
-    pattern: Pattern, pattern_types: Sequence[PatternType], time_zone: str | None
+    pattern: Pattern, pattern_types: Sequence[PatternType]
 ) -> str:
     """Write what the matching model is given.
 
     Args:
         pattern: The Pattern to match.
         pattern_types: The Pattern Types it may fit.
-        time_zone: The User's IANA time zone, for the days.
 
     Returns:
         The Pattern Types, then the Pattern with its evidence.
@@ -149,10 +148,7 @@ def describe_pattern_to_match(
     catalog = "\n\n".join(
         describe_pattern_type(pattern_type) for pattern_type in pattern_types
     )
-    return (
-        f"The Pattern Types:\n{catalog}\n\n"
-        f"The Pattern:\n{describe_pattern(pattern, time_zone)}"
-    )
+    return f"The Pattern Types:\n{catalog}\n\nThe Pattern:\n{describe_pattern(pattern)}"
 
 
 def read_matching_answer(answer: str) -> dict[str, Any] | None:
@@ -201,8 +197,7 @@ def plan_days_to_tag_again(
     """Work out which days' Conversations to tag again, and against what.
 
     Every day a matched Pattern has evidence on is tagged against the
-    Pattern Type it fits. A closed Pattern's evidence is left alone: the
-    User rejected it.
+    Pattern Type it fits.
 
     Args:
         matched: Each matched Pattern with the ID of the Pattern Type it
@@ -215,8 +210,6 @@ def plan_days_to_tag_again(
     pattern_type_ids: dict[date, set[str]] = {}
     thread_ids: dict[date, set[UUID]] = {}
     for pattern, pattern_type_id in matched:
-        if pattern.state == PatternState.CLOSED:
-            continue
         for item in pattern.evidence:
             pattern_type_ids.setdefault(item.day, set()).add(pattern_type_id)
             thread_ids.setdefault(item.day, set()).add(item.thread_id)
@@ -233,10 +226,9 @@ def plan_days_to_tag_again(
 class PatternMatcher:
     """Matches Patterns with no Pattern Type to the Pattern Catalog, on demand.
 
-    Run by an Admin command, never by a reply or a Conversation end: once to
-    move the Patterns kept before the catalog across, and again whenever a
-    Pattern Type is added. A match is only a link: the Pattern keeps its
-    words, state and evidence. The Conversations behind a matched Pattern's
+    Run by an Admin command whenever a Pattern Type is added, never by a
+    reply or a Conversation end. A match is only a link: the Pattern keeps
+    its words, state and evidence. The Conversations behind a matched Pattern's
     evidence are then tagged again, so the evidence becomes Observations
     that code checks and scores like any other (ADR-0024).
     """
@@ -475,9 +467,7 @@ class PatternMatcher:
             were unreadable.
         """
         settings = snapshot.settings
-        description = describe_pattern_to_match(
-            pattern, list(pattern_types.values()), snapshot.user.time_zone
-        )
+        description = describe_pattern_to_match(pattern, list(pattern_types.values()))
         for _ in range(2):
             answer = self._chat_model.generate(
                 snapshot=snapshot,
