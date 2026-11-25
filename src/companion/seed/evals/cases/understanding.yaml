@@ -230,9 +230,10 @@ rules:
     Zeph's last reply doesn't quote or teach any idea, teaching, philosophy,
     story or technique.
   checks_guess_gently: >-
-    Zeph's last reply checks, lightly and as a question, whether their mum
-    lives in Singapore (e.g. "she's back in Singapore, right?"). It never
-    states it as fact, and asks no more than one question.
+    Zeph's last reply asks one light question whose answer would show where
+    their mum lives (e.g. "where's home for her these days?" or "she's back
+    in Singapore, right?"). It never states as fact that she lives in
+    Singapore, and asks no more than one question.
   one_light_question: >-
     Zeph's last reply asks one short, light question about what they said
     (e.g. what's on today, or how come so little sleep), the way a curious
@@ -656,13 +657,16 @@ cases:
           lead_move: [Push, Plan steps]
           rules: [pushes_for_one_step]
 
+  # The Curiosity is expected raised, not Get curious to lead: code drops a
+  # Move that asks a question when the reply raises a Curiosity, so a reply
+  # asks one question.
   - id: guess-checked-gently
     memory:
       portrait: >-
         Maya is 34, a nurse in Melbourne who grew up in Penang. She is
         studying part time for a ward manager role.
       curiosities:
-        - question: Is your mum back home after her visit?
+        - question: Where is home for your mum these days?
           why: >-
             Her mum stayed with her for a week, then flew home, landing at
             Changi, Singapore's airport.
@@ -670,9 +674,11 @@ cases:
           guess: their mum lives in Singapore
           how_sure: medium
     messages:
-      - text: had a long call with my mum last night, she sounded so happy
+      - text: >-
+          had a long call with my mum last night, she's settled back in at
+          home after the visit
         expect:
-          lead_move: [Get curious]
+          curiosity_raised: true
           rules: [checks_guess_gently]
 
   # The check-in and "long day" are earlier lines: Get curious asks a
