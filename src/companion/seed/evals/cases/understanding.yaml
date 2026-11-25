@@ -193,10 +193,10 @@ rules:
     doesn't ask why they said yes or what they were hoping for then, and
     doesn't ask whether it would have gone differently with someone else.
     Talking about Mei herself, or about today, is fine.
-  stays_with_dad_news: >-
-    Zeph's last reply stays with what is happening now: their dad in
-    hospital and how scared they are. It asks about nothing else, and brings
-    up no older story such as Mei's move.
+  stays_with_losing_the_flat: >-
+    Zeph's last reply stays with what is happening now: having to leave
+    their flat in two weeks and how upset they are. It asks about nothing
+    else, and brings up no older story such as Mei's move.
   asks_about_presentation: >-
     Zeph's last reply asks how the presentation to the board went, naturally
     and warmly.
@@ -961,14 +961,14 @@ cases:
     memory: *dana-unclear-mei
     messages:
       - text: >-
-          I just got off the phone with mum. dad's in hospital, they think
-          it's his heart. I can't stop shaking
+          our landlord just told us we have to be out in two weeks. I've been
+          crying for an hour, I don't know where we'll go
         expect:
           struggling: true
           agenda_shown: false
           aimed_raised: false
           curiosity_raised: false
-          rules: [stays_with_dad_news]
+          rules: [stays_with_losing_the_flat]
 
   # Must not ask: they brushed the last try off two days ago, so the next
   # one waits. The Agenda is still shown, with that try on it.
