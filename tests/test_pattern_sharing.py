@@ -37,6 +37,7 @@ from tests.telegram_helpers import (
 )
 from tests.test_admin_check_ins import list_kinds
 from tests.test_check_in_sending import send_answer, set_up_user_with_check_ins
+from tests.test_conversation import set_platform_setting
 from tests.test_curiosity_check_in import check_in_model_saw
 from tests.test_explorations import talk, turn_exploring_on
 from tests.test_features import switch_for_user, user_features_by_key
@@ -996,7 +997,7 @@ def test_the_migration_keeps_user_data_and_reloads_the_three_prompts(
             {"keys": list(reloaded)},
         )
 
-    downgrade_to(database_url, "0098")
+    downgrade_to(database_url, "0099")
     try:
         with client.engine.connect() as connection:
             states = connection.execute(text("SELECT state FROM patterns")).scalars()
@@ -1039,3 +1040,30 @@ def test_users_see_the_kind_that_shares_a_pattern_only_while_sharing_works_for_t
     turn_sharing_on(client, auth_verifier)
 
     assert kind_names()[-1] == NOTICED_KIND
+
+
+def test_the_shared_check_thinks_when_its_model_always_thinks(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    ready_to_share(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+    )
+    set_platform_setting(client.engine, "check_in_model", "anthropic/claude-sonnet-5.5")
+
+    share(client, chat_model, clock)
+
+    [check] = chat_model.shared_check_calls
+    assert check.model == "anthropic/claude-sonnet-5.5"
+    assert check.thinking is True

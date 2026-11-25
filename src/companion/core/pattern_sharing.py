@@ -42,6 +42,7 @@ from companion.core.platform_settings import (
     CHECK_IN_MODEL,
     PATTERN_SHARE_WAIT,
     PATTERNS_SHARED_PER_WEEK,
+    thinking_for_model,
 )
 from companion.core.ports import Clock, Repositories
 from companion.core.ready_gate import ReadyKeeper
@@ -534,7 +535,8 @@ class PatternSharing:
     ) -> bool:
         """Check whether a sent message shared the Pattern, and record it if so.
 
-        One small model call, on the Check-in model without thinking, reads
+        One small model call, on the Check-in model, without thinking where
+        the model can do without, reads
         the message. Only when it says the Pattern was told does the Pattern
         move to shared, with the move logged and its Prediction kept. It
         never raises: a failed or unreadable check counts as not shared, so
@@ -551,12 +553,13 @@ class PatternSharing:
         Returns:
             True if the Pattern is now shared.
         """
+        model = snapshot.settings.get(CHECK_IN_MODEL)
         try:
             answer = self._chat_model.generate(
                 snapshot=snapshot,
                 step=ModelStep.PATTERN_SHARED_CHECK,
-                model=snapshot.settings.get(CHECK_IN_MODEL),
-                thinking=False,
+                model=model,
+                thinking=thinking_for_model(snapshot.settings, model, wanted=False),
                 instructions=SHARED_CHECK_PROMPT,
                 history=[
                     ChatLine(
