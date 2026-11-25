@@ -24,7 +24,12 @@ from sqlalchemy import (
     tuple_,
     update,
 )
-from sqlalchemy.dialects.postgresql import aggregate_order_by, distinct_on, insert
+from sqlalchemy.dialects.postgresql import (
+    JSONB,
+    aggregate_order_by,
+    distinct_on,
+    insert,
+)
 from sqlalchemy.exc import IntegrityError
 
 from companion.adapters.postgres.tables import (
@@ -53,6 +58,7 @@ from companion.adapters.postgres.tables import (
     needs,
     observations,
     pattern_evidence,
+    pattern_exclusion_flags,
     pattern_moves,
     pattern_types,
     patterns,
@@ -111,6 +117,8 @@ from companion.core.models import (
     DaySummary,
     Directness,
     EvidenceKind,
+    ExcludedEvidence,
+    ExclusionFlag,
     Exploration,
     ExplorationNeed,
     ExplorationState,
@@ -156,6 +164,7 @@ from companion.core.models import (
     MoveOutcomeToSave,
     MoveResult,
     MoveRole,
+    NarrowingTag,
     Need,
     NeedDetails,
     NextDueTimeChange,
@@ -166,6 +175,7 @@ from companion.core.models import (
     PatternEvidence,
     PatternMove,
     PatternMoveCause,
+    PatternNarrowing,
     PatternPicked,
     PatternState,
     PatternToSave,
@@ -173,6 +183,7 @@ from companion.core.models import (
     PersonalSticker,
     PlatformSettings,
     Power,
+    ReadyCheck,
     Relationship,
     RepliedToSender,
     RepliedToText,
@@ -2177,6 +2188,27 @@ class PostgresSafeguardEventRepository:
                 )
             )
 
+    def happened_since(self, user_id: UUID, since: datetime) -> bool:
+        """Say whether a User had a Safeguard Event after a time.
+
+        Args:
+            user_id: The User's ID.
+            since: The time; events at it or before are left out.
+
+        Returns:
+            True when there is one.
+        """
+        with self._database.connect() as connection:
+            found = connection.execute(
+                select(safeguard_events.c.id)
+                .where(
+                    safeguard_events.c.user_id == user_id,
+                    safeguard_events.c.created_at > since,
+                )
+                .limit(1)
+            ).first()
+        return found is not None
+
     def list_overviews(
         self, since: datetime | None, risk_type: RiskType | None
     ) -> list[SafeguardEventOverview]:
@@ -3334,6 +3366,9 @@ def to_observation(row: Row[Any]) -> Observation:
         second_pattern_type_version=row.second_pattern_type_version,
         situational=row.situational,
         tagged_at=row.tagged_at,
+        excluded=row.excluded,
+        ruled_out_topic=row.ruled_out_topic,
+        raised_by_user=row.raised_by_user,
     )
 
 
@@ -3384,6 +3419,9 @@ class PostgresObservationRepository:
                         ),
                         "situational": observation.situational,
                         "tagged_at": observation.tagged_at,
+                        "excluded": observation.excluded,
+                        "ruled_out_topic": observation.ruled_out_topic,
+                        "raised_by_user": observation.raised_by_user,
                     }
                     for observation in new_observations
                 ],
@@ -3461,7 +3499,7 @@ class PostgresObservationRepository:
         return deleted_id is not None
 
     def delete_for_user(self, user_id: UUID) -> None:
-        """Delete all of a User's Observations.
+        """Delete all of a User's Observations and exclusion flags.
 
         Args:
             user_id: The User's ID.
@@ -3470,6 +3508,70 @@ class PostgresObservationRepository:
             connection.execute(
                 delete(observations).where(observations.c.user_id == user_id)
             )
+            connection.execute(
+                delete(pattern_exclusion_flags).where(
+                    pattern_exclusion_flags.c.user_id == user_id
+                )
+            )
+
+    def replace_exclusion_flags(
+        self, user_id: UUID, flags: Sequence[ExclusionFlag]
+    ) -> None:
+        """Save the exclusions that apply to a User now, in place of the old ones.
+
+        Args:
+            user_id: The User's ID.
+            flags: The exclusions that apply now; none clears them.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(pattern_exclusion_flags).where(
+                    pattern_exclusion_flags.c.user_id == user_id
+                )
+            )
+            if flags:
+                connection.execute(
+                    insert(pattern_exclusion_flags),
+                    [
+                        {
+                            "user_id": user_id,
+                            "pattern_type_id": flag.pattern_type_id,
+                            "exclusion": flag.exclusion,
+                            "evidence": flag.evidence.value,
+                            "flagged_at": flag.flagged_at,
+                        }
+                        for flag in flags
+                    ],
+                )
+
+    def list_exclusion_flags(self, user_id: UUID) -> list[ExclusionFlag]:
+        """List the exclusions that apply to a User now.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The flags from the last time their Observations were tagged.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(pattern_exclusion_flags)
+                .where(pattern_exclusion_flags.c.user_id == user_id)
+                .order_by(
+                    pattern_exclusion_flags.c.pattern_type_id,
+                    pattern_exclusion_flags.c.exclusion,
+                )
+            ).all()
+        return [
+            ExclusionFlag(
+                user_id=row.user_id,
+                pattern_type_id=row.pattern_type_id,
+                exclusion=row.exclusion,
+                evidence=ExcludedEvidence(row.evidence),
+                flagged_at=row.flagged_at,
+            )
+            for row in rows
+        ]
 
 
 def _value_or_none(tag: StrEnum | None) -> str | None:
@@ -3852,6 +3954,17 @@ class PostgresPatternRepository:
                 state=PatternState(row.state),
                 started_at=row.started_at,
                 updated_at=row.updated_at,
+                blocked_by=ReadyCheck(row.blocked_by) if row.blocked_by else None,
+                narrowings=tuple(
+                    PatternNarrowing(
+                        tag=NarrowingTag(narrowing["tag"]),
+                        holds_with=tuple(narrowing["holds_with"]),
+                        not_with=tuple(narrowing["not_with"]),
+                    )
+                    for narrowing in row.narrowings
+                ),
+                other_side_asked_at=row.other_side_asked_at,
+                other_side_found_better=row.other_side_found_better,
             )
             for row in rows
         ]
@@ -3863,11 +3976,13 @@ class PostgresPatternRepository:
         deleted_ids: Sequence[UUID],
         moves: Sequence[PatternMove],
     ) -> None:
-        """Save what scoring a User's Patterns of Pattern Types changed, in one step.
+        """Save what scoring or the ready gate changed in a User's Patterns, at once.
 
         Args:
             added: Patterns noticed for the first time.
-            changed: Patterns that moved, in their new state.
+            changed: Patterns that moved or that the ready gate judged, with
+                their state, blocking check, narrowings and when the other
+                side was last argued.
             deleted_ids: Patterns with no Observations left; their moves stay.
             moves: The moves, added to the log in order.
         """
@@ -3902,12 +4017,31 @@ class PostgresPatternRepository:
                     .values(
                         state=bindparam("new_state"),
                         updated_at=bindparam("new_updated_at"),
+                        blocked_by=bindparam("new_blocked_by"),
+                        narrowings=bindparam("new_narrowings", type_=JSONB),
+                        other_side_asked_at=bindparam("new_other_side_asked_at"),
+                        other_side_found_better=bindparam(
+                            "new_other_side_found_better"
+                        ),
                     ),
                     [
                         {
                             "pattern_id": pattern.id,
                             "new_state": pattern.state.value,
                             "new_updated_at": pattern.updated_at,
+                            "new_blocked_by": _value_or_none(pattern.blocked_by),
+                            "new_narrowings": [
+                                {
+                                    "tag": narrowing.tag.value,
+                                    "holds_with": list(narrowing.holds_with),
+                                    "not_with": list(narrowing.not_with),
+                                }
+                                for narrowing in pattern.narrowings
+                            ],
+                            "new_other_side_asked_at": pattern.other_side_asked_at,
+                            "new_other_side_found_better": (
+                                pattern.other_side_found_better
+                            ),
                         }
                         for pattern in changed
                     ],
@@ -3928,6 +4062,7 @@ class PostgresPatternRepository:
                             "points": move.points,
                             "situations": move.situations,
                             "moved_at": move.moved_at,
+                            "blocked_by": _value_or_none(move.blocked_by),
                         }
                         for move in moves
                     ],
@@ -3961,6 +4096,7 @@ class PostgresPatternRepository:
                 points=row.points,
                 situations=row.situations,
                 moved_at=row.moved_at,
+                blocked_by=ReadyCheck(row.blocked_by) if row.blocked_by else None,
             )
             for row in rows
         ]

@@ -208,6 +208,7 @@ describe("taggingShapeFacts", () => {
   it("names the tagging step and counts what was tagged and dropped", () => {
     expect(modelStepLabel("pattern_tagging")).toBe("Pattern tagging");
     expect(modelStepLabel("pattern_matching")).toBe("Pattern matching");
+    expect(modelStepLabel("pattern_other_side")).toBe("Other side");
     expect(taggingShapeFacts({ tagged: 3, dropped: 1 })).toEqual([
       { label: "Observations tagged", value: "3" },
       { label: "Dropped by code", value: "1" },

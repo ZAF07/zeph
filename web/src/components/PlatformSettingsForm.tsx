@@ -63,6 +63,15 @@ const trailingWordsField: TextField = {
   label: "Trailing words",
 };
 
+/** The ruled-out topics, edited as one comma-separated text. */
+const ruledOutTopicsField: TextField = {
+  key: "pattern_ruled_out_topics",
+  label: "Ruled-out topics",
+};
+
+/** The settings kept as a list of words and edited as comma-separated text. */
+const wordListKeys = [trailingWordsField.key, ruledOutTopicsField.key];
+
 /** The number and on/off settings on this page, grouped by section, with any editors below them. */
 const fieldSections: {
   heading: string;
@@ -177,6 +186,7 @@ const fieldSections: {
   },
   {
     heading: "Patterns",
+    editors: [ruledOutTopicsField],
     fields: [
       {
         key: "pattern_weak_sign_points",
@@ -242,6 +252,36 @@ const fieldSections: {
         key: "pattern_closed_under_points",
         label: "Score that closes a Pattern",
         unit: "points",
+      },
+      {
+        key: "pattern_ready_situations",
+        label: "Situations to be ready",
+        unit: "situations",
+      },
+      {
+        key: "pattern_ready_conversations",
+        label: "Conversations to be ready",
+        unit: "chats",
+      },
+      {
+        key: "pattern_ready_points",
+        label: "Score to be ready",
+        unit: "points",
+      },
+      {
+        key: "pattern_ready_against_under_points",
+        label: "Evidence against must stay under",
+        unit: "points",
+      },
+      {
+        key: "pattern_safeguard_quiet_days",
+        label: "Days no Pattern is ready after a Safeguard Event",
+        unit: "days",
+      },
+      {
+        key: "pattern_exclusion_summary_days",
+        label: "Day Summaries read for exclusions",
+        unit: "days",
       },
       {
         key: "agenda_size",
@@ -480,7 +520,7 @@ const allKeys = [
   ...numberKeys,
   ...switchKeys,
   ...textFields.map((field) => field.key),
-  trailingWordsField.key,
+  ...wordListKeys,
 ];
 
 const wholeNumber = /^-?\d+$/;
@@ -544,7 +584,7 @@ function savedDrafts(settings: AdminSettings): Record<string, string> {
  * @returns A number, on or off, or the text itself.
  */
 function settingValue(key: string, value: string): SettingValue {
-  if (key === trailingWordsField.key) {
+  if (wordListKeys.includes(key)) {
     return wordList(value);
   }
   if (switchKeys.includes(key)) {
@@ -598,7 +638,7 @@ export function PlatformSettingsForm() {
   const isValid =
     numberKeys.every((key) => wholeNumber.test(values[key] ?? "")) &&
     textFields.every((field) => (values[field.key] ?? "").trim() !== "") &&
-    wordList(values[trailingWordsField.key] ?? "").length > 0;
+    wordListKeys.every((key) => wordList(values[key] ?? "").length > 0);
   const isDirty = changedKeys.length > 0;
 
   function hintFor(key: string, loadedSettings: AdminSettings): string {

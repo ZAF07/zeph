@@ -335,6 +335,20 @@ PATTERN_SUSPECTED_SITUATIONS = Setting(
 )
 PATTERN_SUSPECTED_POINTS = Setting("pattern_suspected_points", read_whole_number)
 PATTERN_CLOSED_UNDER_POINTS = Setting("pattern_closed_under_points", read_whole_number)
+PATTERN_READY_SITUATIONS = Setting("pattern_ready_situations", read_whole_number)
+PATTERN_READY_CONVERSATIONS = Setting("pattern_ready_conversations", read_whole_number)
+PATTERN_READY_POINTS = Setting("pattern_ready_points", read_whole_number)
+PATTERN_READY_AGAINST_UNDER_POINTS = Setting(
+    "pattern_ready_against_under_points", read_whole_number
+)
+PATTERN_SAFEGUARD_QUIET = Setting("pattern_safeguard_quiet_days", read_days)
+PATTERN_EXCLUSION_SUMMARY_DAYS = Setting(
+    "pattern_exclusion_summary_days", read_whole_number
+)
+PATTERN_RULED_OUT_TOPICS = Setting("pattern_ruled_out_topics", read_text_list)
+PATTERN_OTHER_SIDE_MODEL = Setting("pattern_other_side_model", read_text)
+PATTERN_OTHER_SIDE_THINKING = Setting("pattern_other_side_thinking", read_on_off)
+PATTERN_OTHER_SIDE_PROMPT = Setting("pattern_other_side_prompt", read_text)
 AGENDA_SIZE = Setting("agenda_size", read_whole_number)
 EXPLORATION_WAIT = Setting("exploration_wait_days", read_days)
 EXPLORATION_REST_AFTER_TRIES = Setting(
@@ -1042,6 +1056,28 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         hint=THINKING_HINT,
     ),
     EditableSetting(
+        PATTERN_OTHER_SIDE_PROMPT.key,
+        "Other-side prompt",
+        SettingKind.TEXT,
+        hint=(
+            "How to argue against a Pattern that passed every other ready check: "
+            "is there a better explanation of the same evidence? It can only stop "
+            "a Pattern being ready, never make one ready."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_OTHER_SIDE_MODEL.key,
+        "Other-side model",
+        SettingKind.MODEL,
+        hint=MODEL_HINT,
+    ),
+    EditableSetting(
+        PATTERN_OTHER_SIDE_THINKING.key,
+        "Other-side thinking",
+        SettingKind.ON_OFF,
+        hint=THINKING_HINT,
+    ),
+    EditableSetting(
         PATTERN_MATCHING_PROMPT.key,
         "Pattern matching prompt",
         SettingKind.TEXT,
@@ -1477,6 +1513,87 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
             "A noticed or suspected Pattern whose score falls under this, in "
             "points, is closed. One whose score comes back over it is noticed "
             "again."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_READY_SITUATIONS.key,
+        "Situations to be ready",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=50,
+        hint=(
+            "How many situations a suspected Pattern must show in before it may "
+            "be shared. A Pattern Type that asks for more in the Pattern Catalog "
+            "needs that many."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_READY_CONVERSATIONS.key,
+        "Conversations to be ready",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=50,
+        hint=(
+            "How many different Conversations a Pattern’s evidence must come "
+            "from before it may be shared, so one long talk is never enough."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_READY_POINTS.key,
+        "Score to be ready",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=10000,
+        hint=(
+            "The lowest score, in points, at which a suspected Pattern may be "
+            "shared; its clear Observations alone must reach it too. Higher "
+            "means fewer, surer Patterns."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_READY_AGAINST_UNDER_POINTS.key,
+        "Evidence against must stay under",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=10000,
+        hint=(
+            "A Pattern with this many points of evidence against it, or more, is "
+            "not ready. Evidence against that only narrows it (“with seniors, "
+            "not with friends”) isn’t counted."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_SAFEGUARD_QUIET.key,
+        "Days no Pattern is ready after a Safeguard Event",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=365,
+        hint=(
+            "For this many days after a Safeguard Event no Pattern of that User "
+            "becomes ready, and a ready one goes back to suspected. 0 turns "
+            "this off."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_EXCLUSION_SUMMARY_DAYS.key,
+        "Day Summaries read for exclusions",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=60,
+        hint=(
+            "How many of a User’s latest Day Summaries the tagging step reads, "
+            "with their open Life Threads, to tell whether a Pattern Type’s "
+            "exclusion (grief, a crisis) applies now."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_RULED_OUT_TOPICS.key,
+        "Ruled-out topics",
+        SettingKind.TEXT_LIST,
+        hint=(
+            "Topics, separated by commas, that no Pattern is shared from unless "
+            "the User raised them: a Pattern resting on one Zeph asked about is "
+            "never ready. Adding a topic counts for Conversations that end after."
         ),
     ),
     EditableSetting(
@@ -2129,6 +2246,22 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         prompt_key=PATTERN_TAGGING_PROMPT.key,
         model_key=PATTERN_TAGGING_MODEL.key,
         thinking_key=PATTERN_TAGGING_THINKING.key,
+    ),
+    CoreService(
+        name="Other side",
+        runs_when=(
+            "Conversation end · after scoring, only for a Pattern that passed "
+            "every other ready check"
+        ),
+        description=(
+            "Argues against a Pattern about to become ready: is there a better "
+            "explanation of the same evidence, such as a look-alike or what "
+            "anyone would do? A yes, an unreadable answer or a failed call "
+            "stops it being ready. It can never make a Pattern ready."
+        ),
+        prompt_key=PATTERN_OTHER_SIDE_PROMPT.key,
+        model_key=PATTERN_OTHER_SIDE_MODEL.key,
+        thinking_key=PATTERN_OTHER_SIDE_THINKING.key,
     ),
     CoreService(
         name="Pattern matching",

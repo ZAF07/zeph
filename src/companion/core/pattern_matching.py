@@ -34,6 +34,7 @@ from companion.core.platform_settings import (
     thinking_to_use,
 )
 from companion.core.ports import Repositories
+from companion.core.ready_gate import ReadyKeeper
 from companion.core.timing import day_span
 from companion.core.usage import UsageRecordingChatModel
 from companion.core.user_snapshot import UserSnapshotLoader
@@ -241,6 +242,7 @@ class PatternMatcher:
         chat_model: UsageRecordingChatModel,
         pattern_tagger: PatternTagger,
         pattern_scorer: PatternScorer,
+        ready_keeper: ReadyKeeper,
     ) -> None:
         """Set up the matcher.
 
@@ -253,6 +255,7 @@ class PatternMatcher:
                 the tokens used.
             pattern_tagger: Tags past Conversations again.
             pattern_scorer: Scores a User's Patterns again after that.
+            ready_keeper: Takes back a ready Pattern that no longer passes.
         """
         self._repositories = repositories
         self._pattern_catalog = pattern_catalog
@@ -260,6 +263,7 @@ class PatternMatcher:
         self._chat_model = chat_model
         self._pattern_tagger = pattern_tagger
         self._pattern_scorer = pattern_scorer
+        self._ready_keeper = ready_keeper
 
     def match(self, pattern_type_ids: Sequence[str] = ()) -> list[UserMatchingReport]:
         """Match every Pattern with no Pattern Type that wasn't matched yet.
@@ -381,9 +385,9 @@ class PatternMatcher:
             snapshot, plan_days_to_tag_again(matched), pattern_types
         )
         if tagged.observations_kept:
-            self._pattern_scorer.score(
-                snapshot.user, snapshot.settings, PatternMoveCause.EVIDENCE_TAGGED_AGAIN
-            )
+            cause = PatternMoveCause.EVIDENCE_TAGGED_AGAIN
+            self._pattern_scorer.score(snapshot.user, snapshot.settings, cause)
+            self._ready_keeper.look(snapshot.user, snapshot.settings, cause)
         for pattern, pattern_type_id in matched:
             self._repositories.patterns.save_match(pattern.id, pattern_type_id)
         return UserMatchingReport(

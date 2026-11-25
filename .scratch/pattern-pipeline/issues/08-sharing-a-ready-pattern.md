@@ -37,3 +37,5 @@ This adds Dashboard UI: read `web/design/README.md` first, add or extend the ref
 - `07-ready-gate.md`
 
 ## Comments
+
+- 25 Nov 2026 (from issue 07): the ready gate is built (`core/ready_gate.py`). For sharing: (1) a ready Pattern is judged again only at a Conversation end or when Observations are deleted, so look again before sharing (`ReadyKeeper.look` does it with no model call), and check struggling there, which the gate doesn't; (2) "not rejected" has no source yet: make a rejected Pattern contested and the gate will never look at it; (3) the narrowing is on the Pattern (`CatalogPattern.narrowings`: tag, holds with, not with) for the wording; (4) pick quotes from Observations that are not `excluded` and not on a ruled-out topic the User didn't raise.

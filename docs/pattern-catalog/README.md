@@ -60,10 +60,10 @@ was last loaded. Zeph keeps replying either way.
 | `look_alikes` | What it can be mistaken for. Either another `pattern_type` (by ID) or a `name` for something outside the catalog (e.g. healthy focus), with `tells_apart`. | The tagging model: when it can't tell two look-alikes apart it names both, and the Observation is unclear. |
 | `anyone_would` | When anyone would act this way, so it says nothing about the person. | The tagging model. |
 | `anyone_would_when` | Optional. The same, as situation tags: `relationship`, `power`, `setting`, `stance`. A match needs every tag it names. | Code: an Observation whose tags fit is situational and carries no weight. |
-| `exclusions` | When it must not be shared, and whether evidence from then is `ignored` or `counted_not_shared`. | Not read yet: the tagging step's exclusion flag and the Ready gate are still to come. |
+| `exclusions` | When it must not be shared, and whether evidence from then is `ignored` or `counted_not_shared`. | The tagging model, which says which exclusions apply to a User now (from their open Life Threads and latest Day Summaries), and the ready gate: while one applies the Pattern is never ready, and with `ignored` the Observations tagged then carry no weight. |
 | `approved_wording` | The Pattern in warm, plain words, as Zeph's view. | Not read yet: sharing (issue 08). |
 | `prediction_wording` | One thing to notice next time, with a `{placeholder}` the model fills. | Not read yet: sharing (issue 08). |
-| `numbers.situations_needed` | Situations (Life Threads) needed before it can be Ready. | Not read yet: the Ready gate (issue 07). The global Platform Settings apply until then. |
+| `numbers.situations_needed` | Situations (Life Threads) needed before it can be Ready. | The ready gate: the Pattern needs this many situations, or the Admin-set number when that is more. |
 | `numbers.base_rate` | A first guess at how common it is, 0 to 1. | Not read yet: kept for when the score becomes a probability. |
 
 Numbers that apply to every Pattern Type (sign points, kind of evidence,
@@ -143,8 +143,10 @@ the whole catalog.
 | A sign removed or its `id` changed | Observations that named it count nothing from the next scoring. The tagging step can't pick it any more. |
 | `definition`, `if` / `then` / `function`, signs' `text`, `look_alikes`, `anyone_would` | Changes what the tagging model looks for, from the next Conversation end. Past Observations are not tagged again. Run the Tagging Eval. |
 | `anyone_would_when` | Changes which new Observations are situational. Past ones keep how they were marked. |
-| `exclusions`, `approved_wording`, `prediction_wording`, `numbers` | Nothing yet; they wait for the Ready gate and sharing. |
-| `status` draft → approved | Nothing yet beyond the Dashboard. Once the Ready gate is built, only approved Pattern Types may become Ready and be shared; drafts gather evidence silently. Needs `approved_by` and `approved_on`. |
+| `exclusions` | Changes what the tagging step may flag, from the next Conversation end. An exclusion taken away stops applying at the User's next tagged Conversation. Observations already marked excluded stay so. |
+| `numbers.situations_needed` | The ready gate uses it from the next Conversation end; a ready Pattern that no longer has enough situations goes back to suspected. |
+| `approved_wording`, `prediction_wording`, `numbers.base_rate` | Nothing yet; they wait for sharing. |
+| `status` draft → approved | Its Patterns may become ready from the next Conversation end. A draft gathers evidence silently and is never ready; approved → draft sends a ready Pattern back to suspected. Needs `approved_by` and `approved_on`. |
 | `status` → archived | Today nothing: the tagging step is sent every Pattern Type in the catalog, archived ones too, so an archived one is still looked for. To come: it stops being looked for and is never shared. Keep the file; never delete it. |
 | A file deleted | It leaves the catalog, but its stored versions and Observations stay. Archive instead. |
 | A new Pattern Type | The tagging step looks for it from the next Conversation end; the tagging prompt grows, so each Conversation end and each Tagging Eval run costs a little more. |

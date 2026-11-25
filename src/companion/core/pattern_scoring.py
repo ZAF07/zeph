@@ -12,6 +12,7 @@ from companion.core.models import (
     PatternMoveCause,
     PatternState,
     PlatformSettings,
+    ReadyCheck,
     SignStrength,
     User,
 )
@@ -130,8 +131,9 @@ def observation_points(
     """Work out what one Observation is worth today.
 
     Its sign's points times its kind of evidence, cut when unclear, nothing
-    when situational, negative when against, and halved every half-life
-    since the day it was said.
+    when situational or said while an exclusion applied whose evidence is
+    ignored, negative when against, and halved every half-life since the
+    day it was said.
 
     Args:
         observation: The Observation.
@@ -143,7 +145,7 @@ def observation_points(
         The points; 0 when its sign isn't in the catalog now.
     """
     strength = sign_strengths.get((observation.pattern_type_id, observation.sign_id))
-    if strength is None or observation.situational:
+    if strength is None or observation.situational or observation.excluded:
         return 0.0
     points = (
         numbers.sign_points[strength]
@@ -327,6 +329,7 @@ def logged_move(
     cause: PatternMoveCause,
     conversation_id: UUID | None,
     now: datetime,
+    blocked_by: ReadyCheck | None = None,
 ) -> PatternMove:
     """Write one move of a Pattern as its log keeps it.
 
@@ -338,6 +341,7 @@ def logged_move(
         cause: What made it be scored again.
         conversation_id: The Conversation tagged, when that is the cause.
         now: When it moved.
+        blocked_by: The ready check to record, for a move to or from ready.
 
     Returns:
         The move.
@@ -354,6 +358,7 @@ def logged_move(
         points=score.points,
         situations=score.situations,
         moved_at=now,
+        blocked_by=blocked_by,
     )
 
 

@@ -562,6 +562,10 @@ patterns = Table(
         index=True,
     ),
     Column("embedding", Vector(EMBEDDING_SIZE)),
+    Column("blocked_by", Text),
+    Column("narrowings", JSONB, nullable=False, server_default="[]"),
+    Column("other_side_asked_at", DateTime(timezone=True)),
+    Column("other_side_found_better", Boolean),
     UniqueConstraint(
         "user_id", "pattern_type_id", name="uq_patterns_user_id_pattern_type_id"
     ),
@@ -601,6 +605,7 @@ pattern_moves = Table(
     Column("points", Float, nullable=False),
     Column("situations", Integer, nullable=False),
     Column("moved_at", DateTime(timezone=True), nullable=False),
+    Column("blocked_by", Text),
 )
 
 pattern_evidence = Table(
@@ -668,6 +673,24 @@ observations = Table(
     Column("second_pattern_type_version", Text),
     Column("situational", Boolean, nullable=False),
     Column("tagged_at", DateTime(timezone=True), nullable=False),
+    Column("excluded", Boolean, nullable=False, server_default="false"),
+    Column("ruled_out_topic", Text),
+    Column("raised_by_user", Boolean, nullable=False, server_default="false"),
+)
+
+pattern_exclusion_flags = Table(
+    "pattern_exclusion_flags",
+    metadata,
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("pattern_type_id", Text, primary_key=True),
+    Column("exclusion", Text, primary_key=True),
+    Column("evidence", Text, nullable=False),
+    Column("flagged_at", DateTime(timezone=True), nullable=False),
 )
 
 explorations = Table(

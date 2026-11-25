@@ -286,6 +286,7 @@ def chat_model(seeded_settings: dict[str, Any]) -> ScriptedChatModel:
         pattern_keeping_prompt=seeded_settings["pattern_keeping_prompt"],
         pattern_tagging_prompt=seeded_settings["pattern_tagging_prompt"],
         pattern_matching_prompt=seeded_settings["pattern_matching_prompt"],
+        pattern_other_side_prompt=seeded_settings["pattern_other_side_prompt"],
     )
 
 

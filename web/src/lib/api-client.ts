@@ -710,6 +710,7 @@ export type ModelStep =
   | "curiosities"
   | "move_outcomes"
   | "pattern_tagging"
+  | "pattern_other_side"
   | "pattern_matching"
   | "patterns"
   | "portrait"

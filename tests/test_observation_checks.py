@@ -10,6 +10,7 @@ from companion.core.models import (
     ChannelPhoto,
     ConversationMessage,
     EvidenceKind,
+    ExcludedEvidence,
     LifeThread,
     MessageDirection,
     MessageKind,
@@ -25,9 +26,12 @@ from companion.core.observations import (
     DroppedEntry,
     DropReason,
     TaggingContext,
+    ignored_pattern_types,
     is_situational,
+    plan_exclusion_flags,
     plan_observations,
     plan_settled,
+    read_exclusions_answer,
     read_settled_answer,
     read_tagging_answer,
     users_own_texts,
@@ -486,3 +490,64 @@ def test_an_answer_to_a_thought_experiment_shown_is_a_what_if_answer(
     [observation] = plan_observations([entry(thought_experiment=answered)], shown).kept
 
     assert observation.evidence_kind == kind
+
+
+def test_a_ruled_out_topic_is_kept_only_when_it_is_on_the_admin_set_list() -> None:
+    listed = replace(context(), ruled_out_topics=frozenset({"abuse"}))
+
+    planned = plan_observations(
+        [
+            entry(ruled_out_topic="Abuse", raised_by_user=True),
+            entry(sign="I5", quote="It’s fine", ruled_out_topic="money"),
+            entry(sign="I1", quote="honestly", raised_by_user=True),
+        ],
+        listed,
+    )
+
+    assert [(kept.ruled_out_topic, kept.raised_by_user) for kept in planned.kept] == [
+        ("abuse", True),
+        (None, False),
+        (None, False),
+    ]
+
+
+def test_an_observation_is_excluded_while_an_ignored_exclusion_applies_to_it() -> None:
+    grieving = replace(
+        context(), ignored_pattern_type_ids=frozenset({"ACH.WORTH.PERF"})
+    )
+
+    planned = plan_observations(
+        [
+            entry(),
+            entry(
+                sign="I5",
+                quote="It’s fine",
+                pattern_types=["CONF.AVOID.BELONG", "ACH.WORTH.PERF"],
+            ),
+        ],
+        grieving,
+    )
+
+    assert [kept.excluded for kept in planned.kept] == [False, True]
+
+
+def test_only_exclusions_the_catalog_lists_are_flagged_once_each() -> None:
+    answer = (
+        '{"observations": [], "exclusions": ['
+        '{"pattern_type": "CONF.AVOID.BELONG", "exclusion": "grief"},'
+        '{"pattern_type": "CONF.AVOID.BELONG", "exclusion": "Grief"},'
+        '{"pattern_type": "CONF.AVOID.BELONG", "exclusion": "A bad week"},'
+        '{"pattern_type": "NOT.A.TYPE", "exclusion": "Grief"}, "Grief", '
+        '{"pattern_type": "REL.MOOD.FIX"}]}'
+    )
+
+    flags = plan_exclusion_flags(
+        read_exclusions_answer(answer), PATTERN_TYPES, MEI.user_id, SENT_AT
+    )
+
+    assert [
+        (flag.pattern_type_id, flag.exclusion, flag.evidence, flag.flagged_at)
+        for flag in flags
+    ] == [("CONF.AVOID.BELONG", "Grief", ExcludedEvidence.IGNORED, SENT_AT)]
+    assert ignored_pattern_types(flags) == frozenset({"CONF.AVOID.BELONG"})
+    assert read_exclusions_answer('{"observations": []}') == []

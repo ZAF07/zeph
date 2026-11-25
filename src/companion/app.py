@@ -90,6 +90,7 @@ from companion.core.ports import (
     WebSearch,
 )
 from companion.core.post_conversation import PostConversationProcessor
+from companion.core.ready_gate import ReadyGate, ReadyKeeper
 from companion.core.recent_messages import RecentMessagesReader
 from companion.core.reply_gate import ReplyGate
 from companion.core.reply_plan import ReplyPlanService
@@ -199,8 +200,15 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     pattern_scorer = PatternScorer(
         dependencies.repositories, pattern_catalog_service, dependencies.clock
     )
+    ready_keeper = ReadyKeeper(
+        dependencies.repositories, pattern_catalog_service, dependencies.clock
+    )
     user_memory_service = UserMemoryService(
-        dependencies.repositories, feature_service, pattern_scorer, dependencies.clock
+        dependencies.repositories,
+        feature_service,
+        pattern_scorer,
+        ready_keeper,
+        dependencies.clock,
     )
     usage_limiter = UsageLimiter(dependencies.repositories, dependencies.clock)
     model_call_log = ModelCallLog(
@@ -215,6 +223,9 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         usage_limiter,
         model_call_log,
         dependencies.clock,
+    )
+    ready_gate = ReadyGate(
+        dependencies.repositories, ready_keeper, chat_model, dependencies.clock
     )
     user_snapshots = UserSnapshotLoader(dependencies.repositories, dependencies.clock)
     check_in_service = CheckInService(
@@ -408,6 +419,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 clock=dependencies.clock,
             ),
             pattern_scorer=pattern_scorer,
+            ready_gate=ready_gate,
             pattern_keeper=PatternKeeper(
                 repositories=dependencies.repositories,
                 pattern_catalog=pattern_catalog_service,

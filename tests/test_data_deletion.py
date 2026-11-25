@@ -59,9 +59,9 @@ def set_up_user_with_every_kind_of_data(
     """Give a User messages, User Memory, a Check-in and a Telegram Connection.
 
     Their User Memory holds a Memory Item, a Day Summary, a Shared
-    Photo, two Life Threads, an Observation, a Pattern, a Move Outcome and a
-    User Portrait, and they have a Personal Sticker, a Curiosity and an
-    Exploration with its aimed Curiosity.
+    Photo, two Life Threads, an Observation, an exclusion flag, a Pattern,
+    a Move Outcome and a User Portrait, and they have a Personal Sticker, a
+    Curiosity and an Exploration with its aimed Curiosity.
 
     Returns:
         Their Dashboard API headers and their User ID.
@@ -98,7 +98,13 @@ def set_up_user_with_every_kind_of_data(
                         "thread": 2,
                         "evidence": "real_story",
                     },
-                ]
+                ],
+                "exclusions": [
+                    {
+                        "pattern_type": "ACH.WORTH.PERF",
+                        "exclusion": "Active burnout or job loss in the last month",
+                    }
+                ],
             }
         )
     )

@@ -56,7 +56,8 @@ flowchart TD
       E1[a. Day Summary, Memory Items, Shared Photos] --> E2[b. Life Threads]
       E2 --> T[b2. Pattern tagging, while Pattern noticing works]
       T --> SC[b3. Pattern scoring, code, while Pattern noticing works]
-      SC --> E3[c. Patterns]
+      SC --> RG[b4. Ready gate, code and one model call that can only block]
+      RG --> E3[c. Patterns]
       E3 --> FA[c2. Familiarity, code]
       FA --> E4[d. Curiosities]
       E4 --> AG[d2. Agenda, code, while Pattern exploring works]
@@ -171,6 +172,10 @@ After the quiet gap (Admin-set), these run in order, each using what the earlier
 ### b3. Pattern scoring *(new, code only)*
 
 - *Built (24 Nov 2026): right after tagging, while Pattern noticing works, code scores each of the User's Patterns of Pattern Types from all their Observations and moves it between noticed, suspected and closed, logging each move. No model call; silent. Deleting a Life Thread scores again at once. See `docs/pattern-pipeline/README.md`, Scoring.*
+
+### b4. Ready gate *(new, code and one model call)*
+
+- *Built (25 Nov 2026): right after scoring, while Pattern noticing works, code judges each suspected or ready Pattern against the ten ready checks. A suspected one that passes the eight stored checks has its quotes read again and one model call ("Other side") argue for a better explanation; it can only block. A ready Pattern that fails a check goes back. The tagging step (b2) now also flags the Pattern Type exclusions that apply to the User and the ruled-out topics an Observation touches. Silent: a ready Pattern waits. See `docs/pattern-pipeline/README.md`, the ready gate.*
 
 ### c. Patterns *(new)*
 

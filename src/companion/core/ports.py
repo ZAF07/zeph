@@ -29,6 +29,7 @@ from companion.core.models import (
     DailyUsage,
     DaySummary,
     EmbeddedChunk,
+    ExclusionFlag,
     Exploration,
     ExplorationTry,
     Familiarity,
@@ -1381,10 +1382,32 @@ class ObservationRepository(Protocol):
         ...
 
     def delete_for_user(self, user_id: UUID) -> None:
-        """Delete all of a User's Observations.
+        """Delete all of a User's Observations and exclusion flags.
 
         Args:
             user_id: The User's ID.
+        """
+        ...
+
+    def replace_exclusion_flags(
+        self, user_id: UUID, flags: Sequence[ExclusionFlag]
+    ) -> None:
+        """Save the exclusions that apply to a User now, in place of the old ones.
+
+        Args:
+            user_id: The User's ID.
+            flags: The exclusions that apply now; none clears them.
+        """
+        ...
+
+    def list_exclusion_flags(self, user_id: UUID) -> list[ExclusionFlag]:
+        """List the exclusions that apply to a User now.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The flags from the last time their Observations were tagged.
         """
         ...
 
@@ -1524,11 +1547,13 @@ class PatternRepository(Protocol):
         deleted_ids: Sequence[UUID],
         moves: Sequence[PatternMove],
     ) -> None:
-        """Save what scoring a User's Patterns of Pattern Types changed, in one step.
+        """Save what scoring or the ready gate changed in a User's Patterns, at once.
 
         Args:
             added: Patterns noticed for the first time.
-            changed: Patterns that moved, in their new state.
+            changed: Patterns that moved or that the ready gate judged, with
+                their state, blocking check, narrowings and when the other
+                side was last argued.
             deleted_ids: Patterns with no Observations left; their moves stay.
             moves: The moves, added to the log in order.
         """
@@ -2418,6 +2443,18 @@ class SafeguardEventRepository(Protocol):
 
         Args:
             event: The event to save.
+        """
+        ...
+
+    def happened_since(self, user_id: UUID, since: datetime) -> bool:
+        """Say whether a User had a Safeguard Event after a time.
+
+        Args:
+            user_id: The User's ID.
+            since: The time; events at it or before are left out.
+
+        Returns:
+            True when there is one.
         """
         ...
 

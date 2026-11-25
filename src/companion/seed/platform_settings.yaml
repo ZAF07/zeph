@@ -827,6 +827,32 @@ pattern_suspected_situations: 2
 pattern_suspected_points: 100
 pattern_closed_under_points: -150
 
+# The ready gate: a suspected Pattern may be shared only when code finds all
+# ten checks true (docs/pattern-pipeline/README.md). It must show in this many
+# situations (or more, when its Pattern Type asks for more), with evidence
+# from this many Conversations and at least this score, also from its clear
+# Observations alone, and its evidence against must stay under this many
+# points. Starting values from the pattern-pipeline grill (decision 29).
+pattern_ready_situations: 3
+pattern_ready_conversations: 2
+pattern_ready_points: 300
+pattern_ready_against_under_points: 100
+
+# No Pattern is ready for this many days after a Safeguard Event.
+pattern_safeguard_quiet_days: 14
+
+# The tagging step reads this many of the User's latest Day Summaries, with
+# their open Life Threads, to tell whether a Pattern Type's exclusion applies.
+pattern_exclusion_summary_days: 7
+
+# Topics no Pattern is drawn or shared from unless the User raised them. A
+# first list, for the owner to correct.
+pattern_ruled_out_topics:
+  - abuse
+  - sexual trauma
+  - self-harm or suicide
+  - eating and body image
+
 # The Agenda, while Pattern exploring works: at most this many Explorations
 # (suspected Patterns Zeph is trying to learn more about) are active at once,
 # highest score first. An Exploration tried with nothing useful waits this many
@@ -1367,7 +1393,8 @@ pattern_tagging_prompt: |-
   the lists each tag comes from; the unclear stories Zeph asked about in
   this Conversation, if any, each with a number; the Thought Experiments
   (made-up situations) Zeph put to them in this Conversation, if any, each
-  with a number; and the Conversation.
+  with a number; their open Life Threads and latest Day Summaries (what is
+  going on in their life now); the ruled-out topics; and the Conversation.
 
   Write one Observation for each thing the person said that matches a sign
   of a Pattern Type, for it or against it. Only what the person said counts,
@@ -1404,6 +1431,11 @@ pattern_tagging_prompt: |-
     when it is their answer to one Zeph put to them; null otherwise. Its
     evidence is then "what_if_answer". A real story they tell while
     answering is a "real_story" with null here.
+  - ruled_out_topic: the ruled-out topic it is about, copied from the list;
+    null when it is about none of them.
+  - raised_by_user: true when the person brought that topic up themselves,
+    false when they spoke of it only because Zeph asked or brought it up.
+    false when ruled_out_topic is null.
 
   Note it even when anyone would act the same in that situation: tag the
   situation as it was and leave the weighing to others.
@@ -1415,6 +1447,16 @@ pattern_tagging_prompt: |-
   only when their answer really tells; otherwise leave it out. "settled" is
   an empty list when there is nothing to settle.
 
+  Each Pattern Type lists its exclusions: times in a life (such as grief or
+  a crisis) when it must not be judged. Under "exclusions", name each
+  exclusion that applies to the person now, going by their open Life
+  Threads, their latest Day Summaries and this Conversation: the Pattern
+  Type's ID and the exclusion copied exactly. Name one only when it is
+  plainly going on now, not for something long past. Check every Pattern
+  Type, also those with no Observation. "exclusions" is an empty list when
+  none applies. Still write every Observation as usual while an exclusion
+  applies: others decide what it counts for.
+
   Answer with JSON only, in exactly this shape:
   {
     "observations": [
@@ -1423,12 +1465,52 @@ pattern_tagging_prompt: |-
        "about": "...", "thread": <number> | null,
        "relationship": "..." | null, "power": "..." | null,
        "setting": "..." | null, "stance": "..." | null,
-       "evidence": "...", "thought_experiment": <number> | null}
+       "evidence": "...", "thought_experiment": <number> | null,
+       "ruled_out_topic": "..." | null, "raised_by_user": true | false}
     ],
     "settled": [
       {"unclear": <number>, "pattern_type": "<ID>", "sign": "<ID>"}
+    ],
+    "exclusions": [
+      {"pattern_type": "<ID>", "exclusion": "..."}
     ]
   }
+
+# The ready gate's one model call. When a Conversation ends and a suspected
+# Pattern passes every check code can make, this call argues the other side:
+# is there a better explanation of the same evidence? It can only block. A
+# yes, an unreadable answer or a failed call leaves the Pattern suspected; it
+# is asked again only once new evidence for that Pattern is tagged.
+pattern_other_side_model: deepseek/deepseek-v4.1-flash-1017
+pattern_other_side_thinking: true
+
+pattern_other_side_prompt: |-
+  Zeph, an AI companion, is about to tell a person a Pattern it sees in
+  them: a way they act in a kind of situation, for a reason. Your job is to
+  argue the other side before it does. A wrong Pattern told to someone as
+  true can hurt them, so look hard for a better explanation.
+
+  You are given today's date, the Pattern with what it is and its if / then
+  / function, its look-alikes (other Patterns easily mistaken for it, with
+  what tells them apart), what anyone would do in such situations, where it
+  was already shown not to happen, and the evidence: each thing the person
+  said, with its day, whether it counts for or against, the kind of
+  evidence, who it was about and what was going on.
+
+  Ask yourself:
+  - Does one of the look-alikes explain this evidence at least as well?
+  - Is this just what anyone would do in these situations?
+  - Does the evidence show what they did but not why, so the reason is a
+    guess?
+  - Is it all really one story, one person or one rough stretch of time?
+  - Does the evidence against outweigh the evidence for?
+
+  Say there is a better explanation only when one of these truly holds for
+  this evidence, not merely because it is possible. When the Pattern is the
+  best explanation of what they said, say there is none.
+
+  Answer with JSON only, in exactly this shape:
+  {"better_explanation": true | false, "why": "<one line>"}
 
 # The matching pass, run by an Admin command (`make match-patterns`), never by
 # a reply or a Conversation end. For each Pattern with no Pattern Type that

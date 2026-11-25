@@ -201,6 +201,29 @@ def newest_first(observations: Sequence[Observation]) -> list[Observation]:
     )
 
 
+def counter_tested(
+    observations: Sequence[Observation], tries: Sequence[ExplorationTry]
+) -> bool:
+    """Say whether a Pattern was tested against itself.
+
+    Args:
+        observations: The Observations of the Pattern.
+        tries: The tries of its Exploration.
+
+    Returns:
+        True when an Observation against came, or a counter-test try came
+        back useful.
+    """
+    return any(
+        observation.direction == ObservationDirection.AGAINST
+        for observation in observations
+    ) or any(
+        attempt.need == ExplorationNeed.COUNTER_TEST
+        and attempt.outcome == TryOutcome.USEFUL
+        for attempt in tries
+    )
+
+
 def open_needs(
     observations: Sequence[Observation],
     tries: Sequence[ExplorationTry],
@@ -228,15 +251,7 @@ def open_needs(
     missing = [part for part in PARTS_OF_LIFE if part not in seen]
     if missing and len(missing) < len(PARTS_OF_LIFE):
         needs.append(OpenNeed(ExplorationNeed.MISSING_PART, part_of_life=missing[0]))
-    tested = any(
-        observation.direction == ObservationDirection.AGAINST
-        for observation in observations
-    ) or any(
-        attempt.need == ExplorationNeed.COUNTER_TEST
-        and attempt.outcome == TryOutcome.USEFUL
-        for attempt in tries
-    )
-    if not tested:
+    if not counter_tested(observations, tries):
         stories = [
             observation
             for observation in newest_first(observations)
