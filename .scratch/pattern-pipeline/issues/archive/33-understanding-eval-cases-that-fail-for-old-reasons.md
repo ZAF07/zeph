@@ -134,4 +134,4 @@ The case `hosting-research` still uses `names_hosts_under_budget` and has the sa
 ## Completion
 
 - Completed: 2026-11-25
-- Commit: <merge commit, filled in after the merge>
+- Commit: 4e95c528 (merge of pattern-33-understanding-eval-old-failures into main; work commits a9daaa24, 866d2b91 and the archive commit 0d037b4d)
