@@ -400,7 +400,9 @@ def format_asked_for_patterns_for_reply(told: Sequence[ToldPatternInMind]) -> st
             "to know them "
             "and would rather not guess at who they are. You may give your "
             "view of one recent situation they told you about, as a view of "
-            "that situation only. Don't say they always, usually or tend to "
+            "that situation only. If they have told you about none, give no "
+            "view at all: read nothing into how or why they asked, and ask "
+            "for a story instead. Don't say they always, usually or tend to "
             "act some way, don't link several people or moments into one "
             "habit, and don't call anything a pattern."
         )
