@@ -599,6 +599,64 @@ Run `1641c640`, 12 cases once: 9 passed, 3 failed. 108,180 tokens in, 22,240 out
 - **Impact:** the pace rule itself is not tested by these cases.
 - **Suggested fix:** none needed; the tests of the pace cover it.
 
+## 27 — Four reply-path faults a User can meet today (2026-11-25)
+
+### Reply thinking on made the Reply call the settings tool every time
+
+- **Kind:** risk
+- **What:** in Eval Run 2a7a1577 (`more-direct` and `gentler`, 3 tries each) the Reply's first draft called `change_directness` 5 of 6 times on the live settings, 6 of 6 with `response_thinking` on, and 4 of 6 on deepseek-v4-pro. The code guard now catches the misses, at the price of a second Reply call.
+- **Impact:** without thinking, about 1 settings request in 6 needs the reply written twice, so it is slower; a few may still end as the reply-failed message.
+- **Suggested fix:** the owner decides whether to turn Reply thinking on (Prompts & models). It costs more and waits longer on every reply. A bigger run (5 repeats, about S$0.15) would say if 6 of 6 holds.
+
+### A settings request can end as "my thoughts got tangled"
+
+- **Kind:** potential failure
+- **What:** when the reply is written twice and still says a setting changed with no tool called, nothing is sent but the reply-failed message. Seen 2 of 18 in Eval Run 2a7a1577. After the note to the model was made firmer: 0 of 6 in Eval Run eb03b46e and 0 of 5 forced live runs.
+- **Impact:** the User is not lied to, but has to ask again.
+- **Suggested fix:** if it shows up in the Model Call Log (two "Settings claim check" calls in one trace, then no reply), force the tool call on the second try (`tool_choice`), which needs a small change to the chat model port.
+
+### One more model call on every reply
+
+- **Kind:** risk
+- **What:** the settings claim check runs before every reply that called no settings tool, which is nearly all of them (`SettingsTools._correction` in `core/chat_settings.py`). It is a small call on the Check-in model without thinking.
+- **Impact:** each reply waits about a second longer and costs a little more. The load test's reply time goes up by one fake call.
+- **Suggested fix:** watch the cost for a week. If it matters, run the check only when the Understanding says the User asked for a change, which means a new Understanding field and a prompt reload.
+
+### The Reply still leaves out picked Curiosities, most of all Prediction follow-ups
+
+- **Kind:** failure
+- **What:** in the live run a Prediction follow-up picked under Just chatting was left out by the real Reply; it now stays waiting, but it was picked again on the next message and left out again. The follow-up's wording is a long instruction, not a question.
+- **Impact:** nothing is lost any more, but a follow-up may be picked several times before it is asked, and each pick drops that reply's question Move.
+- **Suggested fix:** count how often the asked check says no in the Model Call Log ("Curiosity asked: No" with one offered). If it is often, shorten the follow-up instruction or tell the Reply plainly it is a question to ask.
+
+### Curiosity Check-ins are marked raised without the asked check
+
+- **Kind:** potential failure
+- **What:** a Curiosity sent as a Check-in on its own is marked raised when the Check-in is sent (`core/check_ins.py:1139`), whether or not its words asked it.
+- **Impact:** the same loss issue 27 fixed for replies, on the Check-in path.
+- **Suggested fix:** call the same check from the Check-in path; best done with issue 30.
+
+### A rewritten reply can run a tool twice
+
+- **Kind:** potential failure
+- **What:** when the claim check has a reply written again, tools its first draft called (web search, sticker adding) run again in the second (`ResponseComposer.compose`). A picked sticker or photo is dropped, but a web search is paid twice and counts twice toward the daily limit.
+- **Impact:** rare (a false settings claim and a search in one reply); a little cost.
+- **Suggested fix:** leave it unless seen.
+
+### The list of dropped topics has no limit
+
+- **Kind:** risk
+- **What:** every Curiosity a User ever asked to drop is shown to every Reply Plan and reply (`CuriosityRaiser.due`).
+- **Impact:** for a User who drops many topics over months, each prompt grows.
+- **Suggested fix:** cap it at the newest 20 if a real User gets near that.
+
+### The Eval estimate was less than half the real cost
+
+- **Kind:** failure
+- **What:** the owner was shown about S$0.09 for 18 cases and S$0.014 for 6; they cost S$0.20 and S$0.05. The two cases had never run, so a rough figure was used, and the estimate for a Variant on a dearer model was low. Once the cases had run, the estimate for the same 6 cases read S$0.098, which was too high.
+- **Impact:** the owner agrees to a run on a wrong number.
+- **Suggested fix:** the same fix as "The estimate for never-run Tagging cases is off": a better rough figure per Eval, checked against real runs.
+
 ## Comments
 
 ### 25 Nov 2026 — first triage with the owner (sections 01 to 19)
