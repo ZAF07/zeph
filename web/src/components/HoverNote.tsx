@@ -1,21 +1,21 @@
 import type { ReactNode } from "react";
 
 /**
- * Wraps a control so a small note pops up above it while the mouse is over
+ * Wraps a control so a small note pops up to its left while the mouse is over
  * it, e.g. to say why the control is locked. With no note, nothing pops up.
- * Give the control the same `id` as its described-by id so a screen reader
+ * Pass `noteId` to the control as its described-by id so a screen reader
  * reads the note too.
  *
- * @param props - `id` is the note's id; `note` is what the pop-up says, or
+ * @param props - `noteId` is the note's id; `note` is what the pop-up says, or
  *   null for no pop-up; `children` is the control.
  * @returns The control, with its pop-up.
  */
 export function HoverNote({
-  id,
+  noteId,
   note,
   children,
 }: {
-  id: string;
+  noteId: string;
   note: string | null;
   children: ReactNode;
 }) {
@@ -24,9 +24,9 @@ export function HoverNote({
       {children}
       {note ? (
         <span
-          id={id}
+          id={noteId}
           role="tooltip"
-          className="pointer-events-none absolute right-0 bottom-full z-10 hidden w-max max-w-[240px] rounded-input border border-line bg-bg-deep px-3.5 py-2 text-[13px] text-soft group-hover:block"
+          className="pointer-events-none absolute top-1/2 right-full z-10 mr-2 hidden w-max max-w-[200px] -translate-y-1/2 rounded-input border border-line bg-bg-deep px-3.5 py-2 text-[13px] text-soft group-hover:block"
         >
           {note}
         </span>

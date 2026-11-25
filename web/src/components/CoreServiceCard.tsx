@@ -195,7 +195,7 @@ export function CoreServiceCard({
             caption={settings[service.thinking_key]?.hint}
           >
             <HoverNote
-              id={thinkingLockedNoteId}
+              noteId={thinkingLockedNoteId}
               note={
                 modelCanThink
                   ? null
