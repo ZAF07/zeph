@@ -62,6 +62,9 @@ export function CheckInKindCard({
           {kind.raises_curiosity ? (
             <CardTag locked>Asks a Curiosity</CardTag>
           ) : null}
+          {kind.shares_pattern ? (
+            <CardTag locked>Shares a Pattern</CardTag>
+          ) : null}
         </>
       }
       meta={

@@ -14,6 +14,7 @@ from companion.core.memory_retrieval import format_day, summary_line
 from companion.core.model_call_log import ModelCallLog
 from companion.core.models import (
     AIMS_WRITTEN_BY_CODE,
+    CatalogPattern,
     ChatLine,
     ChatRole,
     ConversationMessage,
@@ -29,9 +30,12 @@ from companion.core.models import (
     ModelStep,
     Observation,
     ObservationDirection,
+    PatternReaction,
     PatternSign,
+    PatternState,
     PatternType,
     Power,
+    ReactionToPattern,
     Relationship,
     SituationMatch,
     SituationSetting,
@@ -59,6 +63,9 @@ logger = logging.getLogger(__name__)
 MOST_PATTERN_TYPES_PER_OBSERVATION = 2
 EVENED_OUT_CHARACTERS = str.maketrans({"’": "'", "‘": "'", "“": '"', "”": '"'})
 WHITESPACE_RUNS = re.compile(r"\s+")
+STATES_OF_A_PATTERN_TOLD = frozenset(
+    {PatternState.SHARED, PatternState.CONFIRMED, PatternState.CONTESTED}
+)
 
 
 @dataclass(frozen=True)
@@ -92,6 +99,9 @@ class TaggingContext:
         ruled_out_topics: The Admin-set ruled-out topics, in lower case.
         ignored_pattern_type_ids: The Pattern Types with an exclusion that
             applies to the User now and whose evidence is ignored.
+        not_gathered_pattern_type_ids: The Pattern Types of the Patterns
+            the User disagreed with, while they have gathering on those
+            turned off; no Observation naming one is kept.
     """
 
     user_id: UUID
@@ -104,6 +114,7 @@ class TaggingContext:
     thought_experiment_numbers: frozenset[int] = frozenset()
     ruled_out_topics: frozenset[str] = frozenset()
     ignored_pattern_type_ids: frozenset[str] = frozenset()
+    not_gathered_pattern_type_ids: frozenset[str] = frozenset()
 
 
 class DropReason(StrEnum):
@@ -116,6 +127,7 @@ class DropReason(StrEnum):
     TAG_OFF_ITS_LIST = "a tag or the kind of evidence not from its list"
     MISSING_DETAILS = "no context line or no one it is about"
     REPEAT = "repeats one already kept"
+    NOT_GATHERED = "a Pattern they disagreed with, with gathering turned off"
 
 
 @dataclass(frozen=True)
@@ -295,6 +307,120 @@ def read_settled_answer(answer: str) -> list[Any]:
         return []
     settled = parsed.get("settled") if isinstance(parsed, dict) else None
     return settled if isinstance(settled, list) else []
+
+
+def read_reactions_answer(answer: str) -> list[Any]:
+    """Read how the tagging model says the User took Patterns they were told.
+
+    Args:
+        answer: The model's answer, already readable for its Observations.
+
+    Returns:
+        The reactions, as the model wrote them; empty when it named none.
+    """
+    start, end = answer.find("{"), answer.rfind("}")
+    try:
+        parsed = json.loads(answer[start : end + 1])
+    except json.JSONDecodeError:
+        return []
+    reactions = parsed.get("reactions") if isinstance(parsed, dict) else None
+    return reactions if isinstance(reactions, list) else []
+
+
+def plan_reactions(
+    entries: Sequence[Any],
+    told: Mapping[int, CatalogPattern],
+    conversation_id: UUID,
+    now: datetime,
+) -> list[ReactionToPattern]:
+    """Keep the reactions the tagging model read that name a Pattern it was shown.
+
+    Args:
+        entries: The reactions, as the model wrote them.
+        told: The Patterns the User was told, by the number the model was
+            shown.
+        conversation_id: The Conversation they were read from.
+        now: When they were read.
+
+    Returns:
+        One reaction per Pattern, the first the model wrote for it; an
+        unknown number or a reaction off its list is left out.
+    """
+    kept: dict[UUID, ReactionToPattern] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        number = entry.get("pattern")
+        pattern = (
+            told.get(number)
+            if isinstance(number, int) and not isinstance(number, bool)
+            else None
+        )
+        reaction = read_choice(entry, "reaction", PatternReaction)
+        if pattern is None or reaction is None or pattern.id in kept:
+            continue
+        kept[pattern.id] = ReactionToPattern(
+            id=uuid4(),
+            user_id=pattern.user_id,
+            pattern_id=pattern.id,
+            reaction=reaction,
+            conversation_id=conversation_id,
+            reacted_at=now,
+        )
+    return list(kept.values())
+
+
+def not_gathered_pattern_types(
+    told: Sequence[CatalogPattern],
+    reactions: Sequence[ReactionToPattern],
+    gathering_enabled: bool,
+) -> frozenset[str]:
+    """Find the Pattern Types no new Observation is kept for.
+
+    Args:
+        told: The Patterns the User was told.
+        reactions: How they took them in the Conversation being tagged.
+        gathering_enabled: The User's own switch for noting evidence on a
+            Pattern they disagreed with.
+
+    Returns:
+        None while their switch is on; with it off, the Pattern Types of
+        the Patterns they disagreed with, before or in this Conversation.
+    """
+    if gathering_enabled:
+        return frozenset()
+    pushed_back_ids = {
+        reaction.pattern_id
+        for reaction in reactions
+        if reaction.reaction == PatternReaction.PUSHED_BACK
+    }
+    return frozenset(
+        pattern.pattern_type_id
+        for pattern in told
+        if pattern.state == PatternState.CONTESTED or pattern.id in pushed_back_ids
+    )
+
+
+def describe_patterns_told(
+    told: Mapping[int, CatalogPattern], pattern_types: Mapping[str, PatternType]
+) -> str:
+    """Write the Patterns the User was told, as the tagging model reads them.
+
+    Args:
+        told: The Patterns, by number.
+        pattern_types: The Pattern Types in the catalog now, by ID.
+
+    Returns:
+        One numbered line per Pattern with the words it was told in;
+        "None." with none.
+    """
+    return (
+        "\n".join(
+            f"[{number}] {pattern_types[pattern.pattern_type_id].approved_wording}"
+            for number, pattern in told.items()
+        )
+        or "None."
+    )
 
 
 def plan_settled(
@@ -618,7 +744,9 @@ def check_observation(entry: Any, context: TaggingContext) -> Observation | Drop
         The Observation; or why it is dropped: its Pattern Types or sign
         aren't in the catalog, its quote isn't word for word in the User's
         own texts, a tag or its kind of evidence isn't from its list, or it
-        has no context or who it is about. One that names a Thought
+        has no context or who it is about, or it names a Pattern Type the
+        User disagreed with while they have gathering turned off. One that
+        names a Thought
         Experiment put to the User in the Conversation is a "what if"
         answer, whatever kind the model wrote. A ruled-out topic is kept
         only when it is on the Admin-set list. It is excluded when an
@@ -630,6 +758,11 @@ def check_observation(entry: Any, context: TaggingContext) -> Observation | Drop
     pattern_types = read_named_pattern_types(entry, context.pattern_types)
     if pattern_types is None:
         return DropReason.UNKNOWN_PATTERN_TYPE
+    if any(
+        pattern_type.id in context.not_gathered_pattern_type_ids
+        for pattern_type in pattern_types
+    ):
+        return DropReason.NOT_GATHERED
     matched = read_sign(entry, pattern_types[0])
     if matched is None:
         return DropReason.UNKNOWN_SIGN
@@ -851,6 +984,7 @@ def describe_conversation_to_tag(
     thought_experiments: Mapping[int, str] | None = None,
     life_now: LifeNow | None = None,
     ruled_out_topics: Sequence[str] = (),
+    told: Mapping[int, CatalogPattern] | None = None,
 ) -> str:
     """Write what the tagging model is given.
 
@@ -868,12 +1002,15 @@ def describe_conversation_to_tag(
         life_now: Their open Life Threads and latest Day Summaries; None
             when a past Conversation is tagged again.
         ruled_out_topics: The Admin-set ruled-out topics.
+        told: The Patterns Zeph has told the User, by number; None or
+            empty with none.
 
     Returns:
         Today's date, the Threads, the Pattern Catalog with each Pattern
         Type's exclusions, the tag lists, the unclear stories asked about,
         the Thought Experiments put to them, what is going on in their life
-        now, the ruled-out topics and the Conversation.
+        now, the ruled-out topics, the Patterns they were told and the
+        Conversation.
     """
     thread_lines = "\n".join(
         f"[{number}] {describe_thread(thread, time_zone)}"
@@ -883,6 +1020,7 @@ def describe_conversation_to_tag(
         f"{describe_pattern_type(pattern_type)}\n{describe_exclusions(pattern_type)}"
         for pattern_type in pattern_types
     )
+    types_by_id = {pattern_type.id: pattern_type for pattern_type in pattern_types}
     return (
         f"Today: {format_day(now, time_zone)}\n\n"
         f"Life Threads this Conversation touched:\n{thread_lines or 'None.'}\n\n"
@@ -894,6 +1032,8 @@ def describe_conversation_to_tag(
         f"{describe_thought_experiments_asked(thought_experiments or {})}\n\n"
         f"{describe_life_now(life_now or LifeNow(), time_zone)}\n\n"
         f"Ruled-out topics: {', '.join(ruled_out_topics) or 'none'}\n\n"
+        f"Patterns Zeph has told them:\n"
+        f"{describe_patterns_told(told or {}, types_by_id)}\n\n"
         f"The Conversation:\n{to_transcript_lines(messages, time_zone)}"
     )
 
@@ -906,11 +1046,13 @@ class Tagged:
         planned: The Observations kept and those dropped.
         settled: The unclear stories the model settled, as it wrote them.
         exclusion_flags: The exclusions that apply to the User now.
+        reactions: How the User took the Patterns they were told.
     """
 
     planned: PlannedObservations
     settled: list[Any]
     exclusion_flags: list[ExclusionFlag]
+    reactions: list[ReactionToPattern]
 
 
 class PatternTagger:
@@ -958,7 +1100,8 @@ class PatternTagger:
         once; if it is still unreadable nothing is kept. How many were
         tagged and dropped goes into the Model Call Log, never their words.
         The exclusions the model says apply to the User now replace those
-        flagged before.
+        flagged before. How the model says they took a Pattern Zeph told
+        them is kept, one reaction per Pattern and Conversation.
 
         Args:
             snapshot: The User whose Conversation it was; User Memory works
@@ -987,10 +1130,12 @@ class PatternTagger:
             unclear,
             self._thought_experiments_asked_in(snapshot, conversation_id),
             self._life_now(snapshot),
+            self._patterns_told(snapshot, pattern_types),
         )
         if tagged is None:
             return None
         self._repositories.observations.add_many(tagged.planned.kept)
+        self._repositories.patterns.add_reactions(tagged.reactions)
         self._repositories.observations.settle(
             plan_settled(
                 tagged.settled,
@@ -1041,6 +1186,7 @@ class PatternTagger:
             {},
             self._thought_experiments_asked_in(snapshot, conversation_id),
             None,
+            {},
         )
         if tagged is None:
             return []
@@ -1069,6 +1215,7 @@ class PatternTagger:
         unclear: Mapping[int, Observation],
         thought_experiments: Mapping[int, str],
         life_now: LifeNow | None,
+        told: Mapping[int, CatalogPattern],
     ) -> Tagged | None:
         """Ask the model for a Conversation's Observations and check them.
 
@@ -1086,10 +1233,13 @@ class PatternTagger:
                 to the User in it, as asked, by number.
             life_now: Their open Life Threads and latest Day Summaries, for
                 telling which exclusions apply; None to flag none.
+            told: The Patterns Zeph has told them, by number, for reading
+                how they took one; empty to read none.
 
         Returns:
             The Observations that passed and those dropped, the unclear
-            stories the model settled and the exclusions that apply; None
+            stories the model settled, the exclusions that apply and how
+            they took the Patterns they were told; None
             when the User wrote nothing in their own words, there is no
             Pattern Type or the answer couldn't be read.
         """
@@ -1112,6 +1262,7 @@ class PatternTagger:
                 thought_experiments,
                 life_now,
                 ruled_out_topics,
+                told,
             ),
         )
         if answer is None:
@@ -1124,6 +1275,9 @@ class PatternTagger:
             )
             if life_now is not None
             else []
+        )
+        reactions = plan_reactions(
+            read_reactions_answer(answer), told, conversation_id, now
         )
         entries = read_tagging_answer(answer) or []
         planned = plan_observations(
@@ -1141,6 +1295,11 @@ class PatternTagger:
                     topic.casefold() for topic in ruled_out_topics
                 ),
                 ignored_pattern_type_ids=ignored_pattern_types(exclusion_flags),
+                not_gathered_pattern_type_ids=not_gathered_pattern_types(
+                    list(told.values()),
+                    reactions,
+                    snapshot.user.contested_gathering_enabled,
+                ),
             ),
         )
         self._model_call_log.record_tagging_shape(
@@ -1150,7 +1309,32 @@ class PatternTagger:
             planned=planned,
             settled=read_settled_answer(answer),
             exclusion_flags=exclusion_flags,
+            reactions=reactions,
         )
+
+    def _patterns_told(
+        self, snapshot: UserSnapshot, pattern_types: Sequence[PatternType]
+    ) -> dict[int, CatalogPattern]:
+        """Number the Patterns Zeph has told the User.
+
+        Args:
+            snapshot: The User.
+            pattern_types: The Pattern Types in the catalog now.
+
+        Returns:
+            Their shared, confirmed and contested Patterns whose Pattern
+            Type is still in the catalog, by number from 1.
+        """
+        known = {pattern_type.id for pattern_type in pattern_types}
+        told = [
+            pattern
+            for pattern in self._repositories.patterns.list_of_pattern_types(
+                snapshot.user.id
+            )
+            if pattern.state in STATES_OF_A_PATTERN_TOLD
+            and pattern.pattern_type_id in known
+        ]
+        return dict(enumerate(told, start=1))
 
     def _life_now(self, snapshot: UserSnapshot) -> LifeNow:
         """Read what is going on in a User's life now.

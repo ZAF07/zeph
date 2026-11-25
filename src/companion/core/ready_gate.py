@@ -567,6 +567,20 @@ class LastChecks:
     asked_now: bool
 
 
+@dataclass(frozen=True)
+class Looked:
+    """What one look at a User's suspected and ready Patterns found.
+
+    Attributes:
+        waiting: The suspected Patterns only the last two checks still
+            block.
+        ready: The ready Patterns that still pass every stored check.
+    """
+
+    waiting: list[JudgedPattern]
+    ready: list[JudgedPattern]
+
+
 def has_new_evidence(judged: JudgedPattern) -> bool:
     """Say whether a Pattern has evidence the other side hasn't argued yet.
 
@@ -666,6 +680,47 @@ class ReadyKeeper:
             left out when the other side already found a better
             explanation of the same evidence.
         """
+        return self._look(user, settings, cause, conversation_id).waiting
+
+    def still_ready(
+        self, user: User, settings: PlatformSettings
+    ) -> list[JudgedPattern]:
+        """Look again at a User's Patterns, and list those still ready.
+
+        Used before a Pattern is shared, since a ready one is otherwise
+        judged only when a Conversation ends. No model call.
+
+        Args:
+            user: The User.
+            settings: The platform settings.
+
+        Returns:
+            Their ready Patterns that still pass every stored check, as
+            judged now; one that no longer does was moved back.
+        """
+        return self._look(
+            user, settings, PatternMoveCause.LOOKED_BEFORE_SHARING, None
+        ).ready
+
+    def _look(
+        self,
+        user: User,
+        settings: PlatformSettings,
+        cause: PatternMoveCause,
+        conversation_id: UUID | None,
+    ) -> Looked:
+        """Judge the User's suspected and ready Patterns, and save what changed.
+
+        Args:
+            user: The User.
+            settings: The platform settings.
+            cause: What made their Patterns be looked at.
+            conversation_id: The Conversation tagged, when that is the cause.
+
+        Returns:
+            The suspected Patterns waiting for the last two checks, and the
+            Patterns still ready.
+        """
         with self._repositories.transaction() as transaction:
             transaction.lock_user(user.id)
             repositories = transaction.repositories
@@ -690,6 +745,7 @@ class ReadyKeeper:
             changed = [pattern for pattern, _ in taken]
             moves = [move for _, move in taken]
             waiting = []
+            ready = []
             for judged in all_judged:
                 pattern = replace(judged.pattern, narrowings=judged.facts.narrowings)
                 if pattern.state == PatternState.READY:
@@ -710,6 +766,8 @@ class ReadyKeeper:
                             now,
                         )
                         moves.append(move)
+                    else:
+                        ready.append(replace(judged, pattern=pattern))
                 else:
                     blocked = ready_check(judged.facts, judged.bars)
                     if blocked == ReadyCheck.QUOTES:
@@ -723,7 +781,7 @@ class ReadyKeeper:
                 if pattern != judged.pattern:
                     changed.append(pattern)
             repositories.patterns.save_moves([], changed, [], moves)
-            return waiting
+            return Looked(waiting=waiting, ready=ready)
 
     def settle(
         self,

@@ -73,6 +73,8 @@ from companion.core.models import (
     PersonalSticker,
     PhotoImage,
     PlatformSettings,
+    Prediction,
+    ReactionToPattern,
     ReplyPlan,
     ReplyPlanShape,
     RiskType,
@@ -1552,8 +1554,8 @@ class PatternRepository(Protocol):
         Args:
             added: Patterns noticed for the first time.
             changed: Patterns that moved or that the ready gate judged, with
-                their state, blocking check, narrowings and when the other
-                side was last argued.
+                their state, blocking check, narrowings, when the other
+                side was last argued and when they were shared.
             deleted_ids: Patterns with no Observations left; their moves stay.
             moves: The moves, added to the log in order.
         """
@@ -1567,6 +1569,79 @@ class PatternRepository(Protocol):
 
         Returns:
             The moves, including those of Patterns since deleted.
+        """
+        ...
+
+    def count_shared_since(
+        self, user_ids: Sequence[UUID], since: datetime
+    ) -> dict[UUID, int]:
+        """Count the Patterns shared with many Users since a time, in one query.
+
+        It counts the logged moves to shared, so a Pattern deleted since
+        still counts.
+
+        Args:
+            user_ids: The Users' IDs.
+            since: Only Patterns shared after this are counted.
+
+        Returns:
+            Each User's count; a User with none is left out.
+        """
+        ...
+
+    def list_users_with_ready_since(
+        self, user_ids: Sequence[UUID], ready_by: datetime
+    ) -> set[UUID]:
+        """Find which of many Users have a Pattern ready since a time, in one query.
+
+        Args:
+            user_ids: The Users' IDs.
+            ready_by: Only a Pattern that became ready at or before this
+                counts.
+
+        Returns:
+            The IDs of the Users with such a Pattern.
+        """
+        ...
+
+    def add_prediction(self, prediction: Prediction) -> None:
+        """Save the Prediction given with a shared Pattern.
+
+        Args:
+            prediction: The Prediction.
+        """
+        ...
+
+    def list_predictions(self, user_id: UUID) -> list[Prediction]:
+        """List the Predictions given to a User, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Predictions.
+        """
+        ...
+
+    def add_reactions(self, reactions: Sequence[ReactionToPattern]) -> None:
+        """Save how a User took Patterns in one Conversation.
+
+        A Pattern keeps one reaction per Conversation: a second one read
+        from the same Conversation is left out.
+
+        Args:
+            reactions: The reactions.
+        """
+        ...
+
+    def list_reactions(self, user_id: UUID) -> list[ReactionToPattern]:
+        """List how a User took the Patterns they were told, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The reactions.
         """
         ...
 

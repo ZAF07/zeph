@@ -194,6 +194,7 @@ class ChatSetting(StrEnum):
     PHOTO_VIEWING = "photo_viewing"
     TIME_ZONE = "time_zone"
     DIRECTNESS = "directness"
+    CONTESTED_GATHERING = "contested_gathering"
 
 
 class Directness(StrEnum):
@@ -260,6 +261,8 @@ class User:
             saying Zeph keeps quotes as evidence; none is kept before.
         familiarity: How well the Companion knows them, as worked out when
             their last Conversation ended.
+        contested_gathering_enabled: Whether the Companion may keep noting
+            evidence for a Pattern they disagreed with.
     """
 
     id: UUID
@@ -283,6 +286,7 @@ class User:
     data_deletion_requested_at: datetime | None = None
     pattern_noticing_told_at: datetime | None = None
     familiarity: Familiarity = Familiarity.NEW
+    contested_gathering_enabled: bool = True
 
     @property
     def has_finished_onboarding(self) -> bool:
@@ -458,6 +462,8 @@ class PreferenceChanges:
         user_memory_enabled: Whether the Companion may keep User Memory.
         photo_viewing_enabled: Whether the Companion may look at their photos.
         directness: How direct they want the Companion to be with its Read.
+        contested_gathering_enabled: Whether the Companion may keep noting
+            evidence for a Pattern they disagreed with.
         country: Two-letter country code.
         time_zone: IANA time zone name.
     """
@@ -466,6 +472,7 @@ class PreferenceChanges:
     user_memory_enabled: bool | None = None
     photo_viewing_enabled: bool | None = None
     directness: Directness | None = None
+    contested_gathering_enabled: bool | None = None
     country: str | None = None
     time_zone: str | None = None
 
@@ -1720,6 +1727,11 @@ class ReplyPlanForm:
         pattern_offered: The Pattern the reply offers as Zeph's view, with
             the Read; None for none, and always None when the Read isn't
             said.
+        pattern_to_share: The ready Pattern the reply shares with the User;
+            None for none, and always None unless code offered it.
+        pattern_raised: The Pattern the User disagreed with and has now
+            raised themselves, which the reply may talk about; None for
+            none.
         curiosity_not_asked_why: Why no Curiosity is asked, when the Need
             asks them by default and one was offered; "" otherwise.
         curiosity_taken: How the User took the Curiosity Zeph asked in its
@@ -1748,6 +1760,8 @@ class ReplyPlanForm:
     check_in: ChosenCheckIn | None = None
     patterns_used: tuple[PatternPicked, ...] = ()
     pattern_offered: PatternPicked | None = None
+    pattern_to_share: PatternPicked | None = None
+    pattern_raised: PatternPicked | None = None
     curiosity_not_asked_why: str = ""
     curiosity_taken: ThreadReaction | None = None
 
@@ -2216,6 +2230,9 @@ class CheckInKind:
             change it.
         raises_curiosity: Whether its message asks one of the User's
             Curiosities. Fixed when the Kind is made; Admins can't change it.
+        shares_pattern: Whether its message shares a ready Pattern that
+            waited too long for a moment in chat. Fixed when the Kind is
+            made; Admins can't change it.
     """
 
     id: UUID
@@ -2224,6 +2241,17 @@ class CheckInKind:
     sort_order: int
     sends_shared_photo: bool = False
     raises_curiosity: bool = False
+    shares_pattern: bool = False
+
+    @property
+    def has_fixed_behaviour(self) -> bool:
+        """Say whether code decides when this Kind may be sent.
+
+        Returns:
+            True when it sends a Shared Photo, asks a Curiosity or shares a
+            Pattern.
+        """
+        return self.sends_shared_photo or self.raises_curiosity or self.shares_pattern
 
 
 @dataclass(frozen=True)
@@ -2357,6 +2385,7 @@ class Feature(StrEnum):
     CURIOSITIES = "curiosities"
     PATTERN_NOTICING = "pattern_noticing"
     PATTERN_EXPLORING = "pattern_exploring"
+    PATTERN_SHARING = "pattern_sharing"
 
 
 @dataclass(frozen=True)
@@ -2398,6 +2427,7 @@ class FeatureReason(StrEnum):
     TURNED_OFF_BY_USER = "turned_off_by_user"
     STICKERS_OFF = "stickers_off"
     PATTERN_NOTICING_OFF = "pattern_noticing_off"
+    PATTERN_EXPLORING_OFF = "pattern_exploring_off"
 
 
 @dataclass(frozen=True)
@@ -2495,6 +2525,7 @@ class ModelStep(StrEnum):
     PATTERN_TAGGING = "pattern_tagging"
     PATTERN_MATCHING = "pattern_matching"
     PATTERN_OTHER_SIDE = "pattern_other_side"
+    PATTERN_SHARED_CHECK = "pattern_shared_check"
     PATTERNS = "patterns"
     PORTRAIT = "portrait"
     PERSONAL_STICKERS = "personal_stickers"
@@ -2603,6 +2634,13 @@ class ReplyPlanShape:
             this was recorded.
         curiosity_asked: Whether the reply was to ask a Curiosity; None on
             a shape saved before this was recorded.
+        pattern_to_share_offered: Whether code offered it a ready Pattern
+            to share; None on a shape saved before this was recorded.
+        pattern_share_planned: Whether the reply was to share that Pattern;
+            None on a shape saved before this was recorded.
+        pattern_shared: Whether the check after the reply found the Pattern
+            was shared; None when the reply wasn't to share one, or the
+            check hasn't run.
     """
 
     need: str
@@ -2622,6 +2660,9 @@ class ReplyPlanShape:
     pattern_offered: bool = False
     curiosities_offered: int | None = None
     curiosity_asked: bool | None = None
+    pattern_to_share_offered: bool | None = None
+    pattern_share_planned: bool | None = None
+    pattern_shared: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -3298,6 +3339,8 @@ class CatalogPattern:
             gave a readable answer; None if never.
         other_side_found_better: Whether it then found a better
             explanation; None if never asked.
+        shared_at: When the Companion first told the User about it; None
+            if it never did.
     """
 
     id: UUID
@@ -3310,6 +3353,66 @@ class CatalogPattern:
     narrowings: tuple[PatternNarrowing, ...] = ()
     other_side_asked_at: datetime | None = None
     other_side_found_better: bool | None = None
+    shared_at: datetime | None = None
+
+
+class ShareVia(StrEnum):
+    """How a Pattern was shared with a User."""
+
+    CHAT = "chat"
+    CHECK_IN = "check_in"
+
+
+@dataclass(frozen=True)
+class Prediction:
+    """The one thing a User is asked to watch for when a Pattern is shared.
+
+    Attributes:
+        id: Our ID for the Prediction.
+        user_id: The User it was given to.
+        pattern_id: The Pattern it tests.
+        wording: The Prediction, as the Companion put it to them.
+        made_at: When it was given.
+    """
+
+    id: UUID
+    user_id: UUID
+    pattern_id: UUID
+    wording: str
+    made_at: datetime
+
+
+class PatternReaction(StrEnum):
+    """How a User took a Pattern the Companion told them."""
+
+    AGREED = "agreed"
+    PUSHED_BACK = "pushed_back"
+    BRUSHED_OFF = "brushed_off"
+
+
+@dataclass(frozen=True)
+class ReactionToPattern:
+    """How a User took a Pattern in one Conversation, as the model read it.
+
+    It holds no words of the User's. Agreeing counts as a weak sign for the
+    Pattern and pushing back as a weak sign against it.
+
+    Attributes:
+        id: Our ID for the reaction.
+        user_id: The User who reacted.
+        pattern_id: The Pattern they reacted to.
+        reaction: How they took it.
+        conversation_id: The Conversation it was read from; None once that
+            Conversation is gone.
+        reacted_at: When it was read.
+    """
+
+    id: UUID
+    user_id: UUID
+    pattern_id: UUID
+    reaction: PatternReaction
+    conversation_id: UUID | None
+    reacted_at: datetime
 
 
 @dataclass(frozen=True)
@@ -3336,11 +3439,15 @@ class ExclusionFlag:
 
 
 class PatternMoveCause(StrEnum):
-    """What made code score a User's Patterns again, so one moved."""
+    """What made code look at a User's Patterns again, so one moved."""
 
     CONVERSATION_TAGGED = "conversation_tagged"
     OBSERVATIONS_DELETED = "observations_deleted"
     EVIDENCE_TAGGED_AGAIN = "evidence_tagged_again"
+    LOOKED_BEFORE_SHARING = "looked_before_sharing"
+    SHARED_IN_CHAT = "shared_in_chat"
+    SHARED_IN_CHECK_IN = "shared_in_check_in"
+    USER_REACTED = "user_reacted"
 
 
 @dataclass(frozen=True)

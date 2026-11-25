@@ -67,6 +67,9 @@ users = Table(
     Column("data_deletion_requested_at", DateTime(timezone=True)),
     Column("pattern_noticing_told_at", DateTime(timezone=True)),
     Column("familiarity", Text, nullable=False, server_default="new"),
+    Column(
+        "contested_gathering_enabled", Boolean, nullable=False, server_default="true"
+    ),
 )
 
 telegram_connections = Table(
@@ -566,8 +569,61 @@ patterns = Table(
     Column("narrowings", JSONB, nullable=False, server_default="[]"),
     Column("other_side_asked_at", DateTime(timezone=True)),
     Column("other_side_found_better", Boolean),
+    Column("shared_at", DateTime(timezone=True)),
     UniqueConstraint(
         "user_id", "pattern_type_id", name="uq_patterns_user_id_pattern_type_id"
+    ),
+)
+
+predictions = Table(
+    "predictions",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column(
+        "pattern_id",
+        Uuid,
+        ForeignKey("patterns.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("wording", Text, nullable=False),
+    Column("made_at", DateTime(timezone=True), nullable=False),
+)
+
+pattern_reactions = Table(
+    "pattern_reactions",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column(
+        "pattern_id",
+        Uuid,
+        ForeignKey("patterns.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("reaction", Text, nullable=False),
+    Column(
+        "conversation_id", Uuid, ForeignKey("conversations.id", ondelete="SET NULL")
+    ),
+    Column("reacted_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "pattern_id",
+        "conversation_id",
+        name="uq_pattern_reactions_pattern_id_conversation_id",
     ),
 )
 
@@ -923,6 +979,7 @@ check_in_kinds = Table(
     Column("sort_order", Integer, nullable=False),
     Column("sends_shared_photo", Boolean, nullable=False),
     Column("raises_curiosity", Boolean, nullable=False),
+    Column("shares_pattern", Boolean, nullable=False),
 )
 
 check_ins = Table(

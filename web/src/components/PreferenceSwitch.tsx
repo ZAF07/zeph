@@ -10,7 +10,10 @@ import { paragraphs } from "@/lib/paragraphs";
 import { useUpdatePreferences } from "@/lib/queries";
 
 /** The User's own on/off settings that a `PreferenceSwitch` can save. */
-export type SwitchPreference = "user_memory_enabled" | "photo_viewing_enabled";
+export type SwitchPreference =
+  | "user_memory_enabled"
+  | "photo_viewing_enabled"
+  | "contested_gathering_enabled";
 
 const settingParagraph = "mt-0 mb-2 max-w-[620px] text-[14px] text-soft";
 

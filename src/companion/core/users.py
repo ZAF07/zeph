@@ -220,9 +220,10 @@ class UserService:
     ) -> User:
         """Change a User's name, own switches, directness, country or time zone.
 
-        Only the User Memory and Photo Viewing settings, directness and time
-        zone are marked as changed in chat or on the Dashboard, and only when
-        their value really changes.
+        Only the User Memory and Photo Viewing settings, directness, noting
+        evidence on a Pattern they disagreed with and time zone are marked
+        as changed in chat or on the Dashboard, and only when their value
+        really changes.
 
         Args:
             user: The User making the change.
@@ -247,6 +248,11 @@ class UserService:
             changed.append(ChatSetting.PHOTO_VIEWING)
         if changes.directness not in (None, user.directness):
             changed.append(ChatSetting.DIRECTNESS)
+        if changes.contested_gathering_enabled not in (
+            None,
+            user.contested_gathering_enabled,
+        ):
+            changed.append(ChatSetting.CONTESTED_GATHERING)
         check_ins = user.check_ins
         if changes.time_zone not in (None, user.time_zone):
             changed.append(ChatSetting.TIME_ZONE)
@@ -268,6 +274,11 @@ class UserService:
                 changes.directness
                 if changes.directness is not None
                 else user.directness
+            ),
+            contested_gathering_enabled=(
+                changes.contested_gathering_enabled
+                if changes.contested_gathering_enabled is not None
+                else user.contested_gathering_enabled
             ),
             country=(
                 check_country(changes.country)

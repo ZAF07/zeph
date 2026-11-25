@@ -22,6 +22,7 @@ from companion.core.models import (
     WebSearchResult,
     join_instructions,
 )
+from companion.core.pattern_sharing import SHARED_CHECK_PROMPT
 from companion.core.ports import ChatTool
 from companion.core.typing_keeper import TYPING_WAIT_PREFIX
 from companion.core.woven_check_ins import BROUGHT_UP_CHECK_PROMPT
@@ -555,6 +556,8 @@ def reply_plan_answer(
     offer_pattern: object = None,
     no_curiosity_why: object = None,
     curiosity_taken: object = None,
+    share_pattern: object = False,
+    raised_pattern: object = None,
 ) -> str:
     """Build the form the Reply Plan model answers with.
 
@@ -596,6 +599,10 @@ def reply_plan_answer(
         curiosity_taken: How they took the Curiosity asked in the last
             reply, or anything else a model might write there; None for not
             said.
+        share_pattern: Whether the reply tells them the ready Pattern, or
+            anything else a model might write there.
+        raised_pattern: The number of the Pattern they disagreed with and
+            raised themselves, or anything else a model might write there.
 
     Returns:
         The form as JSON.
@@ -628,6 +635,8 @@ def reply_plan_answer(
         "offer_pattern": offer_pattern,
         "no_curiosity_why": no_curiosity_why,
         "curiosity_taken": curiosity_taken,
+        "share_pattern": share_pattern,
+        "raised_pattern": raised_pattern,
     }
     if ask_why is not None:
         answer["ask_why"] = ask_why
@@ -649,7 +658,8 @@ class ScriptedChatModel:
     `reply_plan_answer()`, Life Thread, Pattern, Curiosity and Move Outcome
     keeping to none kept, arguing the other side to no better
     explanation, Portrait writing to an empty answer (no
-    Portrait), the brought-up check to "no" and drafting to
+    Portrait), the brought-up check to "no", the check that a Pattern was
+    shared to not shared and drafting to
     `DEFAULT_WHEN_IT_HELPS`, so tests about replies don't have to script
     them too. Set
     `before_next_reply` to run something once while the next reply is being
@@ -723,6 +733,7 @@ class ScriptedChatModel:
         self._pattern_tagging_answers: list[str | Exception] = []
         self._pattern_matching_answers: list[str | Exception] = []
         self._other_side_answers: list[str | Exception] = []
+        self._shared_check_answers: list[str | Exception] = []
         self.safeguard_prompt = safeguard_prompt
         self.memory_processing_prompt = memory_processing_prompt
         self.understanding_prompt = understanding_prompt
@@ -753,6 +764,7 @@ class ScriptedChatModel:
         self.pattern_tagging_calls: list[ChatModelCall] = []
         self.pattern_matching_calls: list[ChatModelCall] = []
         self.other_side_calls: list[ChatModelCall] = []
+        self.shared_check_calls: list[ChatModelCall] = []
         self.call_order: list[str] = []
         self.delay_seconds = 0.0
         self.before_next_reply: Callable[[], None] | None = None
@@ -880,6 +892,15 @@ class ScriptedChatModel:
                 returned, to act like a failing model.
         """
         self._other_side_answers.extend(answers)
+
+    def script_shared_check(self, *answers: str | Exception) -> None:
+        """Queue answers to whether a message shared its Pattern, one per call.
+
+        Args:
+            answers: The JSON answers; an exception is raised instead of
+                returned, to act like a failing model.
+        """
+        self._shared_check_answers.extend(answers)
 
     def script_brought_up_check(self, *answers: str | Exception) -> None:
         """Queue answers to whether a reply brought up its Check-in, one per call.
@@ -1084,6 +1105,14 @@ class ScriptedChatModel:
                 self._when_it_helps_answers.pop(0)
                 if self._when_it_helps_answers
                 else DEFAULT_WHEN_IT_HELPS
+            )
+        elif instructions == SHARED_CHECK_PROMPT:
+            self.shared_check_calls.append(call)
+            self.call_order.append("shared_check")
+            answer = (
+                self._shared_check_answers.pop(0)
+                if self._shared_check_answers
+                else json.dumps({"shared": False, "prediction": ""})
             )
         elif instructions == BROUGHT_UP_CHECK_PROMPT:
             self.brought_up_check_calls.append(call)

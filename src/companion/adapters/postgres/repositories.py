@@ -60,12 +60,14 @@ from companion.adapters.postgres.tables import (
     pattern_evidence,
     pattern_exclusion_flags,
     pattern_moves,
+    pattern_reactions,
     pattern_types,
     patterns,
     patterns_in_mind,
     pending_auth_account_deletions,
     personal_stickers,
     platform_settings,
+    predictions,
     reply_plans,
     safeguard_events,
     shared_photos,
@@ -177,12 +179,15 @@ from companion.core.models import (
     PatternMoveCause,
     PatternNarrowing,
     PatternPicked,
+    PatternReaction,
     PatternState,
     PatternToSave,
     PatternTypeVersion,
     PersonalSticker,
     PlatformSettings,
     Power,
+    Prediction,
+    ReactionToPattern,
     ReadyCheck,
     Relationship,
     RepliedToSender,
@@ -322,6 +327,7 @@ def _to_user(row: Row[Any]) -> User:
         data_deletion_requested_at=row.data_deletion_requested_at,
         pattern_noticing_told_at=row.pattern_noticing_told_at,
         familiarity=Familiarity(row.familiarity),
+        contested_gathering_enabled=row.contested_gathering_enabled,
     )
 
 
@@ -476,6 +482,7 @@ def _to_check_in_kind(row: Row[Any]) -> CheckInKind:
         sort_order=row.sort_order,
         sends_shared_photo=row.sends_shared_photo,
         raises_curiosity=row.raises_curiosity,
+        shares_pattern=row.shares_pattern,
     )
 
 
@@ -893,6 +900,7 @@ class PostgresUserRepository:
                 user_memory_enabled=user.user_memory_enabled,
                 photo_viewing_enabled=user.photo_viewing_enabled,
                 directness=user.directness.value,
+                contested_gathering_enabled=user.contested_gathering_enabled,
                 onboarding_completed_at=user.onboarding_completed_at,
                 check_ins_enabled=user.check_ins.enabled,
                 check_in_frequency=user.check_ins.frequency.value,
@@ -2715,11 +2723,12 @@ def _reply_plan_form_values(form: ReplyPlanForm) -> dict[str, Any]:
         {**item, "pattern_id": str(item["pattern_id"])}
         for item in values["patterns_used"]
     ]
-    if values["pattern_offered"] is not None:
-        values["pattern_offered"] = {
-            **values["pattern_offered"],
-            "pattern_id": str(values["pattern_offered"]["pattern_id"]),
-        }
+    for field_name in ("pattern_offered", "pattern_to_share", "pattern_raised"):
+        if values[field_name] is not None:
+            values[field_name] = {
+                **values[field_name],
+                "pattern_id": str(values[field_name]["pattern_id"]),
+            }
     return values
 
 
@@ -2750,7 +2759,8 @@ def _to_reply_plan_form(stored: dict[str, Any]) -> ReplyPlanForm:
     """Turn a saved form back into a Reply Plan form.
 
     A form saved before Reply Plans formed a Read, weighed a Check-in,
-    used Patterns or said why no Curiosity was asked, reads as having none.
+    used or shared Patterns or said why no Curiosity was asked, reads as
+    having none.
 
     Args:
         stored: The form as saved.
@@ -2810,6 +2820,16 @@ def _to_reply_plan_form(stored: dict[str, Any]) -> ReplyPlanForm:
         pattern_offered=(
             _to_pattern_picked(stored["pattern_offered"])
             if stored.get("pattern_offered")
+            else None
+        ),
+        pattern_to_share=(
+            _to_pattern_picked(stored["pattern_to_share"])
+            if stored.get("pattern_to_share")
+            else None
+        ),
+        pattern_raised=(
+            _to_pattern_picked(stored["pattern_raised"])
+            if stored.get("pattern_raised")
             else None
         ),
         curiosity_not_asked_why=stored.get("curiosity_not_asked_why", ""),
@@ -3965,6 +3985,7 @@ class PostgresPatternRepository:
                 ),
                 other_side_asked_at=row.other_side_asked_at,
                 other_side_found_better=row.other_side_found_better,
+                shared_at=row.shared_at,
             )
             for row in rows
         ]
@@ -3981,8 +4002,8 @@ class PostgresPatternRepository:
         Args:
             added: Patterns noticed for the first time.
             changed: Patterns that moved or that the ready gate judged, with
-                their state, blocking check, narrowings and when the other
-                side was last argued.
+                their state, blocking check, narrowings, when the other
+                side was last argued and when they were shared.
             deleted_ids: Patterns with no Observations left; their moves stay.
             moves: The moves, added to the log in order.
         """
@@ -4023,6 +4044,7 @@ class PostgresPatternRepository:
                         other_side_found_better=bindparam(
                             "new_other_side_found_better"
                         ),
+                        shared_at=bindparam("new_shared_at"),
                     ),
                     [
                         {
@@ -4042,6 +4064,7 @@ class PostgresPatternRepository:
                             "new_other_side_found_better": (
                                 pattern.other_side_found_better
                             ),
+                            "new_shared_at": pattern.shared_at,
                         }
                         for pattern in changed
                     ],
@@ -4097,6 +4120,157 @@ class PostgresPatternRepository:
                 situations=row.situations,
                 moved_at=row.moved_at,
                 blocked_by=ReadyCheck(row.blocked_by) if row.blocked_by else None,
+            )
+            for row in rows
+        ]
+
+    def count_shared_since(
+        self, user_ids: Sequence[UUID], since: datetime
+    ) -> dict[UUID, int]:
+        """Count the Patterns shared with many Users since a time, in one query.
+
+        It counts the logged moves to shared, so a Pattern deleted since
+        still counts.
+
+        Args:
+            user_ids: The Users' IDs.
+            since: Only Patterns shared after this are counted.
+
+        Returns:
+            Each User's count; a User with none is left out.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(pattern_moves.c.user_id, func.count().label("shared_count"))
+                .where(
+                    pattern_moves.c.user_id.in_(user_ids),
+                    pattern_moves.c.to_state == PatternState.SHARED.value,
+                    pattern_moves.c.moved_at > since,
+                )
+                .group_by(pattern_moves.c.user_id)
+            ).all()
+        return {row.user_id: row.shared_count for row in rows}
+
+    def list_users_with_ready_since(
+        self, user_ids: Sequence[UUID], ready_by: datetime
+    ) -> set[UUID]:
+        """Find which of many Users have a Pattern ready since a time, in one query.
+
+        Args:
+            user_ids: The Users' IDs.
+            ready_by: Only a Pattern that became ready at or before this
+                counts.
+
+        Returns:
+            The IDs of the Users with such a Pattern.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(patterns.c.user_id)
+                .where(
+                    patterns.c.user_id.in_(user_ids),
+                    patterns.c.state == PatternState.READY.value,
+                    patterns.c.updated_at <= ready_by,
+                )
+                .distinct()
+            ).all()
+        return {row.user_id for row in rows}
+
+    def add_prediction(self, prediction: Prediction) -> None:
+        """Save the Prediction given with a shared Pattern.
+
+        Args:
+            prediction: The Prediction.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                insert(predictions).values(
+                    id=prediction.id,
+                    user_id=prediction.user_id,
+                    pattern_id=prediction.pattern_id,
+                    wording=prediction.wording,
+                    made_at=prediction.made_at,
+                )
+            )
+
+    def list_predictions(self, user_id: UUID) -> list[Prediction]:
+        """List the Predictions given to a User, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Predictions.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(predictions)
+                .where(predictions.c.user_id == user_id)
+                .order_by(predictions.c.made_at, predictions.c.id)
+            ).all()
+        return [
+            Prediction(
+                id=row.id,
+                user_id=row.user_id,
+                pattern_id=row.pattern_id,
+                wording=row.wording,
+                made_at=row.made_at,
+            )
+            for row in rows
+        ]
+
+    def add_reactions(self, reactions: Sequence[ReactionToPattern]) -> None:
+        """Save how a User took Patterns in one Conversation.
+
+        A Pattern keeps one reaction per Conversation: a second one read
+        from the same Conversation is left out.
+
+        Args:
+            reactions: The reactions.
+        """
+        if not reactions:
+            return
+        with self._database.begin() as connection:
+            connection.execute(
+                insert(pattern_reactions).on_conflict_do_nothing(
+                    constraint="uq_pattern_reactions_pattern_id_conversation_id"
+                ),
+                [
+                    {
+                        "id": reaction.id,
+                        "user_id": reaction.user_id,
+                        "pattern_id": reaction.pattern_id,
+                        "reaction": reaction.reaction.value,
+                        "conversation_id": reaction.conversation_id,
+                        "reacted_at": reaction.reacted_at,
+                    }
+                    for reaction in reactions
+                ],
+            )
+
+    def list_reactions(self, user_id: UUID) -> list[ReactionToPattern]:
+        """List how a User took the Patterns they were told, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The reactions.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(pattern_reactions)
+                .where(pattern_reactions.c.user_id == user_id)
+                .order_by(pattern_reactions.c.reacted_at, pattern_reactions.c.id)
+            ).all()
+        return [
+            ReactionToPattern(
+                id=row.id,
+                user_id=row.user_id,
+                pattern_id=row.pattern_id,
+                reaction=PatternReaction(row.reaction),
+                conversation_id=row.conversation_id,
+                reacted_at=row.reacted_at,
             )
             for row in rows
         ]
@@ -6458,6 +6632,7 @@ class PostgresCheckInRepository:
                     sort_order=0 if highest is None else int(highest) + 1,
                     sends_shared_photo=False,
                     raises_curiosity=False,
+                    shares_pattern=False,
                 )
                 .returning(check_in_kinds)
             ).one()
@@ -7448,6 +7623,9 @@ def _to_reply_plan_shape(values: dict[str, Any]) -> ReplyPlanShape:
         check_in_kind=values.get("check_in_kind"),
         curiosities_offered=values.get("curiosities_offered"),
         curiosity_asked=values.get("curiosity_asked"),
+        pattern_to_share_offered=values.get("pattern_to_share_offered"),
+        pattern_share_planned=values.get("pattern_share_planned"),
+        pattern_shared=values.get("pattern_shared"),
     )
 
 

@@ -284,6 +284,16 @@ const fieldSections: {
         unit: "days",
       },
       {
+        key: "patterns_shared_per_week",
+        label: "New Patterns shared a week",
+        unit: "per week",
+      },
+      {
+        key: "pattern_share_wait_days",
+        label: "Days a ready Pattern waits for a moment in chat",
+        unit: "days",
+      },
+      {
         key: "agenda_size",
         label: "Explorations on the Agenda",
         unit: "at once",

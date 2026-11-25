@@ -1,6 +1,6 @@
 # 08 — Zeph shares a ready Pattern with the User's quotes and a Prediction
 
-Status: ready-for-agent
+Status: in-progress
 Track: A
 Blocked by: 07
 
@@ -39,3 +39,15 @@ This adds Dashboard UI: read `web/design/README.md` first, add or extend the ref
 ## Comments
 
 - 25 Nov 2026 (from issue 07): the ready gate is built (`core/ready_gate.py`). For sharing: (1) a ready Pattern is judged again only at a Conversation end or when Observations are deleted, so look again before sharing (`ReadyKeeper.look` does it with no model call), and check struggling there, which the gate doesn't; (2) "not rejected" has no source yet: make a rejected Pattern contested and the gate will never look at it; (3) the narrowing is on the Pattern (`CatalogPattern.narrowings`: tag, holds with, not with) for the wording; (4) pick quotes from Observations that are not `excluded` and not on a ruled-out topic the User didn't raise.
+
+### 25 Nov 2026: plan (branch `pattern-08-sharing-a-ready-pattern`)
+
+Started once issue 07 was merged (f480706). Slices, each test-first:
+
+1. **Feature** Pattern sharing (needs Pattern exploring, off to start). Settings `patterns_shared_per_week` (1) and `pattern_share_wait_days` (5).
+2. **Offer.** New `core/pattern_sharing.py`. Before each reply, when sharing works, they aren't struggling and the weekly limit isn't reached: look again (`ReadyKeeper.look`, no model call), then offer the Reply Plan the oldest ready Pattern with its approved wording, narrowing, two or three quotes from different Life Threads (pure `pick_quotes`) and the Prediction wording. The form gains `share_pattern`.
+3. **Reply and check.** The reply gets the three parts at level 3. A small check after the reply (fixed prompt, Check-in model, like the brought-up check) says whether it was shared and reads the Prediction as worded. Only then: ready → shared (logged), share and Prediction saved. The Reply Plan shape records offered and shared.
+4. **Check-in.** A new Check-in Kind with fixed behaviour `shares_pattern`, offered only when a ready Pattern has waited the Admin-set days; the same check after it is sent.
+5. **Reactions.** Read by the tagging step at Conversation end (it is shown the Patterns told to them): agreed, pushed back, brushed off. Code: agreed adds a weak sign for; pushed back makes it contested (logged) with a weak sign against. Kept as rows (`pattern_reactions`), so agreeing adds up.
+6. **Contested.** Never ready again (the gate skips it). The Reply Plan sees contested ones marked "only if they raise it". A User switch `contested_gathering` (on to start) on Account & privacy and as a chat settings tool; off drops new Observations of contested Pattern Types at tagging.
+7. Dashboard: the switch (reference + pixel test), Features page, Platform settings, Check-in Kinds, trace page. Docs.

@@ -60,6 +60,14 @@ from companion.core.models import (
 )
 from companion.core.move_outcomes import describe_move_outcome
 from companion.core.past_day import PastDayTool
+from companion.core.pattern_sharing import (
+    ContestedPattern,
+    PatternToShare,
+    describe_contested,
+    describe_pattern_to_share,
+    format_pattern_to_share_for_reply,
+    format_raised_pattern_for_reply,
+)
 from companion.core.patterns import RemindedPattern, describe_patterns_in_mind
 from companion.core.platform_settings import (
     CURIOSITY_HELD_WHEN_ASKING_WHY,
@@ -89,6 +97,7 @@ from companion.core.woven_check_ins import WovenCheckIn
 logger = logging.getLogger(__name__)
 
 ASKS_WHY_INSTEAD = "The reply asks why they feel as they do instead."
+SHARES_A_PATTERN_INSTEAD = "The reply tells them a Pattern instead."
 NO_REPLY_PLAN = "The Reply Plan couldn't be made."
 
 
@@ -145,6 +154,10 @@ class PlannedReply:
             Photos.
         check_in: The due Check-in it chose to offer the reply; None for
             none.
+        shape: Its shape as recorded in the Model Call Log; None when not
+            kept.
+        pattern_to_share: The ready Pattern the reply is to share; None
+            for none.
     """
 
     reply_plan: ReplyPlan
@@ -152,6 +165,8 @@ class PlannedReply:
     asks_a_question: bool = False
     may_send_photo: bool = True
     check_in: WovenCheckIn | None = None
+    shape: ReplyPlanShape | None = None
+    pattern_to_share: PatternToShare | None = None
 
 
 def format_earlier_reply_plan(reply_plan: ReplyPlan) -> str:
@@ -373,6 +388,8 @@ def describe_message_for_reply_plan(
     last_conversation_where: str = "",
     patterns: Sequence[RemindedPattern] = (),
     agenda: Sequence[AgendaEntry] = (),
+    pattern_to_share: PatternToShare | None = None,
+    contested: Sequence[ContestedPattern] = (),
 ) -> str:
     """Write what the Reply Plan model is given about the Message.
 
@@ -401,6 +418,9 @@ def describe_message_for_reply_plan(
         patterns: The Patterns in mind, numbered.
         agenda: The User's active Explorations; empty while Pattern
             exploring doesn't work for them or they are struggling.
+        pattern_to_share: The ready Pattern code offers it to share; None
+            for none.
+        contested: The Patterns the User disagreed with, numbered.
 
     Returns:
         The time, the Understanding, how direct the User wants it to be
@@ -408,7 +428,8 @@ def describe_message_for_reply_plan(
         them (their Familiarity), Needs, Moves and which each
         Need allows, past Move Outcomes with their days, User Portrait, Goals,
         Memory Categories, recent Conversations, reminded Life Threads, the
-        Patterns in mind, due Curiosities and how each Need treats them, the
+        Patterns in mind, the ready Pattern it may share and those the User
+        disagreed with, due Curiosities and how each Need treats them, the
         Agenda with its earlier tries, Knowledge documents, the due
         Check-in's Kinds when one is due, where the previous Conversation
         was, earlier Reply Plans, earlier messages across Conversations and
@@ -478,6 +499,8 @@ def describe_message_for_reply_plan(
         f"their life. An unmatched one is only your guess: your Read may think "
         f"with it, but never offer it or say it as a pattern:\n"
         f"{describe_patterns_in_mind(patterns)}"
+        f"{describe_pattern_to_share(pattern_to_share)}"
+        f"{describe_contested(contested)}"
         f"\n\nThings you've been wondering about them, whose time has come "
         f"{describe_due_curiosities(due, snapshot.user.time_zone)}"
         f"{awaiting_line}"
@@ -659,6 +682,49 @@ def read_pattern_offered(
     return PatternPicked(pattern_id=item.pattern.id, pattern=item.pattern.pattern)
 
 
+def read_pattern_to_share(
+    value: Any, offered: PatternToShare | None
+) -> PatternPicked | None:
+    """Read whether the form shares the ready Pattern code offered.
+
+    Args:
+        value: The `share_pattern` field's value.
+        offered: The ready Pattern code offered; None for none.
+
+    Returns:
+        The Pattern, with its approved wording; None unless one was offered
+        and the form says true.
+    """
+    if offered is None or value is not True:
+        return None
+    return PatternPicked(
+        pattern_id=offered.pattern.id, pattern=offered.pattern_type.approved_wording
+    )
+
+
+def read_pattern_raised(
+    value: Any, contested: Sequence[ContestedPattern]
+) -> PatternPicked | None:
+    """Find the Pattern the form says the User raised themselves.
+
+    Args:
+        value: The `raised_pattern` field's value: a number.
+        contested: The Patterns the User disagreed with, numbered.
+
+    Returns:
+        The Pattern, with its approved wording; None if the value isn't one
+        of their numbers.
+    """
+    number = read_number(value)
+    for item in contested:
+        if item.number == number:
+            return PatternPicked(
+                pattern_id=item.pattern.id,
+                pattern=item.pattern_type.approved_wording,
+            )
+    return None
+
+
 def read_patterns_picked(
     value: Any, by_number: dict[int, RemindedPattern]
 ) -> tuple[PatternPicked, ...]:
@@ -837,6 +903,8 @@ def read_reply_plan_form(
     knowledge_documents: dict[int, KnowledgeDocument],
     check_in_kinds: Sequence[CheckInKind] = (),
     patterns: Sequence[RemindedPattern] = (),
+    pattern_to_share: PatternToShare | None = None,
+    contested: Sequence[ContestedPattern] = (),
 ) -> ReplyPlanForm | None:
     """Read the Reply Plan model's JSON form.
 
@@ -850,7 +918,9 @@ def read_reply_plan_form(
     only when there is one and "say_read" is true. A Check-in is chosen only
     from the Kinds offered. Patterns are named by their numbers in the
     Patterns in mind; one is offered only when the Read is said, and an
-    offered one counts as used.
+    offered one counts as used. A Pattern is shared only when code offered
+    a ready one, and one the User disagreed with is talked about only when
+    the form names it as raised by them.
 
     Args:
         answer: The model's answer.
@@ -861,6 +931,8 @@ def read_reply_plan_form(
         check_in_kinds: The Check-in Kinds it was offered; empty when no
             Check-in was due.
         patterns: The Patterns in mind the model was shown, numbered.
+        pattern_to_share: The ready Pattern code offered it; None for none.
+        contested: The Patterns the User disagreed with, numbered.
 
     Returns:
         The form, or None if it has no JSON object naming a Need.
@@ -911,6 +983,10 @@ def read_reply_plan_form(
         check_in=read_check_in_choice(parsed.get("check_in"), check_in_kinds),
         patterns_used=tuple(dict.fromkeys([*used, *([offered] if offered else [])])),
         pattern_offered=offered,
+        pattern_to_share=read_pattern_to_share(
+            parsed.get("share_pattern"), pattern_to_share
+        ),
+        pattern_raised=read_pattern_raised(parsed.get("raised_pattern"), contested),
         curiosity_not_asked_why=read_form_text(parsed.get("no_curiosity_why")),
         curiosity_taken=read_curiosity_taken(parsed.get("curiosity_taken"), due),
     )
@@ -921,30 +997,30 @@ def settle_curiosities(
     form: ReplyPlanForm,
     need: Need,
     due: DueCuriosities,
-    held_back_by_asking_why: bool,
+    held_back_why: str,
 ) -> ReplyPlanForm:
     """Hold the form's Curiosities to what the picked Need and the reply allow.
 
-    When Admins hold Curiosities back from a reply that asks why, such a
-    reply asks no Curiosity too. Under a Need that asks Curiosities by
-    default, a reply that asks none of those offered keeps the reason.
+    A reply that tells them a Pattern asks no Curiosity, and when Admins
+    hold Curiosities back from a reply that asks why, such a reply asks
+    none too. Under a Need that asks Curiosities by default, a reply that
+    asks none of those offered keeps the reason.
 
     Args:
         form: The form, as read.
         need: The Need the reply follows.
         due: The Curiosities the reply may ask under that Need.
-        held_back_by_asking_why: Whether the reply asks why they feel as
-            they do while Admins hold Curiosities back from such a reply.
+        held_back_why: Why the reply holds Curiosities back: it tells them
+            a Pattern, or it asks why they feel as they do while Admins
+            hold Curiosities back from such a reply; "" when it doesn't.
 
     Returns:
         The form, asking a Curiosity only when one was offered under the
-        Need and the reply isn't held back by asking why, with why none is
-        asked when the Need asks by default.
+        Need and the reply doesn't hold them back, with why none is asked
+        when the Need asks by default.
     """
-    chosen = form.curiosities if due.offered and not held_back_by_asking_why else ()
-    reason = (
-        ASKS_WHY_INSTEAD if held_back_by_asking_why else form.curiosity_not_asked_why
-    )
+    chosen = form.curiosities if due.offered and not held_back_why else ()
+    reason = held_back_why or form.curiosity_not_asked_why
     return replace(
         form,
         curiosities=chosen,
@@ -1143,6 +1219,7 @@ def format_reply_guidance(
     curiosities_section: str,
     past_days: Sequence[str] = (),
     open_needs_line: str = "",
+    pattern_section: str = "",
 ) -> ReplyGuidance:
     """Write what the Reply Plan adds to the reply's instructions.
 
@@ -1160,14 +1237,17 @@ def format_reply_guidance(
         past_days: What each call of the past-day tool read, in order.
         open_needs_line: What the Agenda still wants to learn, given when a
             lead or supporting Move asks a question; "" otherwise.
+        pattern_section: The ready Pattern to tell them, or the Pattern
+            they disagreed with and raised themselves; "" for neither.
 
     Returns:
         The Threads to leave alone as a boundary; the Need and how to reply,
         the Read when the plan says to give it now with the Pattern it
         offers, if any, the lead and supporting
         Moves and how to make them, the guidance, the mood, the note, the
-        Threads to bring up and the Curiosity to ask as the plan; and the
-        past days it read, with what the reply remembers.
+        Pattern to tell them, the Threads to bring up and the Curiosity to
+        ask as the plan; and the past days it read, with what the reply
+        remembers.
     """
     lines = [f"What they need from you right now: {need.name}.", need.how_to_reply]
     if plan.say_read:
@@ -1199,7 +1279,7 @@ def format_reply_guidance(
     if ask_why_note:
         lines.append(ask_why_note)
     reply_plan = "\n".join(lines)
-    for section in (threads_section, curiosities_section):
+    for section in (pattern_section, threads_section, curiosities_section):
         if section:
             reply_plan += f"\n\n{section}"
     past_days_section = (
@@ -1214,6 +1294,32 @@ def format_reply_guidance(
     )
 
 
+def pattern_section(
+    form: ReplyPlanForm,
+    offered: PatternToShare | None,
+    contested: Sequence[ContestedPattern],
+) -> str:
+    """Write the reply's section on the Pattern it tells them or talks about.
+
+    Args:
+        form: The form the reply follows.
+        offered: The ready Pattern code offered; None for none.
+        contested: The Patterns the User disagreed with, numbered.
+
+    Returns:
+        How to tell them the ready Pattern, when the form shares it; else
+        how to talk about the one they disagreed with and raised
+        themselves; "" for neither.
+    """
+    if form.pattern_to_share is not None and offered is not None:
+        return format_pattern_to_share_for_reply(offered)
+    if form.pattern_raised is not None:
+        for item in contested:
+            if item.pattern.id == form.pattern_raised.pattern_id:
+                return format_raised_pattern_for_reply(item)
+    return ""
+
+
 def describe_reply_plan_shape(
     need: Need,
     picked: PickedMoves,
@@ -1221,6 +1327,7 @@ def describe_reply_plan_shape(
     reminded: Sequence[RemindedThread],
     check_in_kinds_offered: int = 0,
     curiosities_offered: int = 0,
+    pattern_to_share_offered: bool = False,
 ) -> ReplyPlanShape:
     """Describe the shape of a Reply Plan for the Model Call Log.
 
@@ -1232,14 +1339,17 @@ def describe_reply_plan_shape(
         check_in_kinds_offered: How many Check-in Kinds it could weave in.
         curiosities_offered: How many Curiosities it could ask under the
             Need.
+        pattern_to_share_offered: Whether code offered it a ready Pattern
+            to share.
 
     Returns:
         The Need, the lead, supporting and next Moves' names, how many Life
         Threads were reminded, brought up, left alone and held back,
         whether a Read was formed and said, how many Check-in Kinds were
         offered and which it chose, whether a Pattern was used and
-        offered, and how many Curiosities were offered and whether one is
-        asked; never any words.
+        offered, how many Curiosities were offered and whether one is
+        asked, and whether a ready Pattern was offered and is to be shared;
+        never any words.
     """
     ways = [item.how for item in form.bring_up]
     held_back = [item for item in reminded if item.hold_back]
@@ -1261,6 +1371,8 @@ def describe_reply_plan_shape(
         pattern_offered=form.pattern_offered is not None,
         curiosities_offered=curiosities_offered,
         curiosity_asked=bool(form.curiosities),
+        pattern_to_share_offered=pattern_to_share_offered,
+        pattern_share_planned=form.pattern_to_share is not None,
     )
 
 
@@ -1323,6 +1435,8 @@ class ReplyPlanService:
         check_in_kinds: Sequence[CheckInKind] = (),
         patterns: Sequence[RemindedPattern] = (),
         agenda: Sequence[AgendaEntry] = (),
+        pattern_to_share: PatternToShare | None = None,
+        contested: Sequence[ContestedPattern] = (),
     ) -> PlannedReply:
         """Make and save the Reply Plan of the Conversation's newest Message.
 
@@ -1337,10 +1451,12 @@ class ReplyPlanService:
         Curiosity. No Curiosity is raised under a Need that never asks one,
         or, while Admins hold Curiosities back then, in a reply that asks why;
         under a Need that asks by default, why none was asked is saved
-        with the form. An unreadable form or a
+        with the form. A reply that tells them a ready Pattern asks nothing
+        else: no asking why, no Curiosity and no Move that asks a question.
+        An unreadable form or a
         failed call falls back to the fallback Need with no Moves and no
         Memory Categories, so the reply still goes, with no Life Thread,
-        no Curiosity brought up and no Check-in.
+        no Curiosity brought up, no Check-in and no Pattern shared.
 
         Args:
             snapshot: The User being answered.
@@ -1360,10 +1476,13 @@ class ReplyPlanService:
                 exploring doesn't work for them or they are struggling. A
                 lead or supporting Move that asks a question is told its
                 open needs.
+            pattern_to_share: The ready Pattern code offers it to share;
+                None for none.
+            contested: The Patterns the User disagreed with, numbered.
 
         Returns:
-            The saved Reply Plan, what it adds to the reply and the
-            Check-in it chose.
+            The saved Reply Plan, what it adds to the reply, the Check-in
+            it chose and the Pattern it is to share.
         """
         conversation_id = recent.conversation_id
         needs = self._repositories.needs.list_all()
@@ -1399,6 +1518,8 @@ class ReplyPlanService:
                 self._last_conversation_where(recent),
                 patterns,
                 agenda,
+                pattern_to_share,
+                contested,
             ),
             reminded,
             due,
@@ -1406,6 +1527,8 @@ class ReplyPlanService:
             check_in_kinds,
             past_days.append,
             patterns,
+            pattern_to_share,
+            contested,
         )
         if model_form is None:
             need = fallback_need(needs)
@@ -1413,15 +1536,23 @@ class ReplyPlanService:
         else:
             form = model_form
             need = find_need(needs, form.need)
-        asked_why = should_ask_why(understanding.form, form, earlier)
+        shares_pattern = form.pattern_to_share is not None
+        asked_why = not shares_pattern and should_ask_why(
+            understanding.form, form, earlier
+        )
         due_under_need = offered_under(need, due)
+        held_by_asking_why = asked_why and snapshot.settings.get(
+            CURIOSITY_HELD_WHEN_ASKING_WHY
+        )
         form = settle_curiosities(
             form,
             need,
             due_under_need,
-            asked_why and snapshot.settings.get(CURIOSITY_HELD_WHEN_ASKING_WHY),
+            SHARES_A_PATTERN_INSTEAD
+            if shares_pattern
+            else (ASKS_WHY_INSTEAD if held_by_asking_why else ""),
         )
-        asks_another_question = asked_why or bool(form.curiosities)
+        asks_another_question = asked_why or bool(form.curiosities) or shares_pattern
         picked = pick_moves(need, needs, moves, form)
         if asks_another_question:
             picked = drop_moves_that_ask(picked)
@@ -1441,17 +1572,16 @@ class ReplyPlanService:
             is_fallback=model_form is None,
         )
         self._repositories.reply_plans.add(reply_plan)
-        self._model_call_log.record_reply_plan_shape(
-            snapshot,
-            describe_reply_plan_shape(
-                need,
-                picked,
-                form,
-                reminded,
-                len(check_in_kinds),
-                len(due_under_need.offered),
-            ),
+        shape = describe_reply_plan_shape(
+            need,
+            picked,
+            form,
+            reminded,
+            len(check_in_kinds),
+            len(due_under_need.offered),
+            pattern_to_share is not None,
         )
+        self._model_call_log.record_reply_plan_shape(snapshot, shape)
         ask_why_note = snapshot.settings.get(REPLY_ASK_WHY_NOTE) if asked_why else ""
         return PlannedReply(
             reply_plan=reply_plan,
@@ -1466,10 +1596,13 @@ class ReplyPlanService:
                 format_curiosities_for_reply(form.curiosities, need, asked_why),
                 past_days,
                 describe_open_needs_for_reply(agenda),
+                pattern_section(form, pattern_to_share, contested),
             ),
             asks_a_question=asks_another_question or picked.asks_a_question,
             may_send_photo=may_send_photo(understanding.form, form),
             check_in=woven_check_in_from_plan(snapshot, form, check_in_kinds),
+            shape=shape,
+            pattern_to_share=pattern_to_share if shares_pattern else None,
         )
 
     def _last_conversation_where(self, recent: RecentMessages) -> str:
@@ -1540,6 +1673,8 @@ class ReplyPlanService:
         check_in_kinds: Sequence[CheckInKind],
         on_past_day_read: Callable[[str], None],
         patterns: Sequence[RemindedPattern] = (),
+        pattern_to_share: PatternToShare | None = None,
+        contested: Sequence[ContestedPattern] = (),
     ) -> ReplyPlanForm | None:
         """Ask the model to fill in the form, with the Outlook before the prompt.
 
@@ -1556,6 +1691,9 @@ class ReplyPlanService:
             on_past_day_read: Called with what each call of the past-day
                 tool read.
             patterns: The Patterns in mind it was shown, numbered.
+            pattern_to_share: The ready Pattern code offered it; None for
+                none.
+            contested: The Patterns the User disagreed with, numbered.
 
         Returns:
             The form; None if the call failed or the answer can't be read.
@@ -1580,7 +1718,14 @@ class ReplyPlanService:
             logger.exception("The Reply Plan call failed; using the fallback Need")
             return None
         form = read_reply_plan_form(
-            answer, reminded, due, knowledge_documents, check_in_kinds, patterns
+            answer,
+            reminded,
+            due,
+            knowledge_documents,
+            check_in_kinds,
+            patterns,
+            pattern_to_share,
+            contested,
         )
         if form is None:
             logger.warning(

@@ -33,6 +33,7 @@ from companion.core.user_memory import MemoryNotFoundError, UserMemoryService
 from companion.core.users import InvalidProfileError, UserService
 
 DELETE_DATA_TOOL = "start_deleting_my_data"
+CONTESTED_GATHERING_TOOL = "turn_noting_on_disagreed_patterns_on_or_off"
 TELL_THEM = "Tell them plainly what you changed."
 NOTHING_CHANGED = "Nothing changed."
 FREQUENCY_WORDS = {
@@ -261,6 +262,19 @@ class ReplySettingsTools:
                 ),
                 parameters=DIRECTNESS_PARAMETERS,
                 run=self._change_directness,
+            ),
+            ChatTool(
+                name=CONTESTED_GATHERING_TOOL,
+                description=(
+                    "Turn on or off whether you keep quietly noting what the "
+                    "person says that fits something you noticed about them "
+                    "and they disagreed with. Off when they ask you to stop "
+                    "looking for it or to let it go for good; on when they "
+                    "say you may keep an eye out. Either way you never bring "
+                    "it up again unless they do."
+                ),
+                parameters=ON_OR_OFF_PARAMETERS,
+                run=self._turn_contested_gathering_on_or_off,
             ),
             ChatTool(
                 name="list_memories",
@@ -500,6 +514,35 @@ class ReplySettingsTools:
             f"struggling. {TELL_THEM}"
         )
 
+    def _turn_contested_gathering_on_or_off(self, arguments: dict[str, Any]) -> str:
+        """Turn on or off noting evidence for a Pattern the User disagreed with.
+
+        Args:
+            arguments: The model's arguments, with "on".
+
+        Returns:
+            What the model is told back.
+        """
+        turn_on = arguments.get("on")
+        if not isinstance(turn_on, bool):
+            return f"Say true for on or false for off. {NOTHING_CHANGED}"
+        self._users.update_preferences(
+            self._user(),
+            PreferenceChanges(contested_gathering_enabled=turn_on),
+            changed_by=ChangedBy.CHAT,
+        )
+        if turn_on:
+            return (
+                "You may keep quietly noting what fits something they "
+                "disagreed with. You still never bring it up unless they do. "
+                f"{TELL_THEM}"
+            )
+        return (
+            "You no longer note anything new for something they disagreed "
+            "with, and you never bring it up unless they do. What you noted "
+            f"before is kept; they can delete it on the Dashboard. {TELL_THEM}"
+        )
+
     def _list_memories(self, arguments: dict[str, Any]) -> str:
         """List the User's Memory Items, then their Life Threads, by number.
 
@@ -621,7 +664,9 @@ class SettingsTools:
         """Pick the settings tools for a reply to a User.
 
         Deleting the account, changing country and disconnecting Telegram
-        have no tool: they are only on the Dashboard.
+        have no tool: they are only on the Dashboard. The tool for noting
+        evidence on a Pattern they disagreed with is offered only while
+        Pattern sharing works for them.
 
         Args:
             snapshot: The User being replied to.
@@ -644,7 +689,12 @@ class SettingsTools:
             offer,
         )
         if snapshot.works(Feature.SETTINGS_IN_CHAT):
-            offer.tools = reply_tools.tools
+            offer.tools = [
+                tool
+                for tool in reply_tools.tools
+                if tool.name != CONTESTED_GATHERING_TOOL
+                or snapshot.works(Feature.PATTERN_SHARING)
+            ]
             instructions = REPLY_SETTINGS_INSTRUCTIONS
         else:
             offer.tools = [

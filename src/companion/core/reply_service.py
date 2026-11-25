@@ -1,11 +1,15 @@
+from dataclasses import replace
+
 from companion.core.agenda import AgendaReader
 from companion.core.conversations import ConversationService, ReplyPartlySentError
 from companion.core.curiosities import CuriosityRaiser
 from companion.core.knowledge_retrieval import KnowledgeRetrieval
 from companion.core.life_threads import ThreadReminder
 from companion.core.memory_retrieval import MemoryRetrieval
-from companion.core.models import MessageToAnswer, UserSnapshot
+from companion.core.model_call_log import ModelCallLog
+from companion.core.models import MessageToAnswer, ShareVia, UserSnapshot
 from companion.core.move_outcomes import MoveOutcomeFinder
+from companion.core.pattern_sharing import PatternSharing
 from companion.core.patterns import PatternReminder
 from companion.core.recent_messages import RecentMessagesReader
 from companion.core.reply_attempt import ReplyAttempt
@@ -41,7 +45,10 @@ class ReplyService:
     Plan chose are recalled; then the reply is composed, in its strict
     priority order, a small check asks whether it brought up the Check-in
     it was offered, and it is delivered, and the Threads and Curiosities it
-    brought up are marked raised. A struggling User is
+    brought up are marked raised. While Pattern sharing works, the Reply
+    Plan is also offered a ready Pattern to tell them, and a small check
+    after the reply is sent says whether it was told; only then is it
+    shared. A struggling User is
     offered none of their Shared Photos back unless they asked for one.
     Every step reads the User from the same snapshot.
     """
@@ -62,6 +69,8 @@ class ReplyService:
         recent_messages: RecentMessagesReader,
         pattern_reminder: PatternReminder,
         agenda: AgendaReader,
+        pattern_sharing: PatternSharing,
+        model_call_log: ModelCallLog,
     ) -> None:
         """Set up the service.
 
@@ -87,6 +96,10 @@ class ReplyService:
             pattern_reminder: Finds the Patterns that come to mind for each
                 Message.
             agenda: Reads the User's Agenda for the Reply Plan.
+            pattern_sharing: Offers a ready Pattern to share and records
+                when it was.
+            model_call_log: Records whether the Pattern was shared, on the
+                Reply Plan's shape.
         """
         self._reply_gate = reply_gate
         self._conversations = conversations
@@ -102,6 +115,8 @@ class ReplyService:
         self._recent_messages = recent_messages
         self._pattern_reminder = pattern_reminder
         self._agenda = agenda
+        self._pattern_sharing = pattern_sharing
+        self._model_call_log = model_call_log
 
     def handle(
         self, message: MessageToAnswer, snapshot: UserSnapshot, attempt: ReplyAttempt
@@ -116,7 +131,10 @@ class ReplyService:
         extra. One the brought-up check finds the reply left out, or offered
         to a reply that fails or is dropped before any of it is sent, is
         taken back, so it stays due; once part of a reply that brought it up
-        is sent, it counts as sent and is never woven in again.
+        is sent, it counts as sent and is never woven in again. A ready
+        Pattern the Reply Plan chose to tell them moves to shared only once
+        the reply is sent and the check after it says it was told;
+        otherwise it stays ready.
 
         Args:
             message: The Message to answer, its texts already saved and
@@ -162,6 +180,8 @@ class ReplyService:
             self._woven_check_ins.kinds_to_offer(snapshot, understanding.form),
             patterns,
             self._agenda.read(snapshot, understanding.form.struggling),
+            self._pattern_sharing.to_offer(snapshot, understanding.form.struggling),
+            self._pattern_sharing.contested(snapshot),
         )
         plan = planned.reply_plan.form
         attempt.raise_if_dropped()
@@ -223,3 +243,14 @@ class ReplyService:
         self._thread_reminder.mark_raised(message.conversation_id, plan.bring_up)
         self._curiosity_raiser.record_reaction(due, plan.curiosity_taken)
         self._curiosity_raiser.mark_raised(message.conversation_id, plan.curiosities)
+        if planned.pattern_to_share is not None and planned.shape is not None:
+            shared = self._pattern_sharing.settle(
+                snapshot,
+                planned.pattern_to_share,
+                reply.texts,
+                ShareVia.CHAT,
+                message.conversation_id,
+            )
+            self._model_call_log.record_reply_plan_shape(
+                snapshot, replace(planned.shape, pattern_shared=shared)
+            )

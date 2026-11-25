@@ -66,6 +66,7 @@ from companion.core.observations import PatternTagger
 from companion.core.past_day import PastDayTool
 from companion.core.pattern_catalog import PatternCatalogService
 from companion.core.pattern_scoring import PatternScorer
+from companion.core.pattern_sharing import PatternSharing
 from companion.core.patterns import PatternKeeper, PatternReminder
 from companion.core.personal_stickers import (
     PersonalStickerKeeper,
@@ -227,6 +228,13 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     ready_gate = ReadyGate(
         dependencies.repositories, ready_keeper, chat_model, dependencies.clock
     )
+    pattern_sharing = PatternSharing(
+        dependencies.repositories,
+        ready_keeper,
+        pattern_catalog_service,
+        chat_model,
+        dependencies.clock,
+    )
     user_snapshots = UserSnapshotLoader(dependencies.repositories, dependencies.clock)
     check_in_service = CheckInService(
         repositories=dependencies.repositories,
@@ -236,6 +244,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         usage_limiter=usage_limiter,
         chat_channel=typing_keeper,
         clock=dependencies.clock,
+        pattern_sharing=pattern_sharing,
     )
     user_service = UserService(
         dependencies.repositories.users,
@@ -311,6 +320,8 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         agenda=AgendaReader(
             dependencies.repositories, pattern_catalog_service, dependencies.clock
         ),
+        pattern_sharing=pattern_sharing,
+        model_call_log=model_call_log,
         move_outcome_finder=MoveOutcomeFinder(
             repositories=dependencies.repositories, embedder=dependencies.embedder
         ),
@@ -420,6 +431,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             ),
             pattern_scorer=pattern_scorer,
             ready_gate=ready_gate,
+            pattern_sharing=pattern_sharing,
             pattern_keeper=PatternKeeper(
                 repositories=dependencies.repositories,
                 pattern_catalog=pattern_catalog_service,

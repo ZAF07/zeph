@@ -67,6 +67,8 @@ RULES = CheckInRules(
     ignore_threshold=3,
     curiosity_check_ins_per_week=1,
     kinds=(HELLO, PHOTO_LOOK_BACK, WONDERING),
+    pattern_share_wait=timedelta(days=5),
+    patterns_shared_per_week=1,
 )
 NEXT_DUE = WAS_DUE_AT + timedelta(hours=24)
 

@@ -27,6 +27,7 @@ const hello: CheckInKindOverview = {
   description: "Just checking how you are.",
   sends_shared_photo: false,
   raises_curiosity: false,
+  shares_pattern: false,
   sent_last_30_days: 12,
 };
 
@@ -36,6 +37,7 @@ const followUp: CheckInKindOverview = {
   description: "On something you shared.",
   sends_shared_photo: false,
   raises_curiosity: false,
+  shares_pattern: false,
   sent_last_30_days: 1,
 };
 
@@ -45,6 +47,7 @@ const lookBack: CheckInKindOverview = {
   description: "One of the photos you shared.",
   sends_shared_photo: true,
   raises_curiosity: false,
+  shares_pattern: false,
   sent_last_30_days: 2,
 };
 
@@ -54,6 +57,7 @@ const wondering: CheckInKindOverview = {
   description: "A question about something you mentioned.",
   sends_shared_photo: false,
   raises_curiosity: true,
+  shares_pattern: false,
   sent_last_30_days: 3,
 };
 
@@ -223,6 +227,26 @@ describe("CheckInKindsManager", () => {
     expect(toggle).not.toHaveTextContent("Sends a Shared Photo");
     expect(await findCardToggle("A casual hello")).not.toHaveTextContent(
       "Asks a Curiosity",
+    );
+  });
+
+  it("tags a Kind that shares a Pattern", async () => {
+    apiClient.listCheckInKinds.mockResolvedValue([
+      hello,
+      {
+        ...hello,
+        id: "kind-noticed",
+        name: "Something I've noticed",
+        shares_pattern: true,
+      },
+    ]);
+    renderWithQueries(<CheckInKindsManager />);
+
+    expect(await findCardToggle("Something I've noticed")).toHaveTextContent(
+      "Shares a Pattern",
+    );
+    expect(await findCardToggle("A casual hello")).not.toHaveTextContent(
+      "Shares a Pattern",
     );
   });
 

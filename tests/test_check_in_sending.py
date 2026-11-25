@@ -69,12 +69,14 @@ def set_up_user_with_check_ins(
 
 
 def seeded_check_in_kinds() -> list[str]:
-    """The names of the seeded Check-in Kinds that send no Shared Photo or Curiosity."""
+    """The names of the seeded Check-in Kinds with no fixed behaviour."""
     kinds: list[dict[str, Any]] = yaml.safe_load(CHECK_IN_KINDS_SEED_FILE.read_text())
     return [
         kind["name"]
         for kind in kinds
-        if not kind.get("sends_shared_photo") and not kind.get("raises_curiosity")
+        if not kind.get("sends_shared_photo")
+        and not kind.get("raises_curiosity")
+        and not kind.get("shares_pattern")
     ]
 
 
@@ -701,7 +703,11 @@ def test_with_user_memory_off_every_kind_is_offered_and_saved_memory_is_used(
     assert [
         kind["name"]
         for kind in client.get("/api/check-ins", headers=headers).json()["kinds"]
-    ] == [kind["name"] for kind in yaml.safe_load(CHECK_IN_KINDS_SEED_FILE.read_text())]
+    ] == [
+        kind["name"]
+        for kind in yaml.safe_load(CHECK_IN_KINDS_SEED_FILE.read_text())
+        if not kind.get("shares_pattern")
+    ]
 
 
 def test_an_answer_that_is_not_a_decision_sends_nothing_and_is_tried_again(

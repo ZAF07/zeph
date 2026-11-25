@@ -399,8 +399,9 @@ class SafeguardEventsResponse(BaseModel):
 class CheckInKindResponse(BaseModel):
     """A Check-in Kind as Admins see it, with its fixed behaviour.
 
-    `sends_shared_photo` and `raises_curiosity` say whether it sends a
-    Shared Photo or asks a Curiosity; Admins can't change them.
+    `sends_shared_photo`, `raises_curiosity` and `shares_pattern` say
+    whether it sends a Shared Photo, asks a Curiosity or shares a ready
+    Pattern; Admins can't change them.
     """
 
     id: str
@@ -408,6 +409,7 @@ class CheckInKindResponse(BaseModel):
     description: str
     sends_shared_photo: bool
     raises_curiosity: bool
+    shares_pattern: bool
 
 
 class CheckInKindOverviewResponse(CheckInKindResponse):
@@ -631,6 +633,9 @@ class ReplyPlanShapeResponse(BaseModel):
     pattern_offered: bool
     curiosities_offered: int | None
     curiosity_asked: bool | None
+    pattern_to_share_offered: bool | None
+    pattern_share_planned: bool | None
+    pattern_shared: bool | None
 
 
 class CheckInShapeResponse(BaseModel):
@@ -913,6 +918,7 @@ def to_check_in_kind_response(kind: CheckInKind) -> CheckInKindResponse:
         description=kind.description,
         sends_shared_photo=kind.sends_shared_photo,
         raises_curiosity=kind.raises_curiosity,
+        shares_pattern=kind.shares_pattern,
     )
 
 
@@ -1170,6 +1176,9 @@ def to_reply_plan_shape_response(shape: ReplyPlanShape) -> ReplyPlanShapeRespons
         pattern_offered=shape.pattern_offered,
         curiosities_offered=shape.curiosities_offered,
         curiosity_asked=shape.curiosity_asked,
+        pattern_to_share_offered=shape.pattern_to_share_offered,
+        pattern_share_planned=shape.pattern_share_planned,
+        pattern_shared=shape.pattern_shared,
     )
 
 

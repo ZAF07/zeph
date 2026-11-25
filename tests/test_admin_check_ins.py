@@ -68,6 +68,7 @@ def test_admin_sees_the_check_in_kinds_in_order_with_recent_sends(
         ("A thought to reflect on", 0),
         ("A look back at a photo", 0),
         ("Something I've been wondering", 0),
+        ("Something I've noticed", 0),
     ]
     assert not any("allowed_without_user_memory" in kind for kind in kinds)
     assert kinds[0]["description"] == "Just checking how you are."
