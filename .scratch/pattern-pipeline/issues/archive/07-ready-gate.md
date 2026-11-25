@@ -93,4 +93,4 @@ Evidence (25 Nov 2026, worktree stack on 3010/8010, real model, Conversation end
 ## Completion
 
 - Completed: 2026-11-25
-- Commit: <to be filled in after the merge>
+- Commit: 56469f4 (merge of `pattern-07-ready-gate` into main; work commits 2b8a08f, 0a60745, 02a0e35, f010505, f347d86, 39b9cbf, 82c4c87)
