@@ -109,6 +109,60 @@ Evidence, per criterion (running app = this worktree's stack, ports 3010/8010):
 
 Caveats: the real run was made before the last review fixes (an aim check now also fails when a second aimed Curiosity is brought up; made-up replies are added once per Conversation; tidier result code). Those are covered by tests, not by a second paid run. The words of the "Unclear stories" part are in no reference file (issue 20). The cases and Judge rules are Claude's drafts for the owner to correct.
 
+## Findings for the owner
+
+The same text is section 25 of `20-findings-for-the-owner.md`. It was added there in the main folder's working copy, not in this branch, because that file had the owner's uncommitted triage edits when this was merged.
+
+Run `1641c640`, 12 cases once: 9 passed, 3 failed. 108,180 tokens in, 22,240 out, S$0.0754 (estimate S$0.0740). One case was then rewritten and run alone (`ee9f97a9`, pass, S$0.0057). Nothing was tuned: the prompts are issue 26's.
+
+#### The reply says the User's words back when it asks the aimed question
+
+- **Kind:** to decide
+- **What:** `agenda-unclear-story-asked`. The Reply Plan picked the aimed Curiosity and the reply asked it as one question, but it wrote "You said yes the moment she asked", close to the kept quote ("I said yes straight away"). The Judge failed `no_quote_back`, and also `never_names_a_pattern`, calling that line "a tendency".
+- **Impact:** the User can feel their words are being kept and used as evidence. The second failure looks like the Judge's rule being too wide, not Zeph naming a Pattern.
+- **Suggested fix:** in issue 26, look at how `describe_story` hands the story to the reply (it gives the context line, never the quote, so the model worked the words out itself). Tighten `never_names_a_pattern` so it is only about naming a habit, not about recalling an event.
+
+#### With two Explorations the Reply Plan asked neither
+
+- **Kind:** to decide
+- **What:** `agenda-two-explorations-top-one-asked`. Both aimed Curiosities were offered; the Reply Plan picked Just chatting with Get curious, brought up no Curiosity and gave no reason. The same kind of quiet-evening Message got the aimed Curiosity in three one-Exploration cases.
+- **Impact:** one run, so it may be chance. It may also be that two "ask about a recent time at…" Curiosities fit a "nothing day" worse than a story does.
+- **Suggested fix:** run it with Repeats before reading anything into it; the owner may want a Message that fits better.
+
+#### Aimed Curiosities are offered in the order written, not in the Agenda's order
+
+- **Kind:** risk
+- **What:** the Reply Plan is told "when an aimed Curiosity's day has come, it is first among the Curiosities above". With two Explorations there are two, listed by when they were saved (`list_waiting` orders by `position`), and `plan_agenda` writes them in the Explorations' stored order, not by rank. So number 1 can be for the lower-ranked Exploration. Seen in a test of the seed case, where the order changed between runs.
+- **Impact:** the model has no sure way to tell which aimed Curiosity is for the top Exploration.
+- **Suggested fix:** write, or offer, aimed Curiosities in rank order. A rule change, so it is for the owner (issue 26).
+
+#### The Safeguard took "dad's in hospital" as a crisis
+
+- **Kind:** to decide
+- **What:** the first draft of `agenda-not-asked-while-struggling` said "dad's in hospital, they think it's his heart. I can't stop shaking". The Safeguard answered with the helpline message, so the Understanding never ran. The case now uses losing a flat, which passes.
+- **Impact:** a frightened User with a relative in hospital gets the crisis reply, not Zeph.
+- **Suggested fix:** the owner decides whether that is wanted; if not, add it to the Safeguard Eval as a false alarm.
+
+#### Must-not-ask is decided by code before the model sees anything
+
+- **Kind:** risk
+- **What:** after a brush-off, a drop or a try yesterday, code has already taken the aimed Curiosity away. The four must-not-ask cases passed, but what they test is narrower than it sounds: that the reply doesn't go back to the story on its own while the Agenda is still shown. The guide says so.
+- **Suggested fix:** none; a wrong-moment case where the Curiosity *is* offered (a hurried or practical Message) would test the model's own judgement. The owner may want one.
+
+#### The Tagging result's "Unclear stories" part has no reference file
+
+- **Kind:** risk
+- **What:** the owner agreed (25 Nov 2026) to a fourth part built from the Tagging result's own rows. Its words are new: "Unclear stories", "Ended clear", "Stayed unclear", "Was", "Asked about in this Conversation", "Now", "Expected", "Clear for …", "Unclear", and "N unclear story wrong" on the verdict pill. It shows only when a case has unclear stories, so `AdminEvalTaggingCase` is unchanged.
+- **Impact:** no pixel test covers it; checked by eye at 1280 and 390.
+- **Suggested fix:** the owner approves the words or adds them to the reference.
+
+#### A try's made-up Conversation is given replies so the pace allows the next Curiosity
+
+- **Kind:** risk
+- **What:** the pace between Curiosities counts replies since the last one was asked. A made-up try has none after it, so the next aimed Curiosity would never be offered on the case's first Message. Setup adds twice the Admin-set number of made-up replies after each try (`add_replies_after` in `core/evals/made_up_patterns.py`).
+- **Impact:** the pace rule itself is not tested by these cases.
+- **Suggested fix:** none needed; the tests of the pace cover it.
+
 ## Completion
 
 - Completed: 2026-11-25
