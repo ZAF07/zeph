@@ -134,10 +134,12 @@ replaces that.
 It costs far more than the other Evals: every text is a full reply (the
 Safeguard, Understanding, Reply Plan and reply calls) and every Conversation
 a full Conversation end (about ten calls). Remind the owner and show the
-estimate before any run. Until a case has run once its estimate is a rough
-400,000 tokens in and 30,000 out. Five cases can pass the Eval run token
-limit (1,000,000 to start; Admin → Evals → Model Prices), and the run then
-stops between Conversations, so raise the limit first or run one case.
+estimate before any run. The shortest case (`ordinary-fortnight`, 12 texts in
+4 Conversations) used 208,000 tokens in and 76,000 out, S$0.20, and took 8
+minutes (25 Nov 2026). Until a case has run once its estimate is a rough
+300,000 tokens in and 110,000 out. The 5 cases together pass the Eval run
+token limit (1,000,000 to start; Admin → Evals → Model Prices), and the run
+then stops between Conversations, so raise the limit first or run one case.
 
 Dashboard: Admin → Evals → New run, tick Whole pipeline (or open it and pick
 single cases), read the estimate, Start run. Each result shows "Became ready

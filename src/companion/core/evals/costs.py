@@ -29,7 +29,7 @@ ROUGH_TOKENS_PER_CASE: dict[EvalName, ModelTokens] = {
     EvalName.MOVE_OUTCOME: ModelTokens(3_000, 600),
     EvalName.DAY_SUMMARY: ModelTokens(4_000, 900),
     EvalName.TAGGING: ModelTokens(7_000, 900),
-    EvalName.WHOLE_PIPELINE: ModelTokens(400_000, 30_000),
+    EvalName.WHOLE_PIPELINE: ModelTokens(300_000, 110_000),
 }
 
 

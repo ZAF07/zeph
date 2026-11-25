@@ -197,9 +197,10 @@ reply and the judge). A whole run (2026-11-15) used about 382,000 tokens in
 and 44,000 out (the reasoning counts as output) and took about 9 minutes.
 Each Understanding call took about 3.3 seconds and 1,800 tokens in, 480 out.
 
-The Whole-pipeline Eval is far dearer than the rest: its rough figure is
-400,000 tokens in and 30,000 out per case until a case has run once, and
-each case takes many minutes. Five cases can go over the Eval run token
+The Whole-pipeline Eval is far dearer than the rest. Its shortest case (12
+texts in 4 Conversations) used 208,000 tokens in and 76,000 out, S$0.20, in
+8 minutes (2026-11-25); the rough figure for a case that never ran is
+300,000 in and 110,000 out. The 5 cases together go over the Eval run token
 limit of 1,000,000, so raise the limit first or run single cases
 (`make eval CASES=ordinary-fortnight`). Read the estimate before every run.
 
