@@ -647,7 +647,8 @@ class ScriptedChatModel:
     reply calls, each with its own script. The Safeguard defaults to "none",
     the Understanding to `understanding_answer()`, the Reply Plan to
     `reply_plan_answer()`, Life Thread, Pattern, Curiosity and Move Outcome
-    keeping to none kept, Portrait writing to an empty answer (no
+    keeping to none kept, arguing the other side to no better
+    explanation, Portrait writing to an empty answer (no
     Portrait), the brought-up check to "no" and drafting to
     `DEFAULT_WHEN_IT_HELPS`, so tests about replies don't have to script
     them too. Set
@@ -673,6 +674,7 @@ class ScriptedChatModel:
         pattern_keeping_prompt: str = "",
         pattern_tagging_prompt: str = "",
         pattern_matching_prompt: str = "",
+        pattern_other_side_prompt: str = "",
     ) -> None:
         """Start with no replies scripted, no calls and no delay.
 
@@ -702,6 +704,8 @@ class ScriptedChatModel:
                 tagging call.
             pattern_matching_prompt: The instructions that mark a Pattern
                 matching call.
+            pattern_other_side_prompt: The instructions that mark a call
+                arguing the other side of a Pattern.
         """
         self._replies: list[str | Exception | ToolCall] = []
         self._safeguard_answers: list[str | Exception] = []
@@ -718,6 +722,7 @@ class ScriptedChatModel:
         self._pattern_keeping_answers: list[str | Exception] = []
         self._pattern_tagging_answers: list[str | Exception] = []
         self._pattern_matching_answers: list[str | Exception] = []
+        self._other_side_answers: list[str | Exception] = []
         self.safeguard_prompt = safeguard_prompt
         self.memory_processing_prompt = memory_processing_prompt
         self.understanding_prompt = understanding_prompt
@@ -731,6 +736,7 @@ class ScriptedChatModel:
         self.pattern_keeping_prompt = pattern_keeping_prompt
         self.pattern_tagging_prompt = pattern_tagging_prompt
         self.pattern_matching_prompt = pattern_matching_prompt
+        self.pattern_other_side_prompt = pattern_other_side_prompt
         self.calls: list[ChatModelCall] = []
         self.safeguard_calls: list[ChatModelCall] = []
         self.processing_calls: list[ChatModelCall] = []
@@ -746,6 +752,7 @@ class ScriptedChatModel:
         self.pattern_keeping_calls: list[ChatModelCall] = []
         self.pattern_tagging_calls: list[ChatModelCall] = []
         self.pattern_matching_calls: list[ChatModelCall] = []
+        self.other_side_calls: list[ChatModelCall] = []
         self.call_order: list[str] = []
         self.delay_seconds = 0.0
         self.before_next_reply: Callable[[], None] | None = None
@@ -865,6 +872,15 @@ class ScriptedChatModel:
         """
         self._pattern_matching_answers.extend(answers)
 
+    def script_other_side(self, *answers: str | Exception) -> None:
+        """Queue answers of the call arguing the other side, one per call.
+
+        Args:
+            answers: The JSON answers; an exception is raised instead of
+                returned, to act like a failing model.
+        """
+        self._other_side_answers.extend(answers)
+
     def script_brought_up_check(self, *answers: str | Exception) -> None:
         """Queue answers to whether a reply brought up its Check-in, one per call.
 
@@ -981,6 +997,17 @@ class ScriptedChatModel:
                 self._pattern_matching_answers.pop(0)
                 if self._pattern_matching_answers
                 else json.dumps({"pattern_type": None})
+            )
+        elif (
+            self.pattern_other_side_prompt
+            and instructions == self.pattern_other_side_prompt
+        ):
+            self.other_side_calls.append(call)
+            self.call_order.append("pattern_other_side")
+            answer = (
+                self._other_side_answers.pop(0)
+                if self._other_side_answers
+                else json.dumps({"better_explanation": False, "why": "It fits."})
             )
         elif (
             self.pattern_keeping_prompt and instructions == self.pattern_keeping_prompt

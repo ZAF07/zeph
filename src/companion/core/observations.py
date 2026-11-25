@@ -10,7 +10,7 @@ from uuid import UUID, uuid4
 
 from companion.core.curiosities import format_date
 from companion.core.life_threads import describe_thread, read_text
-from companion.core.memory_retrieval import format_day
+from companion.core.memory_retrieval import format_day, summary_line
 from companion.core.model_call_log import ModelCallLog
 from companion.core.models import (
     AIMS_WRITTEN_BY_CODE,
@@ -18,7 +18,10 @@ from companion.core.models import (
     ChatRole,
     ConversationMessage,
     CuriosityAim,
+    DaySummary,
     EvidenceKind,
+    ExcludedEvidence,
+    ExclusionFlag,
     Feature,
     LifeThread,
     MessageDirection,
@@ -39,6 +42,8 @@ from companion.core.models import (
 )
 from companion.core.pattern_catalog import PatternCatalogService
 from companion.core.platform_settings import (
+    PATTERN_EXCLUSION_SUMMARY_DAYS,
+    PATTERN_RULED_OUT_TOPICS,
     PATTERN_TAGGING_MODEL,
     PATTERN_TAGGING_PROMPT,
     PATTERN_TAGGING_THINKING,
@@ -84,6 +89,9 @@ class TaggingContext:
         thought_experiment_numbers: The numbers of the Thought Experiments
             put to the User in that Conversation, as the model was shown
             them; an Observation answering one is a "what if" answer.
+        ruled_out_topics: The Admin-set ruled-out topics, in lower case.
+        ignored_pattern_type_ids: The Pattern Types with an exclusion that
+            applies to the User now and whose evidence is ignored.
     """
 
     user_id: UUID
@@ -94,6 +102,8 @@ class TaggingContext:
     time_zone: str | None
     now: datetime
     thought_experiment_numbers: frozenset[int] = frozenset()
+    ruled_out_topics: frozenset[str] = frozenset()
+    ignored_pattern_type_ids: frozenset[str] = frozenset()
 
 
 class DropReason(StrEnum):
@@ -119,6 +129,19 @@ class DroppedEntry:
 
     entry: Any
     reason: DropReason
+
+
+@dataclass(frozen=True)
+class LifeNow:
+    """What is going on in a User's life now, for telling which exclusions apply.
+
+    Attributes:
+        open_threads: Their open Life Threads.
+        summaries: Their latest Day Summaries, newest first.
+    """
+
+    open_threads: Sequence[LifeThread] = ()
+    summaries: Sequence[DaySummary] = ()
 
 
 @dataclass(frozen=True)
@@ -494,6 +517,96 @@ def read_thread(
     return thread.id if thread else None
 
 
+def read_ruled_out_topic(
+    entry: dict[str, Any], ruled_out_topics: frozenset[str]
+) -> str | None:
+    """Read the ruled-out topic an Observation the model wrote is about.
+
+    Args:
+        entry: The Observation, as the model wrote it.
+        ruled_out_topics: The Admin-set ruled-out topics, in lower case.
+
+    Returns:
+        The topic, in lower case, when it is on the list; None otherwise.
+    """
+    topic = read_text(entry, "ruled_out_topic")
+    if topic is None or topic.casefold() not in ruled_out_topics:
+        return None
+    return topic.casefold()
+
+
+def read_exclusions_answer(answer: str) -> list[Any]:
+    """Read the exclusions the tagging model says apply from its JSON answer.
+
+    Args:
+        answer: The model's answer, already readable for its Observations.
+
+    Returns:
+        The exclusions, as the model wrote them; empty when it named none.
+    """
+    start, end = answer.find("{"), answer.rfind("}")
+    try:
+        parsed = json.loads(answer[start : end + 1])
+    except json.JSONDecodeError:
+        return []
+    exclusions = parsed.get("exclusions") if isinstance(parsed, dict) else None
+    return exclusions if isinstance(exclusions, list) else []
+
+
+def plan_exclusion_flags(
+    entries: Sequence[Any],
+    pattern_types: Mapping[str, PatternType],
+    user_id: UUID,
+    now: datetime,
+) -> list[ExclusionFlag]:
+    """Keep the exclusions the tagging model named that the catalog holds.
+
+    Args:
+        entries: The exclusions, as the model wrote them.
+        pattern_types: The Pattern Types in the catalog now, by ID.
+        user_id: The User they apply to.
+        now: When they were flagged.
+
+    Returns:
+        One flag per Pattern Type and exclusion named, when that Pattern
+        Type lists that exclusion (any case); the rest are left out.
+    """
+    flags: dict[tuple[str, str], ExclusionFlag] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        pattern_type = pattern_types.get(entry.get("pattern_type") or "")
+        named = read_text(entry, "exclusion")
+        if pattern_type is None or named is None:
+            continue
+        for exclusion in pattern_type.exclusions:
+            if exclusion.text.casefold() == named.casefold():
+                flags[(pattern_type.id, exclusion.text)] = ExclusionFlag(
+                    user_id=user_id,
+                    pattern_type_id=pattern_type.id,
+                    exclusion=exclusion.text,
+                    evidence=exclusion.evidence,
+                    flagged_at=now,
+                )
+    return list(flags.values())
+
+
+def ignored_pattern_types(flags: Sequence[ExclusionFlag]) -> frozenset[str]:
+    """Find the Pattern Types whose evidence is ignored while a flag applies.
+
+    Args:
+        flags: The exclusions that apply to a User now.
+
+    Returns:
+        The IDs of the Pattern Types with a flag whose evidence is ignored.
+    """
+    return frozenset(
+        flag.pattern_type_id
+        for flag in flags
+        if flag.evidence == ExcludedEvidence.IGNORED
+    )
+
+
 def check_observation(entry: Any, context: TaggingContext) -> Observation | DropReason:
     """Check one Observation the model wrote, and turn it into one to keep.
 
@@ -507,7 +620,10 @@ def check_observation(entry: Any, context: TaggingContext) -> Observation | Drop
         own texts, a tag or its kind of evidence isn't from its list, or it
         has no context or who it is about. One that names a Thought
         Experiment put to the User in the Conversation is a "what if"
-        answer, whatever kind the model wrote.
+        answer, whatever kind the model wrote. A ruled-out topic is kept
+        only when it is on the Admin-set list. It is excluded when an
+        exclusion whose evidence is ignored applies to one of its Pattern
+        Types now.
     """
     if not isinstance(entry, dict):
         return DropReason.NOT_AN_OBSERVATION
@@ -538,6 +654,7 @@ def check_observation(entry: Any, context: TaggingContext) -> Observation | Drop
         evidence_kind = EvidenceKind.WHAT_IF_ANSWER
     direction, sign = matched
     second = pattern_types[1] if len(pattern_types) > 1 else None
+    ruled_out_topic = read_ruled_out_topic(entry, context.ruled_out_topics)
     return Observation(
         id=uuid4(),
         user_id=context.user_id,
@@ -557,6 +674,13 @@ def check_observation(entry: Any, context: TaggingContext) -> Observation | Drop
         second_pattern_type_version=second.version if second else None,
         situational=is_situational(tags, pattern_types[0].anyone_would_when),
         tagged_at=context.now,
+        excluded=any(
+            pattern_type.id in context.ignored_pattern_type_ids
+            for pattern_type in pattern_types
+        ),
+        ruled_out_topic=ruled_out_topic,
+        raised_by_user=ruled_out_topic is not None
+        and entry.get("raised_by_user") is True,
     )
 
 
@@ -665,6 +789,40 @@ def describe_pattern_type(pattern_type: PatternType) -> str:
     )
 
 
+def describe_exclusions(pattern_type: PatternType) -> str:
+    """Write a Pattern Type's exclusions on one line, as the tagging model reads them.
+
+    Args:
+        pattern_type: The Pattern Type.
+
+    Returns:
+        E.g. "Exclusions: Active relationship crisis; Grief".
+    """
+    exclusions = "; ".join(exclusion.text for exclusion in pattern_type.exclusions)
+    return f"Exclusions: {exclusions or 'none'}"
+
+
+def describe_life_now(life_now: LifeNow, time_zone: str | None) -> str:
+    """Write what is going on in a User's life now.
+
+    Args:
+        life_now: Their open Life Threads and latest Day Summaries.
+        time_zone: The User's IANA time zone, for the days.
+
+    Returns:
+        The open Threads, one per line, then the Day Summaries, newest
+        first.
+    """
+    threads = "\n".join(
+        f"- {describe_thread(thread, time_zone)}" for thread in life_now.open_threads
+    )
+    summaries = "\n".join(summary_line(summary) for summary in life_now.summaries)
+    return (
+        f"Their open Life Threads:\n{threads or 'None.'}\n\n"
+        f"Their latest Day Summaries, newest first:\n{summaries or 'None.'}"
+    )
+
+
 def describe_tag_lists() -> str:
     """Write the fixed lists each tag must come from.
 
@@ -691,6 +849,8 @@ def describe_conversation_to_tag(
     time_zone: str | None,
     unclear: Mapping[int, Observation] | None = None,
     thought_experiments: Mapping[int, str] | None = None,
+    life_now: LifeNow | None = None,
+    ruled_out_topics: Sequence[str] = (),
 ) -> str:
     """Write what the tagging model is given.
 
@@ -705,18 +865,23 @@ def describe_conversation_to_tag(
         thought_experiments: The questions that put a Thought Experiment to
             the User in this Conversation, as asked, by number; None or
             empty with none.
+        life_now: Their open Life Threads and latest Day Summaries; None
+            when a past Conversation is tagged again.
+        ruled_out_topics: The Admin-set ruled-out topics.
 
     Returns:
-        Today's date, the Threads, the Pattern Catalog, the tag lists, the
-        unclear stories asked about, the Thought Experiments put to them
-        and the Conversation.
+        Today's date, the Threads, the Pattern Catalog with each Pattern
+        Type's exclusions, the tag lists, the unclear stories asked about,
+        the Thought Experiments put to them, what is going on in their life
+        now, the ruled-out topics and the Conversation.
     """
     thread_lines = "\n".join(
         f"[{number}] {describe_thread(thread, time_zone)}"
         for number, thread in threads.items()
     )
     catalog = "\n\n".join(
-        describe_pattern_type(pattern_type) for pattern_type in pattern_types
+        f"{describe_pattern_type(pattern_type)}\n{describe_exclusions(pattern_type)}"
+        for pattern_type in pattern_types
     )
     return (
         f"Today: {format_day(now, time_zone)}\n\n"
@@ -727,8 +892,25 @@ def describe_conversation_to_tag(
         f"{describe_unclear_asked(unclear or {})}\n\n"
         f"Thought Experiments Zeph put to them in this Conversation:\n"
         f"{describe_thought_experiments_asked(thought_experiments or {})}\n\n"
+        f"{describe_life_now(life_now or LifeNow(), time_zone)}\n\n"
+        f"Ruled-out topics: {', '.join(ruled_out_topics) or 'none'}\n\n"
         f"The Conversation:\n{to_transcript_lines(messages, time_zone)}"
     )
+
+
+@dataclass(frozen=True)
+class Tagged:
+    """What one tagging answer came to, once code checked it.
+
+    Attributes:
+        planned: The Observations kept and those dropped.
+        settled: The unclear stories the model settled, as it wrote them.
+        exclusion_flags: The exclusions that apply to the User now.
+    """
+
+    planned: PlannedObservations
+    settled: list[Any]
+    exclusion_flags: list[ExclusionFlag]
 
 
 class PatternTagger:
@@ -775,6 +957,8 @@ class PatternTagger:
         something in their own words. An unreadable answer is asked again
         once; if it is still unreadable nothing is kept. How many were
         tagged and dropped goes into the Model Call Log, never their words.
+        The exclusions the model says apply to the User now replace those
+        flagged before.
 
         Args:
             snapshot: The User whose Conversation it was; User Memory works
@@ -802,19 +986,22 @@ class PatternTagger:
             pattern_types,
             unclear,
             self._thought_experiments_asked_in(snapshot, conversation_id),
+            self._life_now(snapshot),
         )
         if tagged is None:
             return None
-        planned, settled = tagged
-        self._repositories.observations.add_many(planned.kept)
+        self._repositories.observations.add_many(tagged.planned.kept)
         self._repositories.observations.settle(
             plan_settled(
-                settled,
+                tagged.settled,
                 unclear,
                 {pattern_type.id: pattern_type for pattern_type in pattern_types},
             )
         )
-        return planned
+        self._repositories.observations.replace_exclusion_flags(
+            snapshot.user.id, tagged.exclusion_flags
+        )
+        return tagged.planned
 
     def tag_again(
         self,
@@ -829,7 +1016,8 @@ class PatternTagger:
         Used when stored evidence is found to fit a Pattern Type after its
         Conversation ended. The same rules and checks as `tag_from` apply.
         An Observation already kept from that Conversation (the same
-        Pattern Type, sign and quote) is not kept twice.
+        Pattern Type, sign and quote) is not kept twice. Exclusions are
+        left as they are: they say what applies now, not back then.
 
         Args:
             snapshot: The User whose Conversation it was.
@@ -852,6 +1040,7 @@ class PatternTagger:
             pattern_types,
             {},
             self._thought_experiments_asked_in(snapshot, conversation_id),
+            None,
         )
         if tagged is None:
             return []
@@ -864,7 +1053,7 @@ class PatternTagger:
         }
         new = [
             observation
-            for observation in tagged[0].kept
+            for observation in tagged.planned.kept
             if repeat_key(observation) not in already_kept
         ]
         self._repositories.observations.add_many(new)
@@ -879,7 +1068,8 @@ class PatternTagger:
         pattern_types: Sequence[PatternType],
         unclear: Mapping[int, Observation],
         thought_experiments: Mapping[int, str],
-    ) -> tuple[PlannedObservations, list[Any]] | None:
+        life_now: LifeNow | None,
+    ) -> Tagged | None:
         """Ask the model for a Conversation's Observations and check them.
 
         Nothing is saved but how many were tagged and dropped, in the Model
@@ -894,12 +1084,14 @@ class PatternTagger:
             unclear: The unclear stories asked about in it, by number.
             thought_experiments: The questions that put a Thought Experiment
                 to the User in it, as asked, by number.
+            life_now: Their open Life Threads and latest Day Summaries, for
+                telling which exclusions apply; None to flag none.
 
         Returns:
-            The Observations that passed and those dropped, and the unclear
-            stories the model settled; None when the User wrote nothing in
-            their own words, there is no Pattern Type or the answer couldn't
-            be read.
+            The Observations that passed and those dropped, the unclear
+            stories the model settled and the exclusions that apply; None
+            when the User wrote nothing in their own words, there is no
+            Pattern Type or the answer couldn't be read.
         """
         user_texts = users_own_texts(messages)
         if not user_texts or not pattern_types:
@@ -907,6 +1099,7 @@ class PatternTagger:
         numbered_threads = dict(enumerate(threads, start=1))
         now = self._clock.now()
         time_zone = snapshot.user.time_zone
+        ruled_out_topics = snapshot.settings.get(PATTERN_RULED_OUT_TOPICS)
         answer = self._ask(
             snapshot,
             describe_conversation_to_tag(
@@ -917,31 +1110,72 @@ class PatternTagger:
                 time_zone,
                 unclear,
                 thought_experiments,
+                life_now,
+                ruled_out_topics,
             ),
         )
         if answer is None:
             logger.warning("Pattern tagging gave no readable answer")
             return None
-        entries, settled = answer
+        types_by_id = {pattern_type.id: pattern_type for pattern_type in pattern_types}
+        exclusion_flags = (
+            plan_exclusion_flags(
+                read_exclusions_answer(answer), types_by_id, snapshot.user.id, now
+            )
+            if life_now is not None
+            else []
+        )
+        entries = read_tagging_answer(answer) or []
         planned = plan_observations(
             entries,
             TaggingContext(
                 user_id=snapshot.user.id,
                 conversation_id=conversation_id,
-                pattern_types={
-                    pattern_type.id: pattern_type for pattern_type in pattern_types
-                },
+                pattern_types=types_by_id,
                 threads=numbered_threads,
                 user_texts=user_texts,
                 time_zone=time_zone,
                 now=now,
                 thought_experiment_numbers=frozenset(thought_experiments),
+                ruled_out_topics=frozenset(
+                    topic.casefold() for topic in ruled_out_topics
+                ),
+                ignored_pattern_type_ids=ignored_pattern_types(exclusion_flags),
             ),
         )
         self._model_call_log.record_tagging_shape(
             snapshot, TaggingShape(tagged=len(entries), dropped=planned.dropped)
         )
-        return planned, settled
+        return Tagged(
+            planned=planned,
+            settled=read_settled_answer(answer),
+            exclusion_flags=exclusion_flags,
+        )
+
+    def _life_now(self, snapshot: UserSnapshot) -> LifeNow:
+        """Read what is going on in a User's life now.
+
+        Args:
+            snapshot: The User.
+
+        Returns:
+            Their open Life Threads and their latest Day Summaries, as many
+            as the Admin-set number.
+        """
+        user_id = snapshot.user.id
+        days = snapshot.settings.get(PATTERN_EXCLUSION_SUMMARY_DAYS)
+        return LifeNow(
+            open_threads=[
+                thread
+                for thread in self._repositories.life_threads.list_for_user(user_id)
+                if thread.is_open
+            ],
+            summaries=(
+                self._repositories.user_memory.list_summaries(user_id, limit=days)
+                if days
+                else []
+            ),
+        )
 
     def _unclear_asked_in(
         self, snapshot: UserSnapshot, conversation_id: UUID
@@ -1018,9 +1252,7 @@ class PatternTagger:
             for number, curiosity in enumerate(asked, start=1)
         }
 
-    def _ask(
-        self, snapshot: UserSnapshot, description: str
-    ) -> tuple[list[Any], list[Any]] | None:
+    def _ask(self, snapshot: UserSnapshot, description: str) -> str | None:
         """Ask the model for the Observations, once more if it can't be read.
 
         Args:
@@ -1029,8 +1261,8 @@ class PatternTagger:
                 asked about and Conversation.
 
         Returns:
-            The Observations it wrote and the unclear stories it settled, or
-            None if both answers were unreadable.
+            Its answer, with readable Observations; None if both answers
+            were unreadable.
         """
         settings = snapshot.settings
         for _ in range(2):
@@ -1044,7 +1276,6 @@ class PatternTagger:
                 instructions=settings.get(PATTERN_TAGGING_PROMPT),
                 history=[ChatLine(role=ChatRole.USER, text=description)],
             )
-            entries = read_tagging_answer(answer)
-            if entries is not None:
-                return entries, read_settled_answer(answer)
+            if read_tagging_answer(answer) is not None:
+                return answer
         return None

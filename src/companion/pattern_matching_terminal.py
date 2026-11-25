@@ -10,6 +10,7 @@ from companion.core.pattern_catalog import PatternCatalogService
 from companion.core.pattern_matching import PatternMatcher, UserMatchingReport
 from companion.core.pattern_scoring import PatternScorer
 from companion.core.ports import ChatModel, Clock, PhotoViewer, Repositories
+from companion.core.ready_gate import ReadyKeeper
 from companion.core.usage import UsageLimiter, UsageRecordingChatModel
 from companion.core.user_snapshot import UserSnapshotLoader
 from companion.main import (
@@ -131,6 +132,7 @@ def build_pattern_matcher(
             clock=clock,
         ),
         pattern_scorer=PatternScorer(repositories, pattern_catalog, clock),
+        ready_keeper=ReadyKeeper(repositories, pattern_catalog, clock),
     )
 
 

@@ -11,6 +11,7 @@ from companion.core.models import CatalogPatternType, PatternMoveCause, PatternS
 from companion.core.pattern_catalog import PatternCatalogService
 from companion.core.pattern_scoring import PatternScorer
 from companion.core.ports import Repositories
+from companion.core.ready_gate import ReadyKeeper
 from companion.core.user_memory import UserMemoryService
 from tests.fakes import (
     FakeAuthVerifier,
@@ -243,6 +244,9 @@ def test_a_quote_deleted_while_a_conversation_end_scores_does_not_come_back(
         repositories,
         FeatureService(repositories, clock, "http://dashboard"),
         PatternScorer(
+            repositories, PatternCatalogService(repositories.pattern_catalog), clock
+        ),
+        ReadyKeeper(
             repositories, PatternCatalogService(repositories.pattern_catalog), clock
         ),
         clock,

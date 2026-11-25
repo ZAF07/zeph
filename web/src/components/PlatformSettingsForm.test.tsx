@@ -113,6 +113,16 @@ const settings: AdminSettings = {
   exploration_wait_days: seeded(3),
   exploration_rest_after_tries: seeded(4),
   thought_experiments_per_pattern_per_week: seeded(1),
+  pattern_ready_situations: seeded(3),
+  pattern_ready_conversations: seeded(2),
+  pattern_ready_points: seeded(300, "The lowest score to be shared."),
+  pattern_ready_against_under_points: seeded(100),
+  pattern_safeguard_quiet_days: seeded(14),
+  pattern_exclusion_summary_days: seeded(7),
+  pattern_ruled_out_topics: seeded(
+    ["abuse", "self-harm or suicide"],
+    "Topics no Pattern is drawn or shared from unless the User raised them.",
+  ),
   familiarity_conversations: seeded(5),
   familiarity_life_threads: seeded(3),
   familiarity_real_stories: seeded(0),
@@ -724,6 +734,41 @@ describe("PlatformSettingsForm", () => {
 
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
       message_wait_trailing_words: ["and", "hmm", "lol"],
+    });
+  });
+
+  it("shows and saves the ready bars and the ruled-out topics under Patterns", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const points = await screen.findByLabelText("Score to be ready");
+    const topics = screen.getByLabelText(/Ruled-out topics/);
+    const patterns = screen.getByRole("region", { name: "Patterns" });
+    expect(points).toHaveValue(300);
+    expect(topics).toHaveValue("abuse, self-harm or suicide");
+    expect(patterns).toContainElement(points);
+    expect(patterns).toContainElement(topics);
+    expect(screen.getByLabelText("Situations to be ready")).toHaveValue(3);
+    expect(screen.getByLabelText("Conversations to be ready")).toHaveValue(2);
+    expect(
+      screen.getByLabelText("Evidence against must stay under"),
+    ).toHaveValue(100);
+    expect(
+      screen.getByLabelText("Days no Pattern is ready after a Safeguard Event"),
+    ).toHaveValue(14);
+    expect(
+      screen.getByLabelText("Day Summaries read for exclusions"),
+    ).toHaveValue(7);
+    expect(screen.getByText("The lowest score to be shared.")).toBeVisible();
+
+    await user.clear(points);
+    await user.type(points, "350");
+    await user.clear(topics);
+    await user.type(topics, "abuse, money");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      pattern_ready_points: 350,
+      pattern_ruled_out_topics: ["abuse", "money"],
     });
   });
 

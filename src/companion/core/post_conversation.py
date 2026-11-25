@@ -46,6 +46,7 @@ from companion.core.platform_settings import (
     thinking_to_use,
 )
 from companion.core.ports import Clock, Embedder, Repositories
+from companion.core.ready_gate import ReadyGate
 from companion.core.starter_thought_experiments import StarterThoughtExperimentKeeper
 from companion.core.timing import day_span, users_today
 from companion.core.transcripts import to_transcript_lines
@@ -687,6 +688,7 @@ class PostConversationProcessor:
         life_thread_keeper: LifeThreadKeeper,
         pattern_tagger: PatternTagger,
         pattern_scorer: PatternScorer,
+        ready_gate: ReadyGate,
         pattern_keeper: PatternKeeper,
         curiosity_keeper: CuriosityKeeper,
         agenda_keeper: AgendaKeeper,
@@ -713,6 +715,8 @@ class PostConversationProcessor:
                 noticing works.
             pattern_scorer: Scores and moves the User's Patterns of Pattern
                 Types while Pattern noticing works.
+            ready_gate: Decides which suspected Patterns may be shared,
+                right after scoring.
             pattern_keeper: Notes the User's unmatched Patterns.
             curiosity_keeper: Writes, updates and closes the User's
                 Curiosities.
@@ -733,6 +737,7 @@ class PostConversationProcessor:
         self._life_thread_keeper = life_thread_keeper
         self._pattern_tagger = pattern_tagger
         self._pattern_scorer = pattern_scorer
+        self._ready_gate = ready_gate
         self._pattern_keeper = pattern_keeper
         self._curiosity_keeper = curiosity_keeper
         self._agenda_keeper = agenda_keeper
@@ -758,8 +763,9 @@ class PostConversationProcessor:
         again once, and if it is still unreadable nothing is saved, so a bad
         answer is never retried forever. Once the Conversation is marked
         processed, its Life Threads are kept, then its Observations are
-        tagged and the User's Patterns of Pattern Types scored while Pattern
-        noticing works, then its unmatched Patterns from the
+        tagged, the User's Patterns of Pattern Types scored and the ready
+        gate run while Pattern noticing works, then its unmatched Patterns
+        from the
         Threads it touched, then the User's Familiarity is worked out, then
         its Curiosities while the
         Curiosities Feature works, then the Agenda and a new User's starter
@@ -794,6 +800,7 @@ class PostConversationProcessor:
         self._tag_observations(snapshot, conversation.id, messages, touched)
         if snapshot.works(Feature.PATTERN_NOTICING):
             self._score_patterns(snapshot, conversation.id)
+            self._check_ready(snapshot, conversation.id)
         self._keep_patterns(snapshot, conversation.id, messages, touched)
         familiarity = self._keep_familiarity(snapshot)
         if snapshot.works(Feature.CURIOSITIES):
@@ -864,6 +871,18 @@ class PostConversationProcessor:
             )
         except Exception:
             logger.exception("Could not score Patterns")
+
+    def _check_ready(self, snapshot: UserSnapshot, conversation_id: UUID) -> None:
+        """Run the ready gate, logging a failure instead of raising.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            conversation_id: The ended Conversation.
+        """
+        try:
+            self._ready_gate.check(snapshot, conversation_id)
+        except Exception:
+            logger.exception("Could not run the ready gate")
 
     def _keep_patterns(
         self,

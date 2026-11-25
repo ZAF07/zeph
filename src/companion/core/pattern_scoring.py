@@ -130,8 +130,9 @@ def observation_points(
     """Work out what one Observation is worth today.
 
     Its sign's points times its kind of evidence, cut when unclear, nothing
-    when situational, negative when against, and halved every half-life
-    since the day it was said.
+    when situational or said while an exclusion applied whose evidence is
+    ignored, negative when against, and halved every half-life since the
+    day it was said.
 
     Args:
         observation: The Observation.
@@ -143,7 +144,7 @@ def observation_points(
         The points; 0 when its sign isn't in the catalog now.
     """
     strength = sign_strengths.get((observation.pattern_type_id, observation.sign_id))
-    if strength is None or observation.situational:
+    if strength is None or observation.situational or observation.excluded:
         return 0.0
     points = (
         numbers.sign_points[strength]

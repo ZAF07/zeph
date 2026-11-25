@@ -24,6 +24,7 @@ from companion.core.platform_settings import (
     ONBOARDING_REASONS_MEMORY_CATEGORY,
 )
 from companion.core.ports import Clock, Repositories
+from companion.core.ready_gate import ReadyKeeper
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +100,7 @@ class UserMemoryService:
         repositories: Repositories,
         features: FeatureService,
         pattern_scorer: PatternScorer,
+        ready_keeper: ReadyKeeper,
         clock: Clock,
     ) -> None:
         """Set up the service.
@@ -109,11 +111,14 @@ class UserMemoryService:
             features: Says whether User Memory works for the User.
             pattern_scorer: Scores the User's Patterns again once
                 Observations are deleted.
+            ready_keeper: Takes back a ready Pattern that no longer passes
+                once Observations are deleted.
             clock: Tells the current time.
         """
         self._repositories = repositories
         self._features = features
         self._pattern_scorer = pattern_scorer
+        self._ready_keeper = ready_keeper
         self._clock = clock
 
     def list_groups(self, user_id: UUID) -> list[MemoryGroup]:
@@ -337,6 +342,8 @@ class UserMemoryService:
     def _score_patterns_again(self, user_id: UUID) -> None:
         """Score the User's Patterns of Pattern Types again, after Observations went.
 
+        A ready Pattern that no longer passes its checks goes back too.
+
         A failure is logged instead of raised: the deletion already happened.
 
         Args:
@@ -346,11 +353,10 @@ class UserMemoryService:
         if user is None:
             return
         try:
-            self._pattern_scorer.score(
-                user,
-                self._repositories.platform_settings.load(),
-                PatternMoveCause.OBSERVATIONS_DELETED,
-            )
+            settings = self._repositories.platform_settings.load()
+            cause = PatternMoveCause.OBSERVATIONS_DELETED
+            self._pattern_scorer.score(user, settings, cause)
+            self._ready_keeper.look(user, settings, cause)
         except Exception:
             logger.exception("Could not score Patterns after a deletion")
 

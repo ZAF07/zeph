@@ -2494,6 +2494,7 @@ class ModelStep(StrEnum):
     MOVE_OUTCOMES = "move_outcomes"
     PATTERN_TAGGING = "pattern_tagging"
     PATTERN_MATCHING = "pattern_matching"
+    PATTERN_OTHER_SIDE = "pattern_other_side"
     PATTERNS = "patterns"
     PORTRAIT = "portrait"
     PERSONAL_STICKERS = "personal_stickers"
@@ -3196,6 +3197,12 @@ class Observation:
             it is clear.
         situational: Whether anyone would act the same in its situation.
         tagged_at: When it was tagged.
+        excluded: Whether it was said while an exclusion of one of its
+            Pattern Types applied whose evidence is ignored; it then
+            carries no weight.
+        ruled_out_topic: The ruled-out topic it touches, as the Admin-set
+            list named it then; None if none.
+        raised_by_user: Whether the User brought that topic up themselves.
     """
 
     id: UUID
@@ -3216,6 +3223,9 @@ class Observation:
     second_pattern_type_version: str | None
     situational: bool
     tagged_at: datetime
+    excluded: bool = False
+    ruled_out_topic: str | None = None
+    raised_by_user: bool = False
 
     @property
     def unclear(self) -> bool:
@@ -3225,6 +3235,45 @@ class Observation:
             True when it has a second Pattern Type.
         """
         return self.second_pattern_type_id is not None
+
+
+class ReadyCheck(StrEnum):
+    """One of the ten checks a Pattern must pass to be ready, in order."""
+
+    SITUATIONS = "situations"
+    CONVERSATIONS = "conversations"
+    CLEAR = "clear"
+    SCORE = "score"
+    COUNTER_TEST = "counter_test"
+    SITUATIONAL = "situational"
+    QUOTES = "quotes"
+    OTHER_SIDE = "other_side"
+    SAFE = "safe"
+    ALLOWED = "allowed"
+
+
+class NarrowingTag(StrEnum):
+    """The situation tag a Pattern is narrowed by."""
+
+    RELATIONSHIP = "relationship"
+    POWER = "power"
+
+
+@dataclass(frozen=True)
+class PatternNarrowing:
+    """Where a Pattern holds and where a counter-test showed it doesn't.
+
+    E.g. "with seniors, not with friends". It holds no words of the User's.
+
+    Attributes:
+        tag: The situation tag that tells the two apart.
+        holds_with: That tag's values where the Pattern showed.
+        not_with: That tag's values where it was shown not to happen.
+    """
+
+    tag: NarrowingTag
+    holds_with: tuple[str, ...]
+    not_with: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -3242,6 +3291,11 @@ class CatalogPattern:
         state: Where it stands.
         started_at: When it was first noticed.
         updated_at: When it last moved.
+        blocked_by: The ready check that last stopped it being ready; None
+            if the ready gate never looked at it or nothing stops it.
+        narrowings: Where counter-tests showed it doesn't happen.
+        other_side_asked_at: When a model last argued the other side; None
+            if never.
     """
 
     id: UUID
@@ -3250,6 +3304,32 @@ class CatalogPattern:
     state: PatternState
     started_at: datetime
     updated_at: datetime
+    blocked_by: ReadyCheck | None = None
+    narrowings: tuple[PatternNarrowing, ...] = ()
+    other_side_asked_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class ExclusionFlag:
+    """An exclusion of a Pattern Type that applies to a User now.
+
+    The tagging step flags it from their open Life Threads and recent Day
+    Summaries; each tagging replaces the User's flags.
+
+    Attributes:
+        user_id: The User.
+        pattern_type_id: The Pattern Type.
+        exclusion: The exclusion, as the Pattern Catalog words it.
+        evidence: Whether evidence from now is ignored, or counted but not
+            shared.
+        flagged_at: When it was flagged.
+    """
+
+    user_id: UUID
+    pattern_type_id: str
+    exclusion: str
+    evidence: ExcludedEvidence
+    flagged_at: datetime
 
 
 class PatternMoveCause(StrEnum):
@@ -3278,6 +3358,9 @@ class PatternMove:
         points: Its score at the move.
         situations: The situations it was seen in at the move.
         moved_at: When it moved.
+        blocked_by: For a move to ready, the ready check that last stopped
+            it before; for a move back from ready, the check it now fails;
+            None for any other move.
     """
 
     id: UUID
@@ -3291,6 +3374,7 @@ class PatternMove:
     points: float
     situations: int
     moved_at: datetime
+    blocked_by: ReadyCheck | None = None
 
 
 class ExplorationState(StrEnum):
