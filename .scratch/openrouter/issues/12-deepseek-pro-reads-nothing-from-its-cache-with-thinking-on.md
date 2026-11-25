@@ -14,6 +14,8 @@ The same three services on `deepseek/deepseek-v4.1-flash-1017` read from the cac
 
 DeepSeek caches by itself, so there is no marker of ours to fix. Open questions: does Pro skip the cache when thinking is on, does it need more calls or more time before it reads, or does OpenRouter not report it for Pro?
 
+Seen once only. In a second run about 15 minutes later the same three services on Pro did read from the cache (Understanding 768 of 2,526; Reply plan 3,840 of 7,884; Safeguard 0 then 384 of 499). So it may just be a cold cache that takes more than a minute to fill on Pro.
+
 ## Acceptance criteria
 
 - [ ] The cause is found and written here (try Pro with thinking off, and more than two calls)
