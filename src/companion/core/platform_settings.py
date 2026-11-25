@@ -1604,8 +1604,9 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         maximum=100,
         hint=(
             "How close in meaning two general descriptions must be to count as "
-            "one entry on the Unmatched Patterns page. A change applies to "
-            "Patterns kept from then on; entries already made stay as they are."
+            "one entry on the Unmatched Patterns page, for Patterns kept from "
+            "now on. The same way in other words scores about 74–88; a "
+            "different way up to about 78."
         ),
     ),
     EditableSetting(

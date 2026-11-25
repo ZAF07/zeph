@@ -1747,29 +1747,29 @@ class UnmatchedEntryRepository(Protocol):
     Unmatched Patterns are grouped under it by `patterns.unmatched_entry_id`.
     """
 
-    def find_closest_id(
-        self, embedding: list[float], min_closeness: float
-    ) -> UUID | None:
-        """Find the entry closest in meaning to a general description.
+    def join_or_add(
+        self,
+        new_entry: UnmatchedEntry,
+        embedding: list[float],
+        min_closeness: float,
+        created_at: datetime,
+    ) -> UUID:
+        """Find the entry a general description belongs under, or add one.
+
+        Done one at a time across the whole platform, so two Conversations
+        ending at the same moment never add two entries for the same thing.
 
         Args:
+            new_entry: The entry to add when none is close enough, holding
+                the general description.
             embedding: The general description embedded.
-            min_closeness: How close in meaning an entry must be, from 0 to 1.
+            min_closeness: How close in meaning an entry must be to be
+                joined, from 0 to 1.
+            created_at: When the new entry is added.
 
         Returns:
-            The closest entry's ID; None if none is close enough.
-        """
-        ...
-
-    def add(
-        self, entry: UnmatchedEntry, embedding: list[float], created_at: datetime
-    ) -> None:
-        """Add a new entry.
-
-        Args:
-            entry: The entry, with its ID.
-            embedding: Its description embedded, so like ones are found.
-            created_at: When it is added.
+            The ID of the closest entry at least that close, the oldest
+            first when two are as close; the new entry's ID if it was added.
         """
         ...
 

@@ -4,7 +4,10 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from companion.adapters.http.thought_experiment_api import PatternTypeChoiceResponse
+from companion.adapters.http.thought_experiment_api import (
+    PatternTypeChoiceResponse,
+    to_pattern_type_choices,
+)
 from companion.core.models import UnmatchedMark, User
 from companion.core.pattern_catalog import PatternCatalogService
 from companion.core.unmatched_review import ReviewedEntry, UnmatchedReviewService
@@ -97,15 +100,7 @@ def build_unmatched_review_api_router(
                 to_unmatched_entry_response(entry)
                 for entry in unmatched_review_service.list_entries(mark)
             ],
-            pattern_types=sorted(
-                (
-                    PatternTypeChoiceResponse(
-                        id=entry.pattern_type.id, name=entry.pattern_type.name
-                    )
-                    for entry in pattern_catalog_service.catalog()
-                ),
-                key=lambda choice: choice.id,
-            ),
+            pattern_types=to_pattern_type_choices(pattern_catalog_service),
         )
 
     @router.put("/unmatched-patterns/{entry_id}/mark")

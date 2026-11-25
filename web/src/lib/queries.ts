@@ -91,6 +91,7 @@ export const queryKeys = {
   memoryCategories: ["memory-categories"],
   thoughtExperiments: ["thought-experiments"],
   unmatchedEntries: (mark: string | null) => ["unmatched-entries", mark],
+  everyUnmatchedEntries: ["unmatched-entries"],
   knowledgeDocuments: ["knowledge-documents"],
   knowledgeDocument: (documentId: string) => ["knowledge-document", documentId],
   stickers: ["stickers"],

@@ -20,7 +20,8 @@ from companion.core.ports import Clock, Embedder, Repositories
 
 logger = logging.getLogger(__name__)
 
-TELLING_CHARACTERS = re.compile(r"[\d\"“”«»]")
+TELLING_CHARACTERS = re.compile(r"[\d\"“”«»‘]|(?<!\w)'")
+CAPITAL_AFTER_THE_FIRST_WORD = re.compile(r"\s\W*[A-Z]")
 
 
 @dataclass(frozen=True)
@@ -64,7 +65,8 @@ def read_general_description(value: Any, user_name: str | None) -> str | None:
 
     It is the only thing of an unmatched Pattern an Admin reads, so one
     that could tell who it is about is dropped: one with a digit (a date,
-    an age, an amount), a quote mark, or the User's name as a word.
+    an age, an amount), a quote mark, a capital letter after its first word
+    (a person, a place, a company, a month) or the User's name.
 
     Args:
         value: The description as the model wrote it.
@@ -78,10 +80,35 @@ def read_general_description(value: Any, user_name: str | None) -> str | None:
     description = value.strip()
     if not description or TELLING_CHARACTERS.search(description):
         return None
-    name = (user_name or "").strip()
-    if name and re.search(rf"\b{re.escape(name)}\b", description, re.IGNORECASE):
+    if CAPITAL_AFTER_THE_FIRST_WORD.search(description):
+        return None
+    if holds_name(description, user_name):
         return None
     return description
+
+
+def holds_name(description: str, user_name: str | None) -> bool:
+    """Say whether a general description names the User.
+
+    The name counts when it stands as a word of its own and is written
+    with a capital, so a User called Will or May doesn't lose every
+    description that says "will" or "may".
+
+    Args:
+        description: The general description.
+        user_name: What the Companion calls the User; None if not known.
+
+    Returns:
+        True if it names them.
+    """
+    name = (user_name or "").strip()
+    if not name:
+        return False
+    as_a_word = rf"(?<!\w){re.escape(name)}(?!\w)"
+    return any(
+        found.group()[0].isupper()
+        for found in re.finditer(as_a_word, description, re.IGNORECASE)
+    )
 
 
 def needs_general_description(pattern: Pattern) -> bool:
@@ -136,7 +163,9 @@ def to_reviewed_entry(counted: CountedUnmatchedEntry) -> ReviewedEntry:
         user_count=counted.user_count,
         mark=mark,
         folded_into_pattern_type_id=entry.folded_into_pattern_type_id,
-        dropped_before=mark != entry.mark,
+        dropped_before=(
+            entry.mark == UnmatchedMark.DROPPED and mark == UnmatchedMark.TO_REVIEW
+        ),
     )
 
 
@@ -197,9 +226,19 @@ class UnmatchedGrouper:
             logger.exception("Could not embed general descriptions")
             return list(patterns)
         min_closeness = settings.get(UNMATCHED_GROUPING_CLOSENESS_PERCENT) / 100
+        now = self._clock.now()
         entry_ids = {
-            pattern.id: self._entry_for(
-                pattern.general_description or "", embedding, min_closeness
+            pattern.id: self._repositories.unmatched_entries.join_or_add(
+                UnmatchedEntry(
+                    id=uuid4(),
+                    description=pattern.general_description or "",
+                    mark=UnmatchedMark.TO_REVIEW,
+                    folded_into_pattern_type_id=None,
+                    users_when_marked=None,
+                ),
+                embedding,
+                min_closeness,
+                now,
             )
             for pattern, embedding in zip(waiting, embeddings, strict=True)
         }
@@ -209,33 +248,6 @@ class UnmatchedGrouper:
             else pattern
             for pattern in patterns
         ]
-
-    def _entry_for(
-        self, description: str, embedding: list[float], min_closeness: float
-    ) -> UUID:
-        """Find the entry a general description belongs under, or start one.
-
-        Args:
-            description: The general description.
-            embedding: It embedded.
-            min_closeness: How close in meaning an entry must be, from 0 to 1.
-
-        Returns:
-            The entry's ID.
-        """
-        entries = self._repositories.unmatched_entries
-        closest_id = entries.find_closest_id(embedding, min_closeness)
-        if closest_id is not None:
-            return closest_id
-        entry = UnmatchedEntry(
-            id=uuid4(),
-            description=description,
-            mark=UnmatchedMark.TO_REVIEW,
-            folded_into_pattern_type_id=None,
-            users_when_marked=None,
-        )
-        entries.add(entry, embedding, self._clock.now())
-        return entry.id
 
 
 class UnmatchedReviewService:
@@ -303,7 +315,8 @@ class UnmatchedReviewService:
             raise UnmatchedEntryNotFoundError
         folded_into = pattern_type_id if mark == UnmatchedMark.FOLDED else None
         if mark == UnmatchedMark.FOLDED and folded_into not in {
-            entry.pattern_type.id for entry in self._pattern_catalog.catalog()
+            catalog_entry.pattern_type.id
+            for catalog_entry in self._pattern_catalog.catalog()
         }:
             raise UnknownFoldedPatternTypeError
         marked = replace(

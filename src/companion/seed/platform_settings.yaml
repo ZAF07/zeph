@@ -860,7 +860,10 @@ starter_thought_experiments_per_conversation: 1
 # with nothing about the person. Two descriptions at least this close in
 # meaning (cosine similarity, as a percent) count as one entry, whoever they
 # came from. Too low lumps different ways of acting together; too high lists
-# the same one twice.
+# the same one twice. With the bge-small embedder, the same way in other words
+# scores about 74 to 88 and a different way up to about 78. It can't tell
+# opposites apart ("makes jokes" and "stops joking" score about 91), so read
+# an entry's words as the first description grouped under it.
 unmatched_grouping_closeness_percent: 80
 
 # After the User pushes back on a Pattern Zeph offered as its view, and the
@@ -1518,7 +1521,7 @@ pattern_keeping_prompt: |-
   (e.g. "Makes jokes when things get serious", "Lets everything else slip
   while absorbed in something"). It is never about the person: no names, no
   particular people, jobs or places, no dates or numbers, no quotes, and
-  nothing about what happened.
+  nothing about what happened. Only its first letter is a capital.
 
   Answer with JSON only, in exactly this shape, leaving out Patterns with
   nothing new and no general description to write:

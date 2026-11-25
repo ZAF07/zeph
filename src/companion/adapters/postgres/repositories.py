@@ -4380,6 +4380,8 @@ class PostgresExplorationRepository:
 UNMATCHED_ENTRY_COLUMNS = [
     column for column in unmatched_entries.c if column.name != "embedding"
 ]
+UNMATCHED_ENTRIES_LOCK_KEY = 1717
+USERS_OF_UNMATCHED_ENTRY = func.count(patterns.c.user_id.distinct())
 
 
 def _to_counted_unmatched_entry(row: Row[Any]) -> CountedUnmatchedEntry:
@@ -4413,9 +4415,8 @@ def _select_counted_unmatched_entries() -> Select[Any]:
     Returns:
         The query, one row per entry, with `user_count`.
     """
-    user_count = func.count(patterns.c.user_id.distinct()).label("user_count")
     return (
-        select(*UNMATCHED_ENTRY_COLUMNS, user_count)
+        select(*UNMATCHED_ENTRY_COLUMNS, USERS_OF_UNMATCHED_ENTRY.label("user_count"))
         .outerjoin(
             patterns,
             and_(
@@ -4439,51 +4440,57 @@ class PostgresUnmatchedEntryRepository:
         """
         self._database = database
 
-    def find_closest_id(
-        self, embedding: list[float], min_closeness: float
-    ) -> UUID | None:
-        """Find the entry closest in meaning to a general description.
+    def join_or_add(
+        self,
+        new_entry: UnmatchedEntry,
+        embedding: list[float],
+        min_closeness: float,
+        created_at: datetime,
+    ) -> UUID:
+        """Find the entry a general description belongs under, or add one.
+
+        A transaction-wide advisory lock makes this one at a time across
+        every backend, so two Conversations ending at the same moment never
+        add two entries for the same thing.
 
         Args:
+            new_entry: The entry to add when none is close enough, holding
+                the general description.
             embedding: The general description embedded.
-            min_closeness: How close in meaning an entry must be, from 0 to 1.
+            min_closeness: How close in meaning an entry must be to be
+                joined, from 0 to 1.
+            created_at: When the new entry is added.
 
         Returns:
-            The closest entry's ID; None if none is close enough.
+            The ID of the closest entry at least that close, the oldest
+            first when two are as close; the new entry's ID if it was added.
         """
         distance = unmatched_entries.c.embedding.cosine_distance(embedding)
-        with self._database.connect() as connection:
+        with self._database.begin() as connection:
+            connection.execute(
+                select(func.pg_advisory_xact_lock(UNMATCHED_ENTRIES_LOCK_KEY))
+            )
             closest_id: UUID | None = connection.execute(
                 select(unmatched_entries.c.id)
                 .where(distance <= 1 - min_closeness)
                 .order_by(distance, unmatched_entries.c.created_at)
                 .limit(1)
             ).scalar_one_or_none()
-        return closest_id
-
-    def add(
-        self, entry: UnmatchedEntry, embedding: list[float], created_at: datetime
-    ) -> None:
-        """Add a new entry.
-
-        Args:
-            entry: The entry, with its ID.
-            embedding: Its description embedded, so like ones are found.
-            created_at: When it is added.
-        """
-        with self._database.begin() as connection:
+            if closest_id is not None:
+                return closest_id
             connection.execute(
                 insert(unmatched_entries).values(
-                    id=entry.id,
-                    description=entry.description,
+                    id=new_entry.id,
+                    description=new_entry.description,
                     embedding=embedding,
-                    mark=entry.mark.value,
-                    folded_into_pattern_type_id=entry.folded_into_pattern_type_id,
-                    users_when_marked=entry.users_when_marked,
-                    marked_at=entry.marked_at,
+                    mark=new_entry.mark.value,
+                    folded_into_pattern_type_id=(new_entry.folded_into_pattern_type_id),
+                    users_when_marked=new_entry.users_when_marked,
+                    marked_at=new_entry.marked_at,
                     created_at=created_at,
                 )
             )
+        return new_entry.id
 
     def list_counted(self) -> list[CountedUnmatchedEntry]:
         """List the entries that appear for at least one User.
@@ -4491,13 +4498,12 @@ class PostgresUnmatchedEntryRepository:
         Returns:
             The entries, most Users first, then oldest first.
         """
-        user_count = func.count(patterns.c.user_id.distinct())
         with self._database.connect() as connection:
             rows = connection.execute(
                 _select_counted_unmatched_entries()
-                .having(user_count > 0)
+                .having(USERS_OF_UNMATCHED_ENTRY > 0)
                 .order_by(
-                    user_count.desc(),
+                    USERS_OF_UNMATCHED_ENTRY.desc(),
                     unmatched_entries.c.created_at,
                     unmatched_entries.c.id,
                 )

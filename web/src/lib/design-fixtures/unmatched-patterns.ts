@@ -41,4 +41,10 @@ export const unmatchedPatternsFixtures: Partial<ApiClient> = {
     entries: entries.filter((entry) => mark === null || entry.mark === mark),
     pattern_types: patternTypes,
   }),
+  markUnmatchedEntry: async (id, mark, patternTypeId) => ({
+    ...(entries.find((entry) => entry.id === id) ?? entries[0]),
+    mark,
+    folded_into_pattern_type_id: patternTypeId,
+    dropped_before: false,
+  }),
 };

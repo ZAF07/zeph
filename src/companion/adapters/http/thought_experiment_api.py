@@ -73,6 +73,28 @@ class ThoughtExperimentRequest(BaseModel):
         )
 
 
+def to_pattern_type_choices(
+    pattern_catalog_service: PatternCatalogService,
+) -> list[PatternTypeChoiceResponse]:
+    """List the catalog's Pattern Types an Admin can pick from.
+
+    Args:
+        pattern_catalog_service: Reads the Pattern Types in the catalog now.
+
+    Returns:
+        The Pattern Types, by ID.
+    """
+    return sorted(
+        (
+            PatternTypeChoiceResponse(
+                id=entry.pattern_type.id, name=entry.pattern_type.name
+            )
+            for entry in pattern_catalog_service.catalog()
+        ),
+        key=lambda choice: choice.id,
+    )
+
+
 def to_thought_experiment_response(
     thought_experiment: ThoughtExperiment, asked_count: int
 ) -> ThoughtExperimentResponse:
@@ -148,15 +170,7 @@ def build_thought_experiment_api_router(
                 )
                 for thought_experiment in thought_experiment_service.list_all()
             ],
-            pattern_types=sorted(
-                (
-                    PatternTypeChoiceResponse(
-                        id=entry.pattern_type.id, name=entry.pattern_type.name
-                    )
-                    for entry in pattern_catalog_service.catalog()
-                ),
-                key=lambda choice: choice.id,
-            ),
+            pattern_types=to_pattern_type_choices(pattern_catalog_service),
         )
 
     @router.post("/thought-experiments", status_code=status.HTTP_201_CREATED)

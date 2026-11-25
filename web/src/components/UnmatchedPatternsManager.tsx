@@ -48,7 +48,9 @@ export function UnmatchedPatternsManager() {
       draft.mark === "folded" ? draft.patternTypeId : null,
     );
     setFlash({ text: "Saved the mark.", isError: false });
-    await queryClient.invalidateQueries({ queryKey: ["unmatched-entries"] });
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.everyUnmatchedEntries,
+    });
   }
 
   const pills = (

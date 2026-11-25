@@ -208,6 +208,13 @@ def test_an_entry_shows_only_the_general_wording_never_the_users_pattern_or_evid
         "Makes jokes like “it's fine” when things turn serious",
         'Says "it is fine" when things turn serious',
         "Made jokes at the hospital on 3 Nov",
+        "Goes quiet whenever Priya calls",
+        "Works late since joining Deloitte",
+        "Goes quiet around Christmas",
+        "Says 'it is fine' when things turn serious",
+        "Says ‘it is fine’ when things turn serious",
+        "Makes jokes. Then goes quiet",
+        "maya makes jokes when things turn serious".capitalize(),
         "",
         "   ",
         17,
@@ -224,6 +231,13 @@ def test_a_general_description_is_kept_trimmed() -> None:
     assert read_general_description(f"  {JOKES} ", "Maya") == JOKES
     assert read_general_description(JOKES, None) == JOKES
     assert read_general_description("Stays mayan about it", "Maya") is not None
+    assert read_general_description("Finds joy in what others' plans are", "Joy") == (
+        "Finds joy in what others' plans are"
+    )
+    assert read_general_description("Doesn't say what they will do", "Will") == (
+        "Doesn't say what they will do"
+    )
+    assert read_general_description("Will not say no", "Will") is None
 
 
 def test_a_pattern_whose_description_was_dropped_is_kept_and_asked_about_again(

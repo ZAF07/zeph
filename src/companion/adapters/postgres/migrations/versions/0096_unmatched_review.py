@@ -38,6 +38,10 @@ def upgrade() -> None:
         sa.Column("marked_at", sa.DateTime(timezone=True)),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
     )
+    op.execute(
+        "CREATE INDEX ix_unmatched_entries_embedding ON unmatched_entries "
+        "USING hnsw (embedding vector_cosine_ops)"
+    )
     op.add_column("patterns", sa.Column("general_description", sa.Text))
     op.add_column(
         "patterns",
