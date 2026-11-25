@@ -78,7 +78,6 @@ SAFE = UserSafety(
     excluded_pattern_type_ids=frozenset(),
     recent_safeguard_event=False,
     ruled_out_topics=frozenset({"abuse"}),
-    rejected_pattern_type_ids=frozenset(),
 )
 READY_FACTS = GateFacts(
     score=PatternScore(points=420, situations=3),
@@ -90,7 +89,6 @@ READY_FACTS = GateFacts(
     exclusion_applies=False,
     recent_safeguard_event=False,
     ruled_out_topic=False,
-    rejected=False,
     pattern_type_approved=True,
     unchecked_quotes=0,
     better_explanation=False,
@@ -210,7 +208,6 @@ def test_a_pattern_passing_all_ten_checks_is_ready() -> None:
         ({"exclusion_applies": True}, ReadyCheck.SAFE),
         ({"recent_safeguard_event": True}, ReadyCheck.SAFE),
         ({"ruled_out_topic": True}, ReadyCheck.SAFE),
-        ({"rejected": True}, ReadyCheck.ALLOWED),
         ({"pattern_type_approved": False}, ReadyCheck.ALLOWED),
         ({"unchecked_quotes": 1}, ReadyCheck.QUOTES),
         ({"unchecked_quotes": None}, ReadyCheck.QUOTES),
@@ -230,7 +227,10 @@ def test_the_other_side_is_the_last_check_so_it_is_asked_only_when_the_rest_pass
     not_asked = replace(READY_FACTS, better_explanation=None)
 
     assert ready_check(not_asked, BARS) == ReadyCheck.OTHER_SIDE
-    assert ready_check(replace(not_asked, rejected=True), BARS) == ReadyCheck.ALLOWED
+    assert (
+        ready_check(replace(not_asked, pattern_type_approved=False), BARS)
+        == ReadyCheck.ALLOWED
+    )
     assert (
         ready_check(replace(not_asked, unchecked_quotes=None), BARS)
         == ReadyCheck.QUOTES
@@ -392,7 +392,7 @@ def test_an_exclusion_a_recent_safeguard_event_or_a_ruled_out_topic_is_not_safe(
     assert ready_check(facts_of(off_the_list), BARS) is None
 
 
-def test_a_draft_pattern_type_or_a_rejected_pattern_is_never_ready() -> None:
+def test_a_pattern_of_a_draft_pattern_type_is_never_ready() -> None:
     stories = three_stories_in_two_conversations()
     draft = replace(PATTERN_TYPES[BELONG], status=PatternTypeStatus.DRAFT)
     draft_facts = replace(
@@ -400,10 +400,8 @@ def test_a_draft_pattern_type_or_a_rejected_pattern_is_never_ready() -> None:
         unchecked_quotes=0,
         better_explanation=False,
     )
-    rejected = replace(SAFE, rejected_pattern_type_ids=frozenset({BELONG}))
 
     assert ready_check(draft_facts, BARS) == ReadyCheck.ALLOWED
-    assert ready_check(facts_of(stories, safety=rejected), BARS) == ReadyCheck.ALLOWED
 
 
 def test_a_quote_is_checked_again_against_the_texts_still_kept() -> None:

@@ -12,8 +12,8 @@ Admin edited it, since the tagging step now flags exclusions and ruled-out
 topics. The bars, the ruled-out topics and the other-side prompt come from
 the seed on next start. No User data is removed.
 
-Revision ID: 0096
-Revises: 0095
+Revision ID: 0098
+Revises: 0097
 Create Date: 2026-11-25
 """
 
@@ -23,8 +23,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB
 
-revision: str = "0096"
-down_revision: str | None = "0095"
+revision: str = "0098"
+down_revision: str | None = "0097"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

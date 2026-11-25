@@ -16,11 +16,9 @@ from companion.core.models import (
     NarrowingTag,
     Observation,
     ObservationDirection,
-    Pattern,
     PatternMove,
     PatternMoveCause,
     PatternNarrowing,
-    PatternReaction,
     PatternState,
     PatternType,
     PatternTypeStatus,
@@ -146,7 +144,6 @@ class GateFacts:
             the Admin-set time.
         ruled_out_topic: Whether it rests on a ruled-out topic the User
             didn't raise.
-        rejected: Whether the User rejected it.
         pattern_type_approved: Whether its Pattern Type is approved.
         narrowings: Where counter-tests showed it doesn't happen.
         unchecked_quotes: How many of its quotes are not word for word in
@@ -166,7 +163,6 @@ class GateFacts:
     exclusion_applies: bool
     recent_safeguard_event: bool
     ruled_out_topic: bool
-    rejected: bool
     pattern_type_approved: bool
     narrowings: tuple[PatternNarrowing, ...] = ()
     unchecked_quotes: int | None = None
@@ -183,14 +179,11 @@ class UserSafety:
         recent_safeguard_event: Whether a Safeguard Event happened within
             the Admin-set time.
         ruled_out_topics: The Admin-set ruled-out topics, in lower case.
-        rejected_pattern_type_ids: The Pattern Types of the Patterns kept
-            before the Pattern Catalog that they rejected.
     """
 
     excluded_pattern_type_ids: frozenset[str]
     recent_safeguard_event: bool
     ruled_out_topics: frozenset[str]
-    rejected_pattern_type_ids: frozenset[str]
 
 
 def meets_bars(score: PatternScore, bars: ReadyBars) -> bool:
@@ -237,7 +230,7 @@ def ready_check(facts: GateFacts, bars: ReadyBars) -> ReadyCheck | None:
         return ReadyCheck.SITUATIONAL
     if facts.exclusion_applies or facts.recent_safeguard_event or facts.ruled_out_topic:
         return ReadyCheck.SAFE
-    if facts.rejected or not facts.pattern_type_approved:
+    if not facts.pattern_type_approved:
         return ReadyCheck.ALLOWED
     if facts.unchecked_quotes is None or facts.unchecked_quotes > 0:
         return ReadyCheck.QUOTES
@@ -390,7 +383,6 @@ def gate_facts(
             and not observation.raised_by_user
             for observation in observations
         ),
-        rejected=pattern_type.id in safety.rejected_pattern_type_ids,
         pattern_type_approved=pattern_type.status == PatternTypeStatus.APPROVED,
         narrowings=narrowings,
     )
@@ -527,25 +519,6 @@ def ready_bars(settings: PlatformSettings, pattern_type: PatternType) -> ReadyBa
         conversations=settings.get(PATTERN_READY_CONVERSATIONS),
         points=settings.get(PATTERN_READY_POINTS),
         against_under_points=settings.get(PATTERN_READY_AGAINST_UNDER_POINTS),
-    )
-
-
-def rejected_before_the_catalog(patterns: Sequence[Pattern]) -> frozenset[str]:
-    """Find the Pattern Types a User already rejected, before the Pattern Catalog.
-
-    Args:
-        patterns: Their Patterns with no Pattern Type.
-
-    Returns:
-        The Pattern Types matched to a Pattern that was closed after they
-        pushed back on it.
-    """
-    return frozenset(
-        pattern.matched_pattern_type_id
-        for pattern in patterns
-        if pattern.matched_pattern_type_id is not None
-        and pattern.state == PatternState.CLOSED
-        and pattern.last_reaction == PatternReaction.PUSHED_BACK
     )
 
 
@@ -885,9 +858,6 @@ class ReadyKeeper:
             ),
             ruled_out_topics=frozenset(
                 topic.casefold() for topic in settings.get(PATTERN_RULED_OUT_TOPICS)
-            ),
-            rejected_pattern_type_ids=rejected_before_the_catalog(
-                repositories.patterns.list_for_user(user.id)
             ),
         )
         observations = repositories.observations.list_for_user(user.id)

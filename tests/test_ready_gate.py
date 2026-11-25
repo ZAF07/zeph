@@ -810,7 +810,7 @@ def test_the_migration_keeps_user_data_and_reloads_the_tagging_prompt(
             )
         )
 
-    downgrade_to(database_url, "0095")
+    downgrade_to(database_url, "0097")
     try:
         with client.engine.connect() as connection:
             states = connection.execute(text("SELECT state FROM patterns")).scalars()
