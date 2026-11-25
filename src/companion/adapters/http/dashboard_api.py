@@ -29,7 +29,7 @@ from companion.core.models import (
     MoveRole,
     Observation,
     OnboardingAnswers,
-    Pattern,
+    PatternState,
     PauseLength,
     PersonalSticker,
     PreferenceChanges,
@@ -41,6 +41,7 @@ from companion.core.personal_stickers import PersonalStickerService
 from companion.core.photos import PhotoService
 from companion.core.platform_settings import PlatformSettingsService
 from companion.core.telegram_connection import TelegramConnectionService
+from companion.core.told_patterns import ToldPattern
 from companion.core.user_data import UserDataService
 from companion.core.user_memory import UserMemoryService
 from companion.core.users import UserService
@@ -301,25 +302,53 @@ class MoveOutcomesResponse(BaseModel):
     move_outcomes: list[MoveOutcomeResponse]
 
 
-class PatternEvidenceResponse(BaseModel):
-    """One time a Pattern showed up: the day, its Life Thread and what happened."""
+class WhereItShowsResponse(BaseModel):
+    """Who a Pattern shows with and who it was shown not to happen with."""
 
+    shows_with: list[str]
+    not_with: list[str]
+
+
+class PatternQuoteResponse(BaseModel):
+    """One of the User's quotes behind a Pattern, and the day they said it."""
+
+    quote: str
     day: date
-    thread: str
-    line: str
+
+
+class PatternQuoteGroupResponse(BaseModel):
+    """A Pattern's quotes from one Life Thread; `life_thread` is None for no Thread."""
+
+    life_thread: str | None
+    quotes: list[PatternQuoteResponse]
+
+
+class PredictionResponse(BaseModel):
+    """A Prediction given for a Pattern; `outcome` is None until it is known."""
+
+    wording: str
+    made_at: datetime
+    outcome: str | None
 
 
 class PatternResponse(BaseModel):
-    """A Pattern the User agreed with, when they agreed and what it is based on."""
+    """A Pattern Zeph told the User about, in words and evidence, with no score.
+
+    `state` is shared (being tested), confirmed, contested (they disagreed)
+    or closed (it didn't hold up).
+    """
 
     id: str
+    state: PatternState
     pattern: str
-    agreed_at: datetime
-    evidence: list[PatternEvidenceResponse]
+    where_it_shows: list[WhereItShowsResponse]
+    told_at: datetime
+    quote_groups: list[PatternQuoteGroupResponse]
+    predictions: list[PredictionResponse]
 
 
 class PatternsResponse(BaseModel):
-    """A User's confirmed Patterns, newest agreed first."""
+    """The Patterns Zeph told a User about: tested, confirmed, contested, closed."""
 
     patterns: list[PatternResponse]
 
@@ -440,25 +469,43 @@ def to_kept_quote_response(observation: Observation) -> KeptQuoteResponse:
     )
 
 
-def to_pattern_response(pattern: Pattern) -> PatternResponse:
-    """Describe a confirmed Pattern for the Dashboard.
+def to_pattern_response(told: ToldPattern) -> PatternResponse:
+    """Describe a Pattern Zeph told the User about for the Dashboard.
 
     Args:
-        pattern: The confirmed Pattern.
+        told: The Pattern as the User sees it.
 
     Returns:
-        The pattern, when the User agreed with it, and its evidence newest
-        day first.
+        Its state, wording, where it shows, when it was told, its quotes
+        by Life Thread and its Predictions; never a score.
     """
+    pattern = told.pattern
     return PatternResponse(
         id=str(pattern.id),
-        pattern=pattern.pattern,
-        agreed_at=pattern.confirmed_at or pattern.updated_at,
-        evidence=[
-            PatternEvidenceResponse(
-                day=item.day, thread=item.thread_title, line=item.line
+        state=pattern.state,
+        pattern=told.wording,
+        where_it_shows=[
+            WhereItShowsResponse(
+                shows_with=list(where.shows_with), not_with=list(where.not_with)
             )
-            for item in reversed(pattern.evidence)
+            for where in told.where_it_shows
+        ],
+        told_at=pattern.shared_at or pattern.updated_at,
+        quote_groups=[
+            PatternQuoteGroupResponse(
+                life_thread=group.life_thread,
+                quotes=[
+                    PatternQuoteResponse(quote=quote.quote, day=quote.day)
+                    for quote in group.quotes
+                ],
+            )
+            for group in told.quote_groups
+        ],
+        predictions=[
+            PredictionResponse(
+                wording=prediction.wording, made_at=prediction.made_at, outcome=None
+            )
+            for prediction in told.predictions
         ],
     )
 
@@ -1172,18 +1219,19 @@ def build_dashboard_api_router(
     def list_patterns(
         user: Annotated[User, Depends(current_user)],
     ) -> PatternsResponse:
-        """Return the Patterns the User agreed with, newest agreed first.
+        """Return the Patterns Zeph has told the User about.
 
         Args:
             user: The signed-in User.
 
         Returns:
-            The confirmed Patterns, each with its evidence.
+            The Patterns being tested, confirmed, contested and closed after
+            being told, each with its quotes and Predictions.
         """
         return PatternsResponse(
             patterns=[
-                to_pattern_response(pattern)
-                for pattern in user_memory_service.list_confirmed_patterns(user.id)
+                to_pattern_response(told)
+                for told in user_memory_service.list_told_patterns(user.id)
             ]
         )
 
@@ -1191,7 +1239,7 @@ def build_dashboard_api_router(
     def delete_pattern(
         user: Annotated[User, Depends(current_user)], pattern_id: UUID
     ) -> Response:
-        """Delete one of the User's confirmed Patterns.
+        """Delete one of the Patterns Zeph told the User about, with its quotes.
 
         Args:
             user: The signed-in User.
@@ -1201,7 +1249,7 @@ def build_dashboard_api_router(
             An empty response.
 
         Raises:
-            CoreError: 404 if the User has no such confirmed Pattern.
+            CoreError: 404 if the User has no such Pattern they were told.
         """
         user_memory_service.delete_pattern(user.id, pattern_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)

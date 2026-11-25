@@ -150,30 +150,74 @@ const moveOutcomes: MoveOutcome[] = [
 const patterns: Pattern[] = [
   {
     id: "pattern-1",
-    pattern: "Treats rest as something to be earned.",
-    agreed_at: "2026-11-12T09:00:00Z",
-    evidence: [
+    state: "shared",
+    pattern: "You seem to treat rest as something to be earned.",
+    where_it_shows: [],
+    told_at: "2026-11-12T09:00:00Z",
+    quote_groups: [
       {
-        day: "2026-11-12",
-        thread: "Pushing hard at work",
-        line: "Worked through the weekend.",
+        life_thread: "Pushing hard at work",
+        quotes: [
+          { quote: "If I stop now, I fall behind.", day: "2026-11-12" },
+          { quote: "I worked the whole weekend.", day: "2026-11-08" },
+        ],
       },
       {
-        day: "2026-11-02",
-        thread: "Time with their father",
-        line: "Felt guilty about taking an afternoon off.",
+        life_thread: null,
+        quotes: [{ quote: "I felt guilty all afternoon.", day: "2026-11-02" }],
+      },
+    ],
+    predictions: [
+      {
+        wording: "Next time you take an evening off, notice what you do.",
+        made_at: "2026-11-12T09:00:00Z",
+        outcome: null,
       },
     ],
   },
   {
     id: "pattern-2",
-    pattern: "Names the worst version of a plan first.",
-    agreed_at: "2026-11-09T09:00:00Z",
-    evidence: [
+    state: "confirmed",
+    pattern: "You seem to name the worst version of a plan first.",
+    where_it_shows: [
+      { shows_with: ["family", "friend"], not_with: ["colleague"] },
+    ],
+    told_at: "2026-11-01T09:00:00Z",
+    quote_groups: [
       {
-        day: "2026-10-28",
-        thread: "The new job",
-        line: "Listed the ways the job could go wrong.",
+        life_thread: "The new job",
+        quotes: [{ quote: "I'll mess up the first week.", day: "2026-10-28" }],
+      },
+    ],
+    predictions: [
+      {
+        wording: "Next time you share a plan, notice how you start.",
+        made_at: "2026-11-01T09:00:00Z",
+        outcome: "came_true",
+      },
+    ],
+  },
+  {
+    id: "pattern-3",
+    state: "contested",
+    pattern: "You seem to keep disagreements small.",
+    where_it_shows: [],
+    told_at: "2026-11-05T09:00:00Z",
+    quote_groups: [],
+    predictions: [],
+  },
+  {
+    id: "pattern-4",
+    state: "closed",
+    pattern: "You seem to check things are alright after a disagreement.",
+    where_it_shows: [],
+    told_at: "2026-10-20T09:00:00Z",
+    quote_groups: [],
+    predictions: [
+      {
+        wording: "Next time you disagree at work, notice what you do after.",
+        made_at: "2026-10-20T09:00:00Z",
+        outcome: "did_not",
       },
     ],
   },
@@ -627,34 +671,101 @@ describe("Memories", () => {
     expect(apiClient.deleteLifeThread).toHaveBeenCalledWith("thread-2");
   });
 
-  it("shows each Pattern with the day the User agreed and what it is based on", async () => {
+  it("shows the Patterns Zeph told the User under four headings, with quotes by part of life and what to notice", async () => {
     const user = userEvent.setup();
     renderWithQueries(<Memories copy={seedCopy()} />);
 
     await user.click(await screen.findByRole("tab", { name: "Patterns" }));
 
     expect(screen.getByRole("heading", { name: "Patterns" })).toBeVisible();
-    const [earnsRest, worstFirst] = screen.getAllByRole("listitem");
+    const tested = within(screen.getByRole("region", { name: "Being tested" }));
     expect(
-      within(earnsRest).getByText("Treats rest as something to be earned."),
+      tested.getByText("You seem to treat rest as something to be earned."),
+    ).toBeVisible();
+    expect(tested.getByText("Zeph told you this on 12 Nov")).toBeVisible();
+    expect(tested.getByText("In your own words")).toBeVisible();
+    const work = tested.getByText("Pushing hard at work").parentElement!;
+    expect(work).toHaveTextContent(
+      "“If I stop now, I fall behind.”12 Nov“I worked the whole weekend.”8 Nov",
+    );
+    const noThread = tested.getByText("Other moments").parentElement!;
+    expect(noThread).toHaveTextContent("“I felt guilty all afternoon.”2 Nov");
+    expect(tested.getByText("What Zeph asked you to notice")).toBeVisible();
+    const asked = tested.getByText("Asked on 12 Nov").parentElement!;
+    expect(asked).toHaveTextContent(
+      "Next time you take an evening off, notice what you do.Zeph hasn't asked how it went yet.",
+    );
+
+    const confirmed = within(screen.getByRole("region", { name: "Confirmed" }));
+    expect(
+      confirmed.getByText(
+        "You seem to name the worst version of a plan first.",
+      ),
     ).toBeVisible();
     expect(
-      within(earnsRest).getByText("You agreed with this on 12 Nov"),
-    ).toBeVisible();
-    expect(within(earnsRest).getByText("What it is based on")).toBeVisible();
-    expect(
-      within(earnsRest).getByText("12 Nov · Pushing hard at work"),
+      confirmed.getByText("It shows with family, friend; not with colleague."),
     ).toBeVisible();
     expect(
-      within(earnsRest).getByText("Worked through the weekend."),
+      confirmed.getByText("How it went: it happened as Zeph thought."),
+    ).toBeVisible();
+
+    const disagreed = within(
+      screen.getByRole("region", { name: "You disagreed" }),
+    );
+    expect(
+      disagreed.getByText("You seem to keep disagreements small."),
+    ).toBeVisible();
+    expect(disagreed.queryByText("In your own words")).not.toBeInTheDocument();
+
+    const closed = within(
+      screen.getByRole("region", { name: "Didn't hold up" }),
+    );
+    expect(
+      closed.getByText("How it went: it didn't happen as Zeph thought."),
     ).toBeVisible();
     expect(
-      within(earnsRest).getByText("2 Nov · Time with their father"),
-    ).toBeVisible();
+      screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent),
+    ).toEqual(["Being tested", "Confirmed", "You disagreed", "Didn't hold up"]);
+  });
+
+  it("shows no heading for a kind of Pattern the User has none of", async () => {
+    apiClient.listPatterns.mockResolvedValue([patterns[1]]);
+    const user = userEvent.setup();
+    renderWithQueries(<Memories copy={seedCopy()} />);
+
+    await user.click(await screen.findByRole("tab", { name: "Patterns" }));
+
     expect(
-      within(worstFirst).getByText("You agreed with this on 9 Nov"),
-    ).toBeVisible();
-    expect(within(worstFirst).getByText("28 Oct · The new job")).toBeVisible();
+      screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent),
+    ).toEqual(["Confirmed"]);
+    expect(
+      screen.queryByRole("switch", { name: "Keep noticing after I disagree" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("lets the User stop Zeph noting evidence for Patterns they disagreed with", async () => {
+    apiClient.getMe.mockResolvedValue({
+      ...maya,
+      contested_gathering_enabled: true,
+    });
+    apiClient.updatePreferences.mockResolvedValue({
+      ...maya,
+      contested_gathering_enabled: false,
+    });
+    const user = userEvent.setup();
+    renderWithQueries(<Memories copy={seedCopy()} />);
+    await user.click(await screen.findByRole("tab", { name: "Patterns" }));
+    const disagreed = within(
+      screen.getByRole("region", { name: "You disagreed" }),
+    );
+
+    await user.click(
+      disagreed.getByRole("switch", { name: "Keep noticing after I disagree" }),
+    );
+
+    expect(apiClient.updatePreferences).toHaveBeenCalledWith({
+      contested_gathering_enabled: false,
+    });
   });
 
   it("deletes a Pattern", async () => {
@@ -664,16 +775,17 @@ describe("Memories", () => {
 
     await user.click(
       screen.getByRole("button", {
-        name: "Delete pattern: Treats rest as something to be earned.",
+        name: "Delete pattern: You seem to treat rest as something to be earned.",
       }),
     );
 
     expect(apiClient.deletePattern).toHaveBeenCalledWith("pattern-1");
     expect(
-      screen.queryByText("Treats rest as something to be earned."),
+      screen.queryByText("You seem to treat rest as something to be earned."),
     ).not.toBeInTheDocument();
+    expect(screen.queryByText("Being tested")).not.toBeInTheDocument();
     expect(
-      screen.getByText("Names the worst version of a plan first."),
+      screen.getByText("You seem to name the worst version of a plan first."),
     ).toBeVisible();
   });
 
@@ -685,7 +797,7 @@ describe("Memories", () => {
 
     await user.click(
       screen.getByRole("button", {
-        name: "Delete pattern: Treats rest as something to be earned.",
+        name: "Delete pattern: You seem to treat rest as something to be earned.",
       }),
     );
 
@@ -693,11 +805,11 @@ describe("Memories", () => {
       "We couldn’t delete that. Please try again.",
     );
     expect(
-      screen.getByText("Treats rest as something to be earned."),
+      screen.getByText("You seem to treat rest as something to be earned."),
     ).toBeVisible();
   });
 
-  it("explains when no Pattern is confirmed yet", async () => {
+  it("explains when Zeph has told the User no Pattern yet", async () => {
     apiClient.listPatterns.mockResolvedValue([]);
     const user = userEvent.setup();
     renderWithQueries(<Memories copy={seedCopy()} />);
@@ -707,7 +819,7 @@ describe("Memories", () => {
     expect(screen.getByText("No patterns yet")).toBeVisible();
     expect(
       screen.getByText(
-        "When Zeph notices the same thing across different parts of your life, and you agree with it, it appears here with what it is based on.",
+        "When Zeph tells you about something it has noticed across different parts of your life, it appears here with your own words behind it.",
       ),
     ).toBeVisible();
   });
@@ -720,7 +832,7 @@ describe("Memories", () => {
 
     await user.click(
       screen.getByRole("button", {
-        name: "Delete pattern: Names the worst version of a plan first.",
+        name: "Delete pattern: You seem to name the worst version of a plan first.",
       }),
     );
 
@@ -1232,10 +1344,29 @@ describe("Memories", () => {
         patterns.map((pattern) => ({
           ...pattern,
           pattern: "⟦data⟧",
-          evidence: pattern.evidence.map((item) => ({
-            ...item,
-            thread: "⟦data⟧",
-            line: "⟦data⟧",
+          where_it_shows: [{ shows_with: ["⟦data⟧"], not_with: ["⟦data⟧"] }],
+          quote_groups: [
+            {
+              life_thread: "⟦data⟧",
+              quotes: [{ quote: "⟦data⟧", day: "2026-11-12" }],
+            },
+            {
+              life_thread: null,
+              quotes: [{ quote: "⟦data⟧", day: "2026-11-02" }],
+            },
+          ],
+          predictions: (
+            [
+              "came_true",
+              "did_not",
+              "not_come_up",
+              "not_followed_up",
+              null,
+            ] as const
+          ).map((outcome) => ({
+            wording: "⟦data⟧",
+            made_at: "2026-11-12T09:00:00Z",
+            outcome,
           })),
         })),
       );

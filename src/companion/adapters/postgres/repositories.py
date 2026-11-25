@@ -3520,6 +3520,24 @@ class PostgresObservationRepository:
             ).scalar_one_or_none()
         return deleted_id is not None
 
+    def delete_naming(self, user_id: UUID, pattern_type_id: str) -> None:
+        """Delete a User's Observations that name a Pattern Type, first or second.
+
+        Args:
+            user_id: The User's ID.
+            pattern_type_id: The Pattern Type's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(observations).where(
+                    observations.c.user_id == user_id,
+                    or_(
+                        observations.c.pattern_type_id == pattern_type_id,
+                        observations.c.second_pattern_type_id == pattern_type_id,
+                    ),
+                )
+            )
+
     def delete_for_user(self, user_id: UUID) -> None:
         """Delete all of a User's Observations and exclusion flags.
 
@@ -3928,30 +3946,6 @@ class PostgresPatternRepository:
         """
         with self._database.begin() as connection:
             _delete_patterns_without_evidence(connection, user_id)
-
-    def delete_confirmed(self, user_id: UUID, pattern_id: UUID) -> bool:
-        """Delete one of a User's confirmed Patterns, with its evidence.
-
-        Args:
-            user_id: The User's ID.
-            pattern_id: The Pattern's ID.
-
-        Returns:
-            True if it was deleted; False if the User has no such confirmed
-            Pattern.
-        """
-        with self._database.begin() as connection:
-            deleted = connection.execute(
-                delete(patterns)
-                .where(
-                    patterns.c.user_id == user_id,
-                    patterns.c.id == pattern_id,
-                    HAS_NO_PATTERN_TYPE,
-                    patterns.c.state == PatternState.CONFIRMED.value,
-                )
-                .returning(patterns.c.id)
-            ).first()
-        return deleted is not None
 
     def list_of_pattern_types(self, user_id: UUID) -> list[CatalogPattern]:
         """List a User's Patterns of Pattern Types, oldest started first.

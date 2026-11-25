@@ -4,31 +4,43 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { EmptyState } from "@/components/EmptyState";
 import { MemoriesPanelHeading } from "@/components/MemoriesPanelHeading";
-import { MemoryCard } from "@/components/MemoryCard";
+import { PatternCard } from "@/components/PatternCard";
+import { PreferenceSwitch } from "@/components/PreferenceSwitch";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
-import type { Pattern } from "@/lib/api-client";
-import { type Copy, fillCopy, readCopy } from "@/lib/copy";
-import { formatShortCalendarDay, formatShortDay } from "@/lib/dates";
+import type { Me, Pattern, ToldPatternState } from "@/lib/api-client";
+import { type Copy, readCopy } from "@/lib/copy";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
+const sectionsInOrder: ToldPatternState[] = [
+  "shared",
+  "confirmed",
+  "contested",
+  "closed",
+];
+
 /**
- * The Patterns tab: each Pattern the User agreed with, newest agreed first,
- * with the day they agreed and what it is based on (one line per piece of
- * evidence: the day, its Life Thread and what happened); each can be
- * deleted, so Zeph stops using it.
+ * The Patterns tab: the Patterns Zeph has told the User about, under four
+ * headings (being tested, confirmed, ones they disagreed with, and ones
+ * that didn't hold up), each with their quotes and what Zeph asked them to
+ * notice. Each can be deleted, which also deletes the quotes it rests on.
+ * Under the ones they disagreed with is the switch that lets Zeph keep
+ * noting evidence for them.
  *
- * @param props - `patterns` are the User's confirmed Patterns, newest
- *   agreed first, `copy` is the Memories page's Copy, and `timeZone` is the
- *   User's time zone.
+ * @param props - `patterns` are the Patterns Zeph told the User about, in
+ *   the order to show them, `me` is the User, `copy` is the Memories
+ *   page's Copy with the Account page's switch slots, and `timeZone` is
+ *   the User's time zone.
  * @returns The tab's content.
  */
 export function PatternsList({
   patterns,
+  me,
   copy,
   timeZone,
 }: {
   patterns: Pattern[];
+  me: Me;
   copy: Copy;
   timeZone?: string;
 }) {
@@ -37,18 +49,28 @@ export function PatternsList({
 
   const deletePattern = useMutation({
     mutationFn: (patternId: string) => apiClient.deletePattern(patternId),
-    onSuccess: (_, patternId) =>
+    onSuccess: (_, patternId) => {
       queryClient.setQueryData(
         queryKeys.patterns,
         patterns.filter((pattern) => pattern.id !== patternId),
-      ),
+      );
+      void queryClient.invalidateQueries({ queryKey: queryKeys.keptQuotes });
+    },
   });
+
+  const sections = sectionsInOrder
+    .map((state) => ({
+      state,
+      heading: readCopy(copy, `memories.patterns.section.${state}`),
+      patterns: patterns.filter((pattern) => pattern.state === state),
+    }))
+    .filter((section) => section.patterns.length > 0);
 
   return (
     <>
       <MemoriesPanelHeading
         title={readCopy(copy, "memories.patterns.heading")}
-        body={readCopy(copy, "memories.patterns.lead")}
+        body={readCopy(copy, "memories.patterns.intro")}
       />
 
       {deletePattern.isError ? (
@@ -57,62 +79,50 @@ export function PatternsList({
         </SaveFailedNote>
       ) : null}
 
-      {patterns.length > 0 ? (
-        <ul className="m-0 flex list-none flex-col gap-6 p-0">
-          {patterns.map((pattern) => (
-            <li key={pattern.id}>
-              <MemoryCard
-                deleteLabel={fillCopy(copy, "memories.patterns.delete", {
-                  pattern: pattern.pattern,
-                })}
-                isDeleting={deletePattern.isPending}
-                onDelete={() => deletePattern.mutate(pattern.id)}
-                below={
-                  <div className="mt-3.5 pr-2.5">
-                    <div className="pb-2 text-[11px] font-medium tracking-[2px] text-soft uppercase">
-                      {readCopy(copy, "memories.patterns.based_on")}
-                    </div>
-                    {pattern.evidence.map((item, index) => (
-                      <div
-                        key={index}
-                        className="flex flex-wrap gap-x-4 gap-y-0.5 border-t border-line py-2.5"
-                      >
-                        <span className="flex-[0_0_190px] text-[13px] text-soft">
-                          {fillCopy(copy, "memories.patterns.evidence_when", {
-                            day: formatShortCalendarDay(item.day),
-                            thread: item.thread,
-                          })}
-                        </span>
-                        <span className="min-w-0 flex-[1_1_260px] text-[14px] text-text">
-                          {item.line}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                }
-              >
-                <div className="min-w-0">
-                  <p className="m-0 text-[16px] font-normal text-text">
-                    {pattern.pattern}
-                  </p>
-                  <div className="mt-1.5">
-                    <span className="text-[12px] text-soft">
-                      {fillCopy(copy, "memories.patterns.agreed", {
-                        day: formatShortDay(pattern.agreed_at, timeZone),
-                      })}
-                    </span>
-                  </div>
-                </div>
-              </MemoryCard>
-            </li>
-          ))}
-        </ul>
-      ) : (
+      {sections.map((section) => (
+        <section key={section.state} aria-label={section.heading}>
+          <h3 className="mt-0 mb-2 text-[12px] font-medium tracking-[2px] text-soft uppercase">
+            {section.heading}
+          </h3>
+          <div className="flex flex-col gap-3">
+            <ul className="m-0 flex list-none flex-col gap-3 p-0">
+              {section.patterns.map((pattern) => (
+                <li key={pattern.id}>
+                  <PatternCard
+                    pattern={pattern}
+                    copy={copy}
+                    timeZone={timeZone}
+                    isDeleting={deletePattern.isPending}
+                    onDelete={() => deletePattern.mutate(pattern.id)}
+                  />
+                </li>
+              ))}
+            </ul>
+            {section.state === "contested" ? (
+              <PreferenceSwitch
+                preference="contested_gathering_enabled"
+                title={readCopy(copy, "account.contested_gathering.title")}
+                copy={copy}
+                enabled={me.contested_gathering_enabled}
+                available
+                explanation={readCopy(
+                  copy,
+                  "account.contested_gathering.explanation",
+                )}
+                changedInChatAt={me.changed_in_chat.contested_gathering}
+                timeZone={timeZone}
+              />
+            ) : null}
+          </div>
+        </section>
+      ))}
+
+      {patterns.length === 0 ? (
         <EmptyState
           title={readCopy(copy, "memories.patterns.empty_title")}
-          body={readCopy(copy, "memories.patterns.empty_body")}
+          body={readCopy(copy, "memories.patterns.empty_message")}
         />
-      )}
+      ) : null}
     </>
   );
 }
