@@ -293,10 +293,10 @@ def new_prediction_question(pattern: CatalogPattern, pattern_type: PatternType) 
         "A while ago you told them something you'd noticed about them: "
         f"{pattern_type.approved_wording}"
         f"{describe_where_it_shows(pattern.narrowings)} It is still only "
-        "your view. Don't ask a question here: give them one new thing to "
-        f"notice in their own life that would test it: "
+        "your view. Ask whether they'd try watching for one new thing in "
+        "their own life that would test it, and say what it is: "
         f"{pattern_type.prediction_wording} Where it has a word in curly "
-        "brackets, put their own person or thing. Say it lightly, as an "
+        "brackets, put their own person or thing. Offer it lightly, as an "
         "invitation and not a task."
     )
 

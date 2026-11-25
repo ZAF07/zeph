@@ -44,7 +44,7 @@ from tests.test_post_conversation import processing_answer, quiet_gap
 from tests.test_ready_gate import belonging
 
 FOLLOW_UP = "You asked them to watch for this"
-GIVE_NEW = "give them one new thing to notice"
+GIVE_NEW = "watching for one new thing"
 OPEN_PREDICTIONS_HEADER = "Predictions Zeph gave them, still open:"
 PORTRAIT_PATTERNS_HEADER = "Patterns they agreed with:"
 SECOND_PREDICTION = "This week, notice what you do when Jun asks a favour."
