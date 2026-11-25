@@ -145,6 +145,7 @@ def test_the_facts_tell_true_from_false_ready_patterns_and_list_the_missed() -> 
     assert check_ready_patterns(facts) == [
         Check(BELONG, True, "shared, one of the true ones"),
         Check(NEEDED, False, "ready, not a true one"),
+        Check("true Patterns found", True, "1 of 3 became ready"),
     ]
     assert [missed_line(missed) for missed in facts["missed"]] == [
         "ACH.GOAL.MOVE: suspected, stopped by counter_test",
@@ -152,19 +153,44 @@ def test_the_facts_tell_true_from_false_ready_patterns_and_list_the_missed() -> 
     ]
 
 
-def test_nothing_ready_passes_whether_or_not_a_true_pattern_was_missed() -> None:
+def test_nothing_ready_passes_only_when_no_pattern_is_true() -> None:
     none_true = pipeline_facts([], [], [], NAMES, conversations=4)
-    one_missed = pipeline_facts(
-        [GOAL], [], [pattern(GOAL, PatternState.NOTICED)], NAMES, conversations=4
-    )
 
     assert check_ready_patterns(none_true) == [
         Check("nothing ready", True, "no Pattern became ready, and none is true")
     ]
-    assert check_ready_patterns(one_missed) == [
-        Check("nothing ready", True, "no Pattern became ready; 1 true missed")
+
+
+def test_a_case_that_finds_none_of_its_true_patterns_fails() -> None:
+    none_found = pipeline_facts(
+        [GOAL, BELONG],
+        [move(NEEDED, PatternState.SUSPECTED, PatternState.READY)],
+        [pattern(GOAL, PatternState.NOTICED), pattern(NEEDED, PatternState.READY)],
+        NAMES,
+        conversations=4,
+    )
+    nothing_ready = pipeline_facts(
+        [GOAL], [], [pattern(GOAL, PatternState.NOTICED)], NAMES, conversations=4
+    )
+
+    assert check_ready_patterns(none_found) == [
+        Check(NEEDED, False, "ready, not a true one"),
+        Check("true Patterns found", False, "0 of 2 became ready"),
     ]
-    assert missed_line(one_missed["missed"][0]) == "ACH.GOAL.MOVE: noticed"
+    assert check_ready_patterns(nothing_ready) == [
+        Check("true Patterns found", False, "0 of 1 became ready")
+    ]
+    assert missed_line(nothing_ready["missed"][0]) == "ACH.GOAL.MOVE: noticed"
+
+
+def test_a_failed_conversation_end_step_is_a_failed_check_of_its_own() -> None:
+    none_true = pipeline_facts([], [], [], NAMES, conversations=4)
+    step = "after Conversation 2: Could not score Patterns: ValueError('no bar')"
+
+    assert check_ready_patterns(none_true, [step]) == [
+        Check("nothing ready", True, "no Pattern became ready, and none is true"),
+        Check("Conversation-end step failed", False, step),
+    ]
 
 
 def test_a_case_reads_its_conversations_and_each_true_pattern_type_once() -> None:
@@ -208,7 +234,7 @@ def test_a_case_needs_a_conversation_with_a_text_and_days_that_are_not_negative(
     }
 
 
-def test_the_seed_has_five_made_up_users_with_a_look_alike_pair_and_one_with_none() -> (
+def test_the_seed_has_six_made_up_users_with_a_look_alike_pair_and_one_with_none() -> (
     None
 ):
     pattern_types = {
@@ -219,7 +245,7 @@ def test_the_seed_has_five_made_up_users_with_a_look_alike_pair_and_one_with_non
     }
     cases: list[WholePipelineCase] = seeded(EvalName.WHOLE_PIPELINE)
 
-    assert len(cases) == 5
+    assert len(cases) == 6
     assert all(len(case.conversations) >= 4 for case in cases)
     assert all(
         name in pattern_types for case in cases for name in case.true_pattern_types
@@ -286,6 +312,7 @@ def test_the_report_scores_ready_patterns_against_the_target_and_lists_the_misse
         "  folds",
         "    PASS CONF.AVOID.BELONG: ready, one of the true ones",
         "    FAIL APPR.GIVE.NEEDED: ready, not a true one",
+        "    PASS true Patterns found: 1 of 2 became ready",
         "    missed ACH.GOAL.MOVE: suspected, stopped by situations",
         "  ordinary",
         "    PASS nothing ready: no Pattern became ready, and none is true",
@@ -303,7 +330,7 @@ def test_the_report_says_none_ready_when_no_pattern_became_ready() -> None:
             case_result(
                 EvalName.WHOLE_PIPELINE,
                 "ordinary",
-                CaseOutcome.PASS,
+                CaseOutcome.FAIL,
                 check_ready_patterns(nothing),
                 {"whole_pipeline": nothing},
             )

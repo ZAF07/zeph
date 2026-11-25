@@ -2951,7 +2951,10 @@ def test_a_whole_pipeline_case_runs_every_conversation_and_lists_ready_patterns(
     assert result["outcome"] == "pass", result
     assert [
         (check["name"], check["passed"], check["detail"]) for check in result["checks"]
-    ] == [(BELONG, True, "ready, one of the true ones")]
+    ] == [
+        (BELONG, True, "ready, one of the true ones"),
+        ("true Patterns found", True, "1 of 1 became ready"),
+    ]
     assert result["whole_pipeline"] == {
         "patterns": [
             {
@@ -3004,7 +3007,10 @@ def test_a_whole_pipeline_case_fails_when_a_ready_pattern_is_not_a_true_one(
     assert result["outcome"] == "fail"
     assert [
         (check["name"], check["passed"], check["detail"]) for check in result["checks"]
-    ] == [(BELONG, False, "ready, not a true one")]
+    ] == [
+        (BELONG, False, "ready, not a true one"),
+        ("true Patterns found", False, "0 of 1 became ready"),
+    ]
     assert result["whole_pipeline"]["patterns"][0]["is_true"] is False
     assert result["whole_pipeline"]["missed"] == [
         {
@@ -3015,6 +3021,11 @@ def test_a_whole_pipeline_case_fails_when_a_ready_pattern_is_not_a_true_one(
         }
     ]
     notes = result["notes"]
+    assert notes[:3] == [
+        "Why it failed:",
+        f"{BELONG}: ready, not a true one",
+        "true Patterns found: 0 of 1 became ready",
+    ]
     assert "ACH.GOAL.MOVE: never noticed" in notes
     assert "Conversation 1, 02 Nov 2026:" in notes
     assert "Conversation 2, 05 Nov 2026:" in notes
@@ -3022,7 +3033,7 @@ def test_a_whole_pipeline_case_fails_when_a_ready_pattern_is_not_a_true_one(
     assert "Zeph: Different with Sam, then." in notes
 
 
-def test_a_whole_pipeline_case_with_nothing_ready_passes_and_counts_the_missed(
+def test_a_whole_pipeline_case_that_finds_none_of_its_true_patterns_fails(
     client: TestClient,
     engine: Engine,
     auth_verifier: FakeAuthVerifier,
@@ -3043,10 +3054,16 @@ def test_a_whole_pipeline_case_with_nothing_ready_passes_and_counts_the_missed(
     runner.work_next_run()
 
     [result] = open_run(client, admin, run["id"])["results"]
-    assert result["outcome"] == "pass", result
+    assert result["outcome"] == "fail", result
     assert [
         (check["name"], check["passed"], check["detail"]) for check in result["checks"]
-    ] == [("nothing ready", True, "no Pattern became ready; 1 true missed")]
+    ] == [("true Patterns found", False, "0 of 1 became ready")]
+    assert result["notes"][:4] == [
+        "Why it failed:",
+        "true Patterns found: 0 of 1 became ready",
+        "True Patterns missed:",
+        f"{BELONG}: suspected, stopped by situations",
+    ]
     assert result["whole_pipeline"]["patterns"] == []
     assert result["whole_pipeline"]["missed"] == [
         {
@@ -3055,6 +3072,72 @@ def test_a_whole_pipeline_case_with_nothing_ready_passes_and_counts_the_missed(
             "state": "suspected",
             "blocked_by": "situations",
         }
+    ]
+
+
+def test_a_whole_pipeline_case_with_no_true_pattern_and_nothing_ready_passes(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    none_true = EvalCase(
+        key="ordinary-days",
+        eval=EvalName.WHOLE_PIPELINE,
+        content={**BELONGING_CASE.content, "true_pattern_types": []},
+    )
+    add_cases(engine, none_true)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.WHOLE_PIPELINE)
+    chat_model.script("Mm.", "Mm.")
+    chat_model.script_processing(
+        processing_answer(summary="Cooked.", mood="neutral"),
+        processing_answer(summary="Ran.", mood="neutral"),
+    )
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "pass", result
+    assert [
+        (check["name"], check["passed"], check["detail"]) for check in result["checks"]
+    ] == [("nothing ready", True, "no Pattern became ready, and none is true")]
+
+
+def test_a_whole_pipeline_case_shows_a_conversation_end_step_that_failed(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, BELONGING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.WHOLE_PIPELINE)
+    script_two_conversations_that_make_belonging_ready(chat_model)
+    chat_model.script_portrait("", RuntimeError("the model is down"))
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    step = (
+        "after Conversation 2: Could not write the User Portrait: "
+        "RuntimeError('the model is down')"
+    )
+    assert result["outcome"] == "fail", result
+    assert [
+        (check["name"], check["passed"], check["detail"]) for check in result["checks"]
+    ] == [
+        (BELONG, True, "ready, one of the true ones"),
+        ("true Patterns found", True, "1 of 1 became ready"),
+        ("Conversation-end step failed", False, step),
+    ]
+    assert result["notes"][:4] == [
+        "Why it failed:",
+        f"Conversation-end step failed: {step}",
+        "",
+        "Conversation 1, 02 Nov 2026:",
     ]
 
 

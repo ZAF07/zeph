@@ -27,6 +27,8 @@ from companion.core.pattern_catalog import PatternCatalogService
 MESSAGE_GAP = timedelta(minutes=1)
 STATES_THAT_COUNT = frozenset({PatternState.READY, PatternState.SHARED})
 NOTHING_READY = "nothing ready"
+TRUE_PATTERNS_FOUND = "true Patterns found"
+CONVERSATION_END_STEP = "Conversation-end step failed"
 TARGET_PERCENT_OF_READY_TRUE = 70
 
 
@@ -129,16 +131,22 @@ def pipeline_facts(
     }
 
 
-def check_ready_patterns(facts: Mapping[str, Any]) -> list[Check]:
-    """Check every Pattern that became ready or shared is a true one.
+def check_ready_patterns(
+    facts: Mapping[str, Any], failed_steps: Sequence[str] = ()
+) -> list[Check]:
+    """Check the ready Patterns are true ones, a true one was found and no step failed.
 
     Args:
         facts: What `pipeline_facts` wrote.
+        failed_steps: Each Conversation-end step that failed and was
+            skipped, one line each.
 
     Returns:
         One check per ready or shared Pattern, passed when it is true of
-        the User; with none, one passed "nothing ready" check. True
-        Patterns missed are told in its detail and never fail it.
+        the User. When the User has true Patterns, one "true Patterns
+        found" check, failed when none of them became ready. With neither,
+        one passed "nothing ready" check. Then one failed check per failed
+        step.
     """
     checks = [
         Check(
@@ -149,17 +157,23 @@ def check_ready_patterns(facts: Mapping[str, Any]) -> list[Check]:
         )
         for pattern in facts["patterns"]
     ]
-    if checks:
-        return checks
-    missed = len(facts["missed"])
-    return [
-        Check(
-            NOTHING_READY,
-            True,
-            f"no Pattern became ready; {missed} true missed"
-            if missed
-            else "no Pattern became ready, and none is true",
+    true_count = facts["true_count"]
+    if true_count:
+        found = true_count - len(facts["missed"])
+        checks.append(
+            Check(
+                TRUE_PATTERNS_FOUND,
+                found > 0,
+                f"{found} of {true_count} became ready",
+            )
         )
+    if not checks:
+        checks.append(
+            Check(NOTHING_READY, True, "no Pattern became ready, and none is true")
+        )
+    return [
+        *checks,
+        *(Check(CONVERSATION_END_STEP, False, failure) for failure in failed_steps),
     ]
 
 
@@ -196,9 +210,11 @@ def check_whole_pipeline_case(
 
     Returns:
         A check per Pattern that became ready or was shared, passed when it
-        is one of the true ones; its facts hold those Patterns and the true
-        ones missed. A failed case notes the missed ones and every
-        Conversation.
+        is one of the true ones; a failed check when the User has true
+        Patterns and none became ready; and a failed check per
+        Conversation-end step that failed and was skipped. Its facts hold
+        the ready Patterns and the true ones missed. A failed case notes
+        why it failed, the missed ones and every Conversation.
 
     Raises:
         CaseStoppedError: If the run is to stop before the last Conversation.
@@ -221,6 +237,7 @@ def check_whole_pipeline_case(
     calls_in_new_traces(repositories, user_id, seen_trace_ids)
 
     transcript: list[str] = []
+    failed_steps: list[str] = []
     for number, conversation in enumerate(case.conversations, start=1):
         stop_reason = should_stop() if number > 1 else None
         if stop_reason is not None:
@@ -235,7 +252,10 @@ def check_whole_pipeline_case(
             transcript.append(transcript_line(True, text))
             transcript += [transcript_line(False, reply) for reply in replies.texts]
             companion.move_clock(MESSAGE_GAP)
-        companion.end_conversation()
+        failed_steps += [
+            f"after Conversation {number}: {failure}"
+            for failure in companion.end_conversation()
+        ]
         if not any(
             call.step == ModelStep.PATTERN_TAGGING
             for call in calls_in_new_traces(repositories, user_id, seen_trace_ids)
@@ -251,19 +271,33 @@ def check_whole_pipeline_case(
         names,
         len(case.conversations),
     )
-    checks = check_ready_patterns(facts)
+    checks = check_ready_patterns(facts, failed_steps)
     passed = all(check.passed for check in checks)
     return CaseCheckResult(
         outcome=CaseOutcome.PASS if passed else CaseOutcome.FAIL,
         checks=checks,
         facts={"whole_pipeline": facts},
-        notes=(
-            []
-            if passed
-            else [
-                "True Patterns missed:",
-                *(missed_line(missed) for missed in facts["missed"]),
-                *transcript,
-            ]
-        ),
+        notes=[] if passed else [*failure_notes(checks, facts["missed"]), *transcript],
     )
+
+
+def failure_notes(
+    checks: Sequence[Check], missed: Sequence[Mapping[str, Any]]
+) -> list[str]:
+    """Write why a case failed and which true Patterns it missed.
+
+    Args:
+        checks: The case's checks.
+        missed: The true Patterns never ready.
+
+    Returns:
+        "Why it failed:" and each failed check, then "True Patterns
+        missed:" and each one, left out when none was missed.
+    """
+    notes = [
+        "Why it failed:",
+        *(f"{check.name}: {check.detail}" for check in checks if not check.passed),
+    ]
+    if missed:
+        notes += ["True Patterns missed:", *(missed_line(one) for one in missed)]
+    return notes

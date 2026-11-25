@@ -126,10 +126,13 @@ the real reply path and every Conversation ends through the real
 Conversation-end steps, with Pattern noticing, exploring and sharing on. The
 result lists each Pattern that became ready or was shared and whether it is
 a true one, and the true ones missed with where they stopped. A case passes
-when every ready Pattern is a true one. Target for a run: at least 70% of
-ready Patterns true. The seed has 5 made-up Users: one true Pattern with a
+when every ready Pattern is a true one, at least one of its true Patterns
+became ready, and no Conversation-end step failed. A User with no true
+Pattern passes with nothing ready. Target for a run: at least 70% of
+ready Patterns true. The seed has 6 made-up Users: one true Pattern with a
 "not with my partner", two true look-alikes, none, one true whose look-alike
-is not, and one true beside a single story of its look-alike.
+is not, one true beside a single story of its look-alike, and one true who
+then asks Zeph what it has noticed, so the Pattern can be shared.
 
 - **Shows:** the pieces work together: replies, Life Threads, tagging,
   scoring, the Agenda, the gate and sharing move the right Patterns and
@@ -145,12 +148,10 @@ is not, and one true beside a single story of its look-alike.
   - That 70% means anything for real Users. Five scripted Users give a
     handful of ready Patterns, so one more or one fewer moves the share a
     lot. Read each case, not only the share.
-  - Missed Patterns as failures. A case with nothing ready passes, so a
-    run can be all passes and find nothing: read "true Patterns found". A
-    Conversation-end step that fails is logged and skipped, as in the live
-    app, so scoring or the gate breaking part-way shows only as fewer
-    Patterns found (the case is an Error only when the Conversation isn't
-    processed at all or the tagging step didn't run).
+  - Every missed Pattern as a failure. A case fails when none of its true
+    Patterns became ready, so a dead pipeline is no longer all passes. A
+    case with two true Patterns still passes when it finds one: read "true
+    Patterns found".
   - A share for the whole run on the Dashboard. The terminal report prints
     it against the 70% target; the Dashboard shows each case's Patterns and
     "true Patterns found", and the share is left to add up.
@@ -166,6 +167,28 @@ is not, and one true beside a single story of its look-alike.
   - A steady result. Zeph's replies and the tagging vary from run to run,
     so the same case can find a Pattern one day and miss it the next. Use
     Repeats before trusting a change.
+
+#### How to read a Whole-pipeline result (changed 25 Nov 2026, issue 32)
+
+- **Pass** now means three things: every ready or shared Pattern is a true
+  one, at least one true Pattern became ready (when the User has any), and
+  every Conversation-end step ran.
+- **Fail, "true Patterns found: 0 of N became ready":** the User has true
+  Patterns and none became ready. Either the script doesn't give enough
+  (look at "True Patterns missed" and its "Stopped by") or the pipeline is
+  broken. Before, this was a Pass.
+- **Fail, "Conversation-end step failed":** a step such as scoring, the
+  ready gate or the Portrait failed and was skipped, as the live app does.
+  The line says after which Conversation and what failed ("after
+  Conversation 2: Could not score Patterns: ..."). Before, this was only
+  in the log. It is read from the failures the app logs while the
+  Conversation ends, so anything else that fails in that scheduled work
+  shows here too.
+- On the Dashboard both reasons are the first lines of a failed case's
+  "What happened", under "Why it failed". The terminal report prints them
+  as FAIL lines.
+- A User with no true Pattern (`ordinary-fortnight`) still passes when
+  nothing becomes ready.
 
 ## What only real use can show
 
@@ -225,13 +248,14 @@ a full Conversation end (about ten calls). Remind the owner and show the
 estimate before any run. The shortest case (`ordinary-fortnight`, 12 texts in
 4 Conversations) used 208,000 tokens in and 76,000 out, S$0.20, and took 8
 minutes (25 Nov 2026). Until a case has run once its estimate is a rough
-300,000 tokens in and 110,000 out. The 5 cases together pass the Eval run
+300,000 tokens in and 110,000 out. The 6 cases together pass the Eval run
 token limit (1,000,000 to start; Admin → Evals → Model Prices), and the run
 then stops between Conversations, so raise the limit first or run one case.
 
 Dashboard: Admin → Evals → New run, tick Whole pipeline (or open it and pick
 single cases), read the estimate, Start run. Each result shows "Became ready
-or shared" and "True Patterns missed". Add a Variant to try another gate
+or shared" and "True Patterns missed"; a failed one's "What happened" starts
+with "Why it failed". Add a Variant to try another gate
 number or prompt on the same Users. Terminal: `make eval
 EVALS=whole_pipeline`, or `make eval CASES=ordinary-fortnight`; a plain
 `make eval` leaves this Eval out. Cases are edited on Admin → Evals → Cases
