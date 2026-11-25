@@ -20,7 +20,7 @@ Deterministic. `tests/test_pattern_matching.py::test_a_quote_the_user_deleted_is
 
 ## Fix
 
-Keep a small record per deleted quote: the User, the Conversation and a hash of the quote (never the words). The tagging checks drop an Observation whose quote is on that record ("Dropped by code"). Written when a User deletes a kept quote, a Pattern they were told, or a Life Thread. Removed by Delete My Data and Account Deletion.
+Keep a small record per deleted quote: the User, the Conversation, a hash of the message it was in and where in it the quote sat (never the words). The tagging checks drop an Observation whose quote shares any words with one on that record, so a longer or shorter cut doesn't come back either ("Dropped by code"). Written when a User deletes a kept quote, a Pattern they were told, or a Life Thread. Removed by Delete My Data and Account Deletion.
 
 ## Acceptance criteria
 

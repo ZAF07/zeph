@@ -396,7 +396,7 @@ def test_a_quote_the_user_deleted_is_not_kept_again_when_its_day_is_tagged_again
     chat_model.script_pattern_tagging(
         tagging_answer(
             FORGOT_TO_EAT,
-            {**FORGOT_TO_EAT, "quote": "I never eat when the app has me"},
+            {**FORGOT_TO_EAT, "quote": "the app has me, I forgot to eat"},
         )
     )
 
@@ -404,6 +404,56 @@ def test_a_quote_the_user_deleted_is_not_kept_again_when_its_day_is_tagged_again
 
     assert deleted.status_code == 204
     assert (report.conversations_tagged, report.observations_kept) == (1, 0)
+    assert observations_of(client.engine, user_id) == []
+
+
+def test_a_quote_that_went_with_a_deleted_life_thread_is_not_kept_again(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    user_id = have_unmatched_pattern(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+    )
+    chat_model.script_pattern_matching(matching_answer(ABSORBED))
+    chat_model.script_pattern_tagging(tagging_answer(FORGOT_TO_EAT))
+    matcher_of(client, chat_model, clock).match()
+    [first] = patterns_of(client.engine, user_id)
+    [kept] = observations_of(client.engine, user_id)
+    other_thread = next(
+        item for item in first.evidence if item.thread_id != kept.thread_id
+    )
+    deleted = client.delete(
+        f"/api/life-threads/{kept.thread_id}", headers=maya_headers(auth_verifier)
+    )
+    keep_pattern(
+        client.engine,
+        user_id,
+        "Loses whole days to whatever is new.",
+        PatternState.UNMATCHED,
+        [(other_thread.day, other_thread.thread_id, "Again.")],
+    )
+    chat_model.script_pattern_matching(matching_answer(ABSORBED))
+    chat_model.script_pattern_tagging(
+        tagging_answer(
+            {**FORGOT_TO_EAT, "thread": None}, {**FORGOT_TO_EAT, "thread": 1}
+        )
+    )
+
+    reports = matcher_of(client, chat_model, clock).match()
+
+    assert deleted.status_code == 204
+    assert sum(report.conversations_tagged for report in reports) == 1
     assert observations_of(client.engine, user_id) == []
 
 

@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from collections.abc import Mapping, Sequence, Set
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
@@ -16,6 +17,7 @@ from companion.core.models import (
     CuriositySensitivity,
     CuriosityState,
     Feature,
+    LifeThread,
     ModelStep,
     Observation,
     PatternMoveCause,
@@ -41,7 +43,10 @@ from companion.core.pattern_scoring import (
     sign_strengths_of,
     without_narrowing,
 )
-from companion.core.pattern_sharing import describe_where_it_shows
+from companion.core.pattern_sharing import (
+    FIRST_PREDICTION_WORDING,
+    describe_where_it_shows,
+)
 from companion.core.platform_settings import (
     CHECK_IN_MODEL,
     PATTERN_CLOSED_UNDER_POINTS,
@@ -60,6 +65,7 @@ from companion.core.usage import UsageRecordingChatModel
 
 logger = logging.getLogger(__name__)
 
+WORDS = re.compile(r"\w+")
 OUTCOMES_THAT_COUNT = frozenset(
     {PredictionOutcome.CAME_TRUE, PredictionOutcome.DID_NOT}
 )
@@ -136,9 +142,10 @@ class SharedPatternFacts:
         pattern: The Pattern.
         scored: Its score with its reactions and Prediction outcomes
             counted, and the situations it showed in.
-        came_true: How many of its Predictions came true, each wording
-            counted once, so the same test passed twice is one.
-        did_not: How many of its Predictions didn't come true.
+        came_true: How many of its Prediction wordings came true, so the
+            same test passed twice is one.
+        did_not: How many of its Prediction wordings didn't come true,
+            counted the same way.
         points_after_sharing: The score of its Observations said on a
             later day than it was shared, alone.
     """
@@ -268,6 +275,39 @@ def counted_once(
     ]
 
 
+def wording_number_of(prediction: Prediction) -> int:
+    """Say which of its Pattern Type's wordings a Prediction was given from.
+
+    Args:
+        prediction: The Prediction.
+
+    Returns:
+        Its number, counted from 1; the first for one given before the
+        wordings were numbered, when a Pattern Type had only that one.
+    """
+    return prediction.wording_number or FIRST_PREDICTION_WORDING
+
+
+def wordings_with(outcome: PredictionOutcome, predictions: Sequence[Prediction]) -> int:
+    """Count the different Prediction wordings that went one way.
+
+    Args:
+        outcome: How a Prediction went.
+        predictions: The Predictions given for one Pattern.
+
+    Returns:
+        How many wordings have a Prediction with that outcome, so the
+        same test passed or failed twice counts once.
+    """
+    return len(
+        {
+            wording_number_of(prediction)
+            for prediction in predictions
+            if prediction.outcome == outcome
+        }
+    )
+
+
 def shared_pattern_facts(
     pattern: CatalogPattern,
     observations: Sequence[Observation],
@@ -307,12 +347,6 @@ def shared_pattern_facts(
         if pattern.shared_at is not None
         and observation.day > users_today(time_zone, pattern.shared_at)
     ]
-    outcomes = [prediction.outcome for prediction in predictions]
-    tests_that_came_true = {
-        prediction.wording_number or prediction.id
-        for prediction in predictions
-        if prediction.outcome == PredictionOutcome.CAME_TRUE
-    }
     return SharedPatternFacts(
         pattern=pattern,
         scored=replace(
@@ -321,8 +355,8 @@ def shared_pattern_facts(
             + reaction_points(reactions, numbers, today, time_zone)
             + prediction_points(predictions, numbers, today, time_zone),
         ),
-        came_true=len(tests_that_came_true),
-        did_not=outcomes.count(PredictionOutcome.DID_NOT),
+        came_true=wordings_with(PredictionOutcome.CAME_TRUE, predictions),
+        did_not=wordings_with(PredictionOutcome.DID_NOT, predictions),
         points_after_sharing=score_observations(
             said_after_sharing, weighing.sign_strengths, numbers, today
         ).points,
@@ -402,13 +436,11 @@ def next_prediction_wording(
         them all, the one given longest ago.
     """
     last_given = {
-        prediction.wording_number: place
-        for place, prediction in enumerate(given)
-        if prediction.wording_number is not None
+        wording_number_of(prediction): place for place, prediction in enumerate(given)
     }
     numbers = range(1, len(pattern_type.prediction_wordings) + 1)
-    number = min(numbers, key=lambda number: last_given.get(number, -1))
-    return number, pattern_type.prediction_wordings[number - 1]
+    next_number = min(numbers, key=lambda candidate: last_given.get(candidate, -1))
+    return next_number, pattern_type.prediction_wordings[next_number - 1]
 
 
 def new_prediction_question(
@@ -509,43 +541,65 @@ def follow_up_window(
     )
 
 
+def is_in_mind(
+    observations: Sequence[Observation], threads_in_mind: Sequence[LifeThread]
+) -> bool:
+    """Say whether the User is talking about where a Pattern showed.
+
+    Args:
+        observations: The Observations of the Pattern.
+        threads_in_mind: The Life Threads this reply has in mind.
+
+    Returns:
+        True when one of those Threads is one the Pattern showed in, or
+        has a person in it that one of its Observations is about.
+    """
+    thread_ids = {thread.id for thread in threads_in_mind}
+    people = {
+        person.casefold() for thread in threads_in_mind for person in thread.people
+    }
+    return any(
+        observation.thread_id in thread_ids
+        or people & set(WORDS.findall(observation.about.casefold()))
+        for observation in observations
+    )
+
+
 def follow_ups_due_early(
     curiosities: Sequence[Curiosity],
     patterns: Sequence[CatalogPattern],
     observations: Sequence[Observation],
     predictions: Sequence[Prediction],
-    thread_ids_in_mind: Set[UUID],
+    threads_in_mind: Sequence[LifeThread],
     today: date,
     time_zone: str | None,
 ) -> frozenset[UUID]:
     """Find the follow-ups that may be asked before their wait is over.
 
     A fixed wait alone is too passive: when the User next talks about a
-    part of their life the Pattern showed in, that is the moment to ask
-    how the Prediction went.
+    person or part of their life the Pattern showed with, that is the
+    moment to ask how the Prediction went.
 
     Args:
         curiosities: The User's Curiosities about Predictions.
         patterns: Their Patterns of Pattern Types.
         observations: Their Observations.
         predictions: The Predictions given to them.
-        thread_ids_in_mind: The Life Threads this reply has in mind.
+        threads_in_mind: The Life Threads this reply has in mind.
         today: The User's day now.
         time_zone: The User's IANA time zone, for the days.
 
     Returns:
         The waiting follow-ups whose Pattern showed in a Life Thread now
-        in mind, on a later day than their Prediction was given or the
-        User last said it hasn't come up.
+        in mind, or with a person in one, on a later day than their
+        Prediction was given or the User last said it hasn't come up.
     """
-    pattern_type_ids: dict[UUID | None, str] = {
-        pattern.id: pattern.pattern_type_id for pattern in patterns
-    }
-    predictions_by_id: dict[UUID | None, Prediction] = {
-        prediction.id: prediction for prediction in predictions
-    }
+    pattern_type_ids = {pattern.id: pattern.pattern_type_id for pattern in patterns}
+    predictions_by_id = {prediction.id: prediction for prediction in predictions}
     due_early = set()
     for curiosity in curiosities:
+        if curiosity.prediction_id is None or curiosity.pattern_id is None:
+            continue
         prediction = predictions_by_id.get(curiosity.prediction_id)
         pattern_type_id = pattern_type_ids.get(curiosity.pattern_id)
         if (
@@ -555,11 +609,7 @@ def follow_ups_due_early(
             or today <= users_today(time_zone, counted_from(prediction))
         ):
             continue
-        shows_in = {
-            observation.thread_id
-            for observation in observations_of(pattern_type_id, observations)
-        }
-        if shows_in & thread_ids_in_mind:
+        if is_in_mind(observations_of(pattern_type_id, observations), threads_in_mind):
             due_early.add(curiosity.id)
     return frozenset(due_early)
 
@@ -1063,7 +1113,7 @@ class PredictionKeeper:
             repositories.curiosities.save_changes(planned.curiosities)
 
     def follow_ups_due_early(
-        self, snapshot: UserSnapshot, thread_ids_in_mind: Sequence[UUID]
+        self, snapshot: UserSnapshot, threads_in_mind: Sequence[LifeThread]
     ) -> frozenset[UUID]:
         """Find the follow-ups a reply may ask before their wait is over.
 
@@ -1072,13 +1122,14 @@ class PredictionKeeper:
 
         Args:
             snapshot: The User being answered.
-            thread_ids_in_mind: The Life Threads this reply has in mind.
+            threads_in_mind: The Life Threads this reply has in mind.
 
         Returns:
             The waiting follow-ups whose Pattern showed in one of those
-            Threads, on a later day than their Prediction was given.
+            Threads, or with a person in one, on a later day than their
+            Prediction was given.
         """
-        if not thread_ids_in_mind or not snapshot.works(Feature.PATTERN_SHARING):
+        if not threads_in_mind or not snapshot.works(Feature.PATTERN_SHARING):
             return frozenset()
         user_id = snapshot.user.id
         waiting = [
@@ -1096,7 +1147,7 @@ class PredictionKeeper:
             self._repositories.patterns.list_of_pattern_types(user_id),
             self._repositories.observations.list_for_user(user_id),
             self._repositories.patterns.list_predictions(user_id),
-            set(thread_ids_in_mind),
+            threads_in_mind,
             snapshot.today,
             snapshot.user.time_zone,
         )

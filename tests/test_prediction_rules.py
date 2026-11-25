@@ -11,6 +11,7 @@ from companion.core.models import (
     Curiosity,
     CuriosityAim,
     CuriosityState,
+    LifeThread,
     ObservationDirection,
     PatternMoveCause,
     PatternMoveReason,
@@ -269,7 +270,7 @@ def test_a_shared_pattern_gets_a_new_prediction_once_the_last_is_settled(
         None,
     )
     assert give.not_before is None
-    assert PATTERN_TYPES[BELONG].prediction_wordings[0] in give.question
+    assert PATTERN_TYPES[BELONG].prediction_wordings[1] in give.question
     assert planned([pattern], [settled], [give]).curiosities.added == []
 
 
@@ -555,9 +556,15 @@ def test_a_shared_patterns_score_counts_reactions_and_prediction_outcomes() -> N
     earlier = [replace(story(about=name), day=shared_on) for name in ("Mei", "Jun")]
     later = [story(about="Priya")]
     predictions = [
-        prediction(pattern, outcome=PredictionOutcome.CAME_TRUE),
-        prediction(pattern, outcome=PredictionOutcome.DID_NOT),
-        prediction(pattern, outcome=PredictionOutcome.CAME_TRUE),
+        replace(prediction(pattern, outcome=outcome), wording_number=number)
+        for number, outcome in enumerate(
+            [
+                PredictionOutcome.CAME_TRUE,
+                PredictionOutcome.DID_NOT,
+                PredictionOutcome.CAME_TRUE,
+            ],
+            start=1,
+        )
     ]
     faded = 140 * 0.5 ** (30 / 75)
 
@@ -696,7 +703,7 @@ def test_a_new_prediction_uses_a_wording_the_pattern_has_not_had() -> None:
     assert first == (1, wordings[0])
     assert second == (2, wordings[1])
     assert third == (3, wordings[2])
-    assert before_they_were_numbered == (1, wordings[0])
+    assert before_they_were_numbered == (2, wordings[1])
 
 
 def test_once_every_wording_was_given_the_one_given_longest_ago_comes_again() -> None:
@@ -732,21 +739,56 @@ def test_the_same_wording_coming_true_twice_is_one_test_passed() -> None:
 
     assert came_true_of(same_twice) == 1
     assert came_true_of(two_sides) == 2
-    assert came_true_of(not_numbered) == 2
+    assert came_true_of(not_numbered) == 1
+
+
+def test_the_same_wording_failing_twice_is_one_test_failed() -> None:
+    pattern = shared_pattern()
+    did_not = PredictionOutcome.DID_NOT
+    came_true = PredictionOutcome.CAME_TRUE
+    first_twice_true = [numbered(pattern, 1, outcome=came_true) for _ in range(2)]
+    two_failed = [numbered(pattern, number, outcome=did_not) for number in (2, 3)]
+    same_failed_twice = [numbered(pattern, 2, outcome=did_not) for _ in range(2)]
+
+    two_sides_failed = shared_pattern_facts(
+        pattern, [], [], [*first_twice_true, *two_failed], WEIGHING, "UTC"
+    )
+    one_side_failed = shared_pattern_facts(
+        pattern, [], [], same_failed_twice, WEIGHING, "UTC"
+    )
+
+    assert (two_sides_failed.came_true, two_sides_failed.did_not) == (1, 2)
+    assert one_side_failed.did_not == 1
+
+
+def life_thread(people: tuple[str, ...] = (), thread_id: Any = None) -> LifeThread:
+    """A Life Thread a reply has in mind."""
+    return LifeThread(
+        id=thread_id or uuid4(),
+        user_id=USER,
+        title="A part of their life",
+        story="Something going on.",
+        people=people,
+        is_open=True,
+        started_at=NOW,
+        updated_at=NOW,
+    )
 
 
 def test_a_follow_up_is_due_early_when_a_thread_of_the_pattern_is_in_mind() -> None:
     pattern = shared_pattern()
-    with_mei = story(about="Mei")
+    with_mei = story(about="Mei, their sister")
     given = prediction(pattern, made_days_ago=2)
     [follow_up] = planned([pattern], [given]).curiosities.added
-    other_thread = uuid4()
+    same_thread = life_thread(thread_id=with_mei.thread_id)
+    same_person = life_thread(people=("mei", "moving flat"))
+    something_else = life_thread(people=("Jun",))
 
     def due_early(
-        thread_ids: set[Any], today: date = TODAY, asked: Prediction = given
+        threads: list[LifeThread], today: date = TODAY, asked: Prediction = given
     ) -> frozenset[Any]:
         return follow_ups_due_early(
-            [follow_up], [pattern], [with_mei], [asked], thread_ids, today, "UTC"
+            [follow_up], [pattern], [with_mei], [asked], threads, today, "UTC"
         )
 
     said_not_yet_today = replace(
@@ -754,8 +796,9 @@ def test_a_follow_up_is_due_early_when_a_thread_of_the_pattern_is_in_mind() -> N
     )
     assert follow_up.not_before is not None
     assert follow_up.not_before > TODAY
-    assert due_early({with_mei.thread_id}) == frozenset({follow_up.id})
-    assert due_early({other_thread}) == frozenset()
-    assert due_early(set()) == frozenset()
-    assert due_early({with_mei.thread_id}, TODAY - timedelta(days=2)) == frozenset()
-    assert due_early({with_mei.thread_id}, asked=said_not_yet_today) == frozenset()
+    assert due_early([same_thread]) == frozenset({follow_up.id})
+    assert due_early([same_person]) == frozenset({follow_up.id})
+    assert due_early([something_else]) == frozenset()
+    assert due_early([]) == frozenset()
+    assert due_early([same_thread], TODAY - timedelta(days=2)) == frozenset()
+    assert due_early([same_thread], asked=said_not_yet_today) == frozenset()

@@ -3514,18 +3514,23 @@ class DeletedQuote:
     """A record that a User deleted a quote kept as evidence, so it is never kept again.
 
     It holds none of their words: only which Conversation the quote was
-    from and a hash of it.
+    from, a hash of the text it was in and where in that text it sat, so
+    a longer or shorter quote of the same words is known too.
 
     Attributes:
         user_id: The User.
         conversation_id: The Conversation the quote was said in.
-        quote_hash: A hash of the quote, evened out.
+        text_hash: A hash of the User's text the quote was in, evened out.
+        span_start: Where the quote starts in that text, evened out.
+        span_end: Where it ends.
         deleted_at: When they deleted it.
     """
 
     user_id: UUID
     conversation_id: UUID
-    quote_hash: str
+    text_hash: str
+    span_start: int
+    span_end: int
     deleted_at: datetime
 
 

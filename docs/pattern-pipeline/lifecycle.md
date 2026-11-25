@@ -41,7 +41,7 @@ Mood, time of day and the kind of event are not tagged yet (issue 23).
 
    Every removal scores the User's Patterns again straight away.
 
-   When a User deletes a quote, a Pattern or a Life Thread, a record of each deleted quote is kept (the Conversation and a hash, never the words), so tagging that day again can never keep it again.
+   When a User deletes a quote, a Pattern or a Life Thread, a record of each deleted quote is kept (the Conversation, a hash of the message and where the quote sat in it, never the words), so tagging that day again can never keep it again, in the same words or a longer or shorter cut of them.
 
    **"Never again".** When the deleted Pattern was one they disagreed with, or one that didn't hold up, its Pattern Type is marked for that User: no Observation is kept for it and no Pattern starts for it again. Delete My Data removes the mark.
 
@@ -125,11 +125,11 @@ A ready Pattern is checked again at every Conversation end. If it fails, it goes
 
 **3. Sharing (ready → shared).** The Reply Plan picks a moment, or a Check-in shares it. Zeph gives the Pattern in warm words, two or three of the User's quotes, and one **Prediction**. If the User asks what patterns Zeph sees in them, a ready Pattern is shared then; with none ready or told, Zeph says it is still getting to know them. The wording it was told in is kept on the Pattern.
 
-**4. After sharing (shared → confirmed, contested or closed).** Each Pattern Type has three Predictions, each testing a different side of it. Sharing gives the first; later ones are those the Pattern hasn't had. Zeph asks how a Prediction went when the User next talks about a part of their life the Pattern showed in (from the day after it was given), or else 7 to 21 days later. The User's answer counts as evidence: "came true" is a strong sign for, "didn't" a strong sign against, and "hasn't come up" adds nothing and starts a new wait. A story that answers a Prediction counts once: that Conversation's Observations for the same Pattern Type count nothing. Then, in this order:
+**4. After sharing (shared → confirmed, contested or closed).** Each Pattern Type has three Predictions, each testing a different side of it. Sharing gives the first; later ones are those the Pattern hasn't had. Zeph asks how a Prediction went when the User next talks about a person or part of their life the Pattern showed with (from the day after it was given), or else 7 to 21 days later. The User's answer counts as evidence: "came true" is a strong sign for, "didn't" a strong sign against, and "hasn't come up" adds nothing and starts a new wait. A story that answers a Prediction counts once: that Conversation's Observations for the same Pattern Type count nothing. Then, in this order:
 
 1. Score under −150 → **closed**, for good.
-2. 2 Predictions didn't come true, and more didn't than did → **closed**, for good.
-3. 2 Predictions came true (each wording counted once), and more did than didn't → **confirmed**.
+2. 2 different Predictions didn't come true, and more didn't than did → **closed**, for good.
+3. 2 different Predictions came true, and more did than didn't → **confirmed**. (The same wording passed or failed twice counts once.)
 4. Observations from days after sharing reach 300 points → **confirmed**.
 
 A Prediction nobody answers within 21 days counts nothing and Zeph offers a new one. After 2 in a row go unanswered, Zeph offers no more for that Pattern until the User brings the Pattern up.

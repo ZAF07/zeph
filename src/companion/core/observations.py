@@ -107,8 +107,8 @@ class TaggingContext:
         not_gathered_pattern_type_ids: The Pattern Types of the Patterns
             the User disagreed with, while they have gathering on those
             turned off; no Observation naming one is kept.
-        deleted_quote_hashes: The hashes of the quotes the User deleted
-            from that Conversation; none is kept again.
+        deleted_quotes: The records of the quotes the User deleted from
+            that Conversation; none is kept again.
         never_again_pattern_type_ids: The Pattern Types of the Patterns
             the User deleted after disagreeing or after they didn't hold
             up; no Observation naming one is kept.
@@ -125,7 +125,7 @@ class TaggingContext:
     ruled_out_topics: frozenset[str] = frozenset()
     ignored_pattern_type_ids: frozenset[str] = frozenset()
     not_gathered_pattern_type_ids: frozenset[str] = frozenset()
-    deleted_quote_hashes: frozenset[str] = frozenset()
+    deleted_quotes: Sequence[DeletedQuote] = ()
     never_again_pattern_type_ids: frozenset[str] = frozenset()
 
 
@@ -233,39 +233,106 @@ def even_out(text: str) -> str:
     return WHITESPACE_RUNS.sub(" ", text.translate(EVENED_OUT_CHARACTERS)).strip()
 
 
-def hash_of_quote(quote: str) -> str:
-    """Hash a quote, so a deleted one can be known again without keeping its words.
+@dataclass(frozen=True)
+class QuoteSpan:
+    """Where a quote sits in one of the User's own texts.
+
+    Attributes:
+        text: The text it is in.
+        text_hash: A hash of that text, evened out.
+        start: Where the quote starts in the text, evened out.
+        end: Where it ends.
+    """
+
+    text: UserText
+    text_hash: str
+    start: int
+    end: int
+
+
+def find_quote_span(quote: str, user_texts: Sequence[UserText]) -> QuoteSpan | None:
+    """Find where a quote sits in the User's own texts, word for word.
 
     Args:
         quote: The quote.
+        user_texts: What the User wrote, oldest first.
 
     Returns:
-        The SHA-256 of the quote, evened out.
+        The first of their texts that holds the whole quote, starting and
+        ending on whole words, with where the quote sits in it; None if
+        none does.
     """
-    return hashlib.sha256(even_out(quote).encode()).hexdigest()
+    whole_words = re.compile(rf"(?<!\w){re.escape(even_out(quote))}(?!\w)")
+    for user_text in user_texts:
+        evened_out = even_out(user_text.text)
+        found = whole_words.search(evened_out)
+        if found:
+            return QuoteSpan(
+                text=user_text,
+                text_hash=hashlib.sha256(evened_out.encode()).hexdigest(),
+                start=found.start(),
+                end=found.end(),
+            )
+    return None
+
+
+def was_deleted(span: QuoteSpan, deleted: Sequence[DeletedQuote]) -> bool:
+    """Say whether a quote takes in words the User deleted before.
+
+    Args:
+        span: Where the quote sits in the User's text.
+        deleted: The records of quotes they deleted from that Conversation.
+
+    Returns:
+        True when it is in the same text as a deleted quote and shares
+        any of its words, so a longer or shorter quote counts too.
+    """
+    return any(
+        record.text_hash == span.text_hash
+        and record.span_start < span.end
+        and span.start < record.span_end
+        for record in deleted
+    )
 
 
 def deleted_quotes_of(
-    observations: Sequence[Observation], now: datetime
+    observations: Sequence[Observation],
+    texts_by_conversation: Mapping[UUID, Sequence[UserText]],
+    now: datetime,
 ) -> list[DeletedQuote]:
     """Write the records that say a User deleted some kept quotes.
 
     Args:
         observations: The Observations being deleted.
+        texts_by_conversation: What the User wrote in each of their
+            Conversations whose messages are still kept, oldest first.
         now: When they are deleted.
 
     Returns:
-        One record per Observation, with a hash in place of its quote.
+        One record per Observation whose quote is still in a kept text,
+        with where it sits in place of its words. A quote whose messages
+        Message Retention deleted needs none: its Conversation can't be
+        tagged again.
     """
-    return [
-        DeletedQuote(
-            user_id=observation.user_id,
-            conversation_id=observation.conversation_id,
-            quote_hash=hash_of_quote(observation.quote),
-            deleted_at=now,
+    records = []
+    for observation in observations:
+        span = find_quote_span(
+            observation.quote,
+            texts_by_conversation.get(observation.conversation_id, ()),
         )
-        for observation in observations
-    ]
+        if span is None:
+            continue
+        records.append(
+            DeletedQuote(
+                user_id=observation.user_id,
+                conversation_id=observation.conversation_id,
+                text_hash=span.text_hash,
+                span_start=span.start,
+                span_end=span.end,
+                deleted_at=now,
+            )
+        )
+    return records
 
 
 def find_quoted_text(quote: str, user_texts: Sequence[UserText]) -> UserText | None:
@@ -279,15 +346,8 @@ def find_quoted_text(quote: str, user_texts: Sequence[UserText]) -> UserText | N
         The first of their texts that holds the whole quote, starting and
         ending on whole words; None if none does.
     """
-    whole_words = re.compile(rf"(?<!\w){re.escape(even_out(quote))}(?!\w)")
-    return next(
-        (
-            user_text
-            for user_text in user_texts
-            if whole_words.search(even_out(user_text.text))
-        ),
-        None,
-    )
+    span = find_quote_span(quote, user_texts)
+    return span.text if span else None
 
 
 def is_situational(tags: SituationTags, matches: Sequence[SituationMatch]) -> bool:
@@ -930,7 +990,7 @@ def check_observation(entry: Any, context: TaggingContext) -> Observation | Drop
         has no context or who it is about, or it names a Pattern Type the
         User disagreed with while they have gathering turned off, or one
         of a Pattern they deleted after disagreeing or after it didn't
-        hold up, or its quote is one the User deleted. One that
+        hold up, or its quote takes in words the User deleted. One that
         names a Thought
         Experiment put to the User in the Conversation is a "what if"
         answer, whatever kind the model wrote. A ruled-out topic is kept
@@ -957,10 +1017,10 @@ def check_observation(entry: Any, context: TaggingContext) -> Observation | Drop
     if matched is None:
         return DropReason.UNKNOWN_SIGN
     quote = read_text(entry, "quote")
-    quoted_text = find_quoted_text(quote, context.user_texts) if quote else None
-    if quote is None or quoted_text is None:
+    span = find_quote_span(quote, context.user_texts) if quote else None
+    if quote is None or span is None:
         return DropReason.QUOTE_NOT_WORD_FOR_WORD
-    if hash_of_quote(quote) in context.deleted_quote_hashes:
+    if was_deleted(span, context.deleted_quotes):
         return DropReason.DELETED_BY_USER
     tags = read_tags(entry)
     evidence_kind = read_choice(entry, "evidence", EvidenceKind)
@@ -990,7 +1050,7 @@ def check_observation(entry: Any, context: TaggingContext) -> Observation | Drop
         direction=direction,
         quote=quote,
         context=context_line,
-        day=users_today(context.time_zone, quoted_text.sent_at),
+        day=users_today(context.time_zone, span.text.sent_at),
         thread_id=read_thread(entry, context.threads),
         about=about,
         tags=tags,
@@ -1518,10 +1578,8 @@ class PatternTagger:
                     reactions,
                     snapshot.user.contested_gathering_enabled,
                 ),
-                deleted_quote_hashes=(
-                    self._repositories.observations.list_deleted_quote_hashes(
-                        snapshot.user.id, conversation_id
-                    )
+                deleted_quotes=self._repositories.observations.list_deleted_quotes(
+                    snapshot.user.id, conversation_id
                 ),
                 never_again_pattern_type_ids=(
                     self._repositories.patterns.list_never_again(snapshot.user.id)

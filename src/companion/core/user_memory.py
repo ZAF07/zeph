@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Callable
 from uuid import UUID, uuid4
 
 from companion.core.errors import NotFoundError
@@ -18,7 +19,7 @@ from companion.core.models import (
     User,
     UserPortrait,
 )
-from companion.core.observations import deleted_quotes_of
+from companion.core.observations import deleted_quotes_of, users_own_texts
 from companion.core.pattern_catalog import PatternCatalogService
 from companion.core.pattern_scoring import PatternScorer
 from companion.core.platform_settings import (
@@ -219,7 +220,8 @@ class UserMemoryService:
         Its evidence in Patterns goes with it, and so does a Pattern left
         with no evidence. So do its Observations, whose quotes are never
         kept again, and the User's Patterns of Pattern Types are scored
-        again at once.
+        again at once. The User is locked while it is deleted, as scoring
+        locks them.
 
         Args:
             user_id: The User's ID.
@@ -229,16 +231,12 @@ class UserMemoryService:
             LifeThreadNotFoundError: If the User has no such Life Thread.
         """
         with self._repositories.transaction() as transaction:
+            transaction.lock_user(user_id)
             in_transaction = transaction.repositories
             self._note_deleted_quotes(
                 in_transaction,
-                [
-                    observation
-                    for observation in in_transaction.observations.list_for_user(
-                        user_id
-                    )
-                    if observation.thread_id == thread_id
-                ],
+                user_id,
+                lambda observation: observation.thread_id == thread_id,
             )
             if not in_transaction.life_threads.delete(user_id, thread_id):
                 raise LifeThreadNotFoundError
@@ -305,13 +303,10 @@ class UserMemoryService:
                 raise PatternNotFoundError
             self._note_deleted_quotes(
                 in_transaction,
-                [
-                    observation
-                    for observation in in_transaction.observations.list_for_user(
-                        user_id
-                    )
-                    if observation.pattern_type_id == told[0].pattern_type_id
-                ],
+                user_id,
+                lambda observation: (
+                    observation.pattern_type_id == told[0].pattern_type_id
+                ),
             )
             in_transaction.observations.delete_of_pattern_type(
                 user_id, told[0].pattern_type_id
@@ -358,13 +353,8 @@ class UserMemoryService:
             in_transaction = transaction.repositories
             self._note_deleted_quotes(
                 in_transaction,
-                [
-                    observation
-                    for observation in in_transaction.observations.list_for_user(
-                        user_id
-                    )
-                    if observation.id == observation_id
-                ],
+                user_id,
+                lambda observation: observation.id == observation_id,
             )
             if not in_transaction.observations.delete(user_id, observation_id):
                 raise KeptQuoteNotFoundError
@@ -422,16 +412,34 @@ class UserMemoryService:
             raise UserPortraitNotFoundError
 
     def _note_deleted_quotes(
-        self, repositories: Repositories, observations: list[Observation]
+        self,
+        repositories: Repositories,
+        user_id: UUID,
+        is_being_deleted: Callable[[Observation], bool],
     ) -> None:
         """Keep a record that the User deleted some kept quotes.
 
         Args:
             repositories: The repositories, inside the deleting transaction.
-            observations: The Observations about to be deleted.
+            user_id: The User's ID.
+            is_being_deleted: Says which of their Observations are about
+                to be deleted.
         """
+        going = [
+            observation
+            for observation in repositories.observations.list_for_user(user_id)
+            if is_being_deleted(observation)
+        ]
+        texts_by_conversation = {
+            conversation_id: users_own_texts(
+                repositories.conversations.list_messages(conversation_id)
+            )
+            for conversation_id in {
+                observation.conversation_id for observation in going
+            }
+        }
         repositories.observations.note_deleted_quotes(
-            deleted_quotes_of(observations, self._clock.now())
+            deleted_quotes_of(going, texts_by_conversation, self._clock.now())
         )
 
     def _score_patterns_again(self, user_id: UUID) -> None:

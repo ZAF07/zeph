@@ -1412,17 +1412,17 @@ class ObservationRepository(Protocol):
         """
         ...
 
-    def list_deleted_quote_hashes(
+    def list_deleted_quotes(
         self, user_id: UUID, conversation_id: UUID
-    ) -> frozenset[str]:
-        """List the hashes of the quotes a User deleted from one Conversation.
+    ) -> list[DeletedQuote]:
+        """List the records of quotes a User deleted from one Conversation.
 
         Args:
             user_id: The User's ID.
             conversation_id: The Conversation the quotes were said in.
 
         Returns:
-            The hashes; none when they deleted no quote from it.
+            The records; none when they deleted no quote from it.
         """
         ...
 

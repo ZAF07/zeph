@@ -173,7 +173,7 @@ class ReplyService:
             message.conversation_id,
             understanding.form.struggling,
             self._prediction_keeper.follow_ups_due_early(
-                snapshot, [item.thread.id for item in reminded]
+                snapshot, [item.thread for item in reminded]
             ),
         )
         move_outcomes = self._move_outcome_finder.find(

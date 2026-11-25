@@ -3586,33 +3586,45 @@ class PostgresObservationRepository:
                     {
                         "user_id": record.user_id,
                         "conversation_id": record.conversation_id,
-                        "quote_hash": record.quote_hash,
+                        "text_hash": record.text_hash,
+                        "span_start": record.span_start,
+                        "span_end": record.span_end,
                         "deleted_at": record.deleted_at,
                     }
                     for record in deleted
                 ],
             )
 
-    def list_deleted_quote_hashes(
+    def list_deleted_quotes(
         self, user_id: UUID, conversation_id: UUID
-    ) -> frozenset[str]:
-        """List the hashes of the quotes a User deleted from one Conversation.
+    ) -> list[DeletedQuote]:
+        """List the records of quotes a User deleted from one Conversation.
 
         Args:
             user_id: The User's ID.
             conversation_id: The Conversation the quotes were said in.
 
         Returns:
-            The hashes; none when they deleted no quote from it.
+            The records; none when they deleted no quote from it.
         """
         with self._database.connect() as connection:
-            hashes = connection.execute(
-                select(deleted_quotes.c.quote_hash).where(
+            rows = connection.execute(
+                select(deleted_quotes).where(
                     deleted_quotes.c.user_id == user_id,
                     deleted_quotes.c.conversation_id == conversation_id,
                 )
-            ).scalars()
-            return frozenset(hashes)
+            ).all()
+        return [
+            DeletedQuote(
+                user_id=row.user_id,
+                conversation_id=row.conversation_id,
+                text_hash=row.text_hash,
+                span_start=row.span_start,
+                span_end=row.span_end,
+                deleted_at=row.deleted_at,
+            )
+            for row in rows
+        ]
 
     def replace_exclusion_flags(
         self, user_id: UUID, flags: Sequence[ExclusionFlag]

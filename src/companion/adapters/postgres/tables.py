@@ -785,7 +785,9 @@ deleted_quotes = Table(
         ForeignKey("conversations.id", ondelete="CASCADE"),
         primary_key=True,
     ),
-    Column("quote_hash", Text, primary_key=True),
+    Column("text_hash", Text, primary_key=True),
+    Column("span_start", Integer, primary_key=True),
+    Column("span_end", Integer, primary_key=True),
     Column("deleted_at", DateTime(timezone=True), nullable=False),
 )
 

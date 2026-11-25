@@ -27,7 +27,6 @@ from companion.core.observations import (
     DropReason,
     TaggingContext,
     deleted_quotes_of,
-    hash_of_quote,
     ignored_pattern_types,
     is_situational,
     plan_exclusion_flags,
@@ -118,25 +117,40 @@ def entry(**changes: Any) -> dict[str, Any]:
     }
 
 
-def test_a_quote_the_user_deleted_is_dropped_and_its_record_holds_no_words() -> None:
+def test_a_quote_the_user_deleted_is_dropped_in_longer_or_shorter_words_too() -> None:
     [kept] = plan_observations([entry()], context()).kept
-    [record] = deleted_quotes_of([kept], SENT_AT)
-    deleted = replace(context(), deleted_quote_hashes=frozenset({record.quote_hash}))
+    [record] = deleted_quotes_of(
+        [kept], {CONVERSATION_ID: users_own_texts(MESSAGES)}, SENT_AT
+    )
+    deleted = replace(context(), deleted_quotes=[record])
 
     planned = plan_observations(
-        [entry(quote="I said  yes to Mei again"), entry(quote="It’s fine, honestly")],
+        [
+            entry(quote="I said  yes to Mei again"),
+            entry(quote="I said yes to Mei"),
+            entry(quote="yes to Mei again. It’s fine"),
+            entry(quote="It’s fine, honestly"),
+            entry(quote="and then I stewed on it all night"),
+        ],
         deleted,
     )
 
     assert (record.user_id, record.conversation_id) == (MEI.user_id, CONVERSATION_ID)
-    assert record.quote_hash == hash_of_quote("I said yes to Mei again")
-    assert "Mei" not in record.quote_hash
+    assert (record.span_start, record.span_end) == (0, len("I said yes to Mei again"))
+    assert "Mei" not in record.text_hash
     assert [observation.quote for observation in planned.kept] == [
-        "It’s fine, honestly"
+        "It’s fine, honestly",
+        "and then I stewed on it all night",
     ]
     assert [dropped.reason for dropped in planned.dropped_entries] == [
         DropReason.DELETED_BY_USER
-    ]
+    ] * 3
+
+
+def test_a_deleted_quote_whose_messages_are_gone_needs_no_record() -> None:
+    [kept] = plan_observations([entry()], context()).kept
+
+    assert deleted_quotes_of([kept], {}, SENT_AT) == []
 
 
 def test_a_valid_observation_is_kept_with_everything_it_needs() -> None:

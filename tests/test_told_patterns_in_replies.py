@@ -46,6 +46,7 @@ from tests.test_ready_gate_rules import BELONG, NOW, PATTERN_TYPES, TODAY, WORTH
 
 TOLD_HEADER = "Patterns you have told them"
 STILL_GETTING_TO_KNOW = "you are still getting to know them"
+NONE_TO_TELL = "You have no pattern you may tell them now"
 ASKED = "what patterns do you see in me?"
 
 
@@ -244,10 +245,20 @@ def test_no_told_pattern_is_shown_while_struggling_or_with_pattern_sharing_off(
         admin = owner_headers(client, auth_verifier)
         switch_for_user(client, admin, user_id, "pattern_sharing", "off")
 
-    saw = talk(client, chat_model, clock, "I can't cope today", named_pattern=1)
+    saw = talk(
+        client,
+        chat_model,
+        clock,
+        "I can't cope. what patterns do you see in me?",
+        named_pattern=1,
+        asked_for_patterns=True,
+    )
 
+    told_reply = chat_model.calls[-1].instructions
     assert TOLD_HEADER not in saw
-    assert APPROVED_WORDING not in chat_model.calls[-1].instructions
+    assert APPROVED_WORDING not in told_reply
+    assert NONE_TO_TELL in told_reply
+    assert "passed your tests" not in told_reply
 
 
 def test_asked_for_patterns_with_nothing_ready_zeph_says_it_is_still_getting_to_know(

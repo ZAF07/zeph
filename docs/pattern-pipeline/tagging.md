@@ -78,7 +78,7 @@ If the answer can't be read (no `observations` list), it is asked once more. If 
 | Not gathered | It names a Pattern the User disagreed with, while they have "Keep noticing after I disagree" off |
 | Unknown sign | Its sign isn't in the first Pattern Type's signs for (or against, if it's against) |
 | Quote not word for word | The quote isn't in one of the User's own texts |
-| Deleted by the User | The quote is one the User deleted from this Conversation before (matched by a hash; the words aren't kept) |
+| Deleted by the User | The quote shares words with one the User deleted from this Conversation before (matched by a hash of the message and the quote's place in it; the words aren't kept) |
 | Tag off its list | A tag or the kind of evidence isn't from its list |
 | Missing details | No context line, or no one it is about |
 | Repeat | Same Pattern Type, sign and quote as one already kept from this answer |

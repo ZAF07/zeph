@@ -386,15 +386,15 @@ def format_asked_for_patterns_for_reply(told: Sequence[ToldPatternInMind]) -> st
         told: The Patterns the Companion told them that a reply may name.
 
     Returns:
-        With none told, the rule to say it is still getting to know them
-        and to claim nothing about who they are; else the told Patterns
-        it may remind them of, and no other.
+        With none it may name now, the rule to say it is still getting
+        to know them and to claim nothing about who they are; else the
+        told Patterns it may remind them of, and no other.
     """
     if not told:
         return (
-            "They asked what patterns you see in them. Nothing you have "
-            "noticed has passed your tests yet, so you have no pattern to "
-            "tell them. Say plainly that you are still getting to know them "
+            "They asked what patterns you see in them. You have no pattern "
+            "you may tell them now. Say plainly that you are still getting "
+            "to know them "
             "and would rather not guess at who they are. You may give your "
             "view of one recent situation they told you about, as a view of "
             "that situation only. Don't say they always, usually or tend to "
