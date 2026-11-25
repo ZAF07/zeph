@@ -1,6 +1,6 @@
 # 30 — Owner decisions before Pattern sharing is on for a real User
 
-Status: ready-for-agent
+Status: completed
 Track: shared
 Blocked by: none
 
@@ -90,9 +90,25 @@ Order: 35, 36, 37, 38, 39, on one branch (`pattern-30-owner-decisions-before-sha
 
 ## Acceptance criteria
 
-- [ ] Each question above has the owner's answer recorded here
-- [ ] Question 5 was checked with a test, and a bug was filed if the quote comes back
-- [ ] `CONTEXT.md`, ADRs and `docs/pattern-pipeline/README.md` are updated where a decision changes the design
-- [ ] The build work is written as a plan here, or split into issues, and the status set to `ready-for-agent`
+- [x] Each question above has the owner's answer recorded here
+- [x] Question 5 was checked with a test, and a bug was filed if the quote comes back
+- [x] `CONTEXT.md`, ADRs and `docs/pattern-pipeline/README.md` are updated where a decision changes the design
+- [x] The build work is written as a plan here, or split into issues, and the status set to `ready-for-agent`
 
 ## Comments
+
+### 25 Nov 2026: closed
+
+**Evidence per criterion**
+
+- **Each question has the owner's answer recorded.** The table "The owner's answers (25 Nov 2026)" and the list under it.
+- **Question 5 was checked with a test, and a bug filed.** The test was red (a deleted quote was kept again); filed and fixed as `archive/35-deleted-quote-comes-back-when-its-day-is-tagged-again.md`.
+- **`CONTEXT.md`, ADRs and the pipeline README are updated.** `CONTEXT.md` (Pattern, Prediction, Read), ADR 0030 (the gate holds when a User asks), `docs/pattern-pipeline/README.md` ("Changed (25 Nov 2026)"), `lifecycle.md`, `tagging.md`, `docs/message-pipeline/README.md`.
+- **The build was split into issues.** 35 to 39, all built on this branch and archived; 34 (Reflections) waits for the owner.
+
+Answer 11 ("leave it") built nothing. What is left for the owner is in `20-findings-for-the-owner.md`, section 30.
+
+## Completion
+
+- Completed: 2026-11-25
+- Commit: MERGE_COMMIT
