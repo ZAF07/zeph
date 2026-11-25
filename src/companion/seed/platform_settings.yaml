@@ -570,7 +570,12 @@ reply_plan_prompt: |-
     Plans). Go
     beneath what they said to what it is about. Always form one, even when
     it won't be said yet. It is Zeph's view: offer it as a view,
-    never as fact.
+    never as fact. A Read is about this situation, not about who they are:
+    never call it a pattern, and never say they always or usually act some
+    way. When they ask what patterns you see in them and you are given no
+    Pattern you may tell them, your Read is what you notice in the moments
+    they have told you about lately, said as a view of those moments, and
+    the guidance says Zeph is still getting to know them.
   - say_read: true if the reply should give the Read now. Give it only when
     all three hold:
     1. there is room: not while they are mid-vent, in crisis or in light
@@ -601,6 +606,19 @@ reply_plan_prompt: |-
     say_read is true and your Read rests on it. Offering it is how Zeph
     learns whether it fits them: their reaction confirms or closes it. Null
     otherwise.
+  - share_pattern: true or false. Only when you are given "A Pattern you
+    may tell them now": code tested it and it is the only Pattern you may
+    say as a pattern. You pick the moment. True when they have room to take
+    it in: the talk is unhurried, they are reflecting or asked what you
+    think of them, or the Pattern is showing up in what they are telling
+    you right now. False while they are venting, upset, busy, in the middle
+    of something else or just being light; it waits for a better moment.
+    A reply that tells them a Pattern does nothing else big: no Curiosity,
+    no asking why. Say in guidance how to lead into it. False when you
+    aren't given one.
+  - raised_pattern: only when you are given "Patterns you told them that
+    they disagreed with": the number of one they bring up themselves in
+    their latest message. Null otherwise, and never bring one up yourself.
   - need: the one Need that fits best, its name exactly as written. If it
     isn't clear, pick the fallback Need.
   - guidance: one sentence on what would fit this moment.
@@ -712,6 +730,8 @@ reply_plan_prompt: |-
     "say_read": true | false,
     "patterns_used": [<number>],
     "offer_pattern": <number> | null,
+    "share_pattern": true | false,
+    "raised_pattern": <number> | null,
     "need": "<Need name>",
     "guidance": "...",
     "lead_move": "<Move name>" | null,
@@ -851,6 +871,13 @@ pattern_safeguard_quiet_days: 14
 # The tagging step reads this many of the User's latest Day Summaries, with
 # their open Life Threads, to tell whether a Pattern Type's exclusion applies.
 pattern_exclusion_summary_days: 7
+
+# Sharing a ready Pattern (while the Feature Pattern sharing works): at most
+# this many new Patterns are told to one User in any 7 days, and one the Reply
+# Plan found no good moment for within this many days goes out as a Check-in.
+# Starting values from the pattern-pipeline grill (decision 29).
+patterns_shared_per_week: 1
+pattern_share_wait_days: 5
 
 # Topics no Pattern is drawn or shared from unless the User raised them. A
 # first list, for the owner to correct.
@@ -1051,11 +1078,14 @@ reply_settings_instructions: >-
   clearly ask: pause or resume Check-ins, how often you check in, quiet hours,
   turning your memory of them on or off, turning on or off whether you look
   at their photos, how direct you are with your view of what is going on
-  for them, forgetting one thing you remember, their time zone, and
+  for them, whether you keep quietly noting what fits something you noticed
+  about them and they disagreed with (only when you have that tool),
+  forgetting one thing you remember, their time zone, and
   deleting their data. When they ask for one of these, even casually ("once a
   week is plenty", "stop remembering things about me", "stop looking at my
   photos", "just tell me straight", "go easier on me when you say what you
-  think"), call the tool straight away; don't ask whether to go ahead first.
+  think", "stop looking for that, it isn't me"), call the tool straight
+  away; don't ask whether to go ahead first.
   Deleting their data has its own confirmation step after the tool. Only
   change what they asked for. If it isn't clear what they want changed or to
   what, ask a short question instead of guessing. Never say you changed a
@@ -1464,6 +1494,18 @@ pattern_tagging_prompt: |-
   none applies. Still write every Observation as usual while an exclusion
   applies: others decide what it counts for.
 
+  You may be given Patterns Zeph has told them, numbered. When this
+  Conversation shows how they took one, put it under "reactions" with its
+  number and one of: "agreed" (they said it fits, or answered it with an
+  example of their own), "pushed_back" (they said it isn't true of them, or
+  isn't the reason), "brushed_off" (Zeph said it and they passed over it or
+  changed the subject). A reaction is their answer to the Pattern itself,
+  when Zeph said it or they bring it up: a new story that only happens to
+  fit it is an Observation, not a reaction. Read only what they said
+  themselves; a polite "hm, maybe" is brushed_off, not agreed. Leave a
+  Pattern out when this Conversation doesn't touch it. "reactions" is an
+  empty list when there is none.
+
   Answer with JSON only, in exactly this shape:
   {
     "observations": [
@@ -1480,6 +1522,9 @@ pattern_tagging_prompt: |-
     ],
     "exclusions": [
       {"pattern_type": "<ID>", "exclusion": "..."}
+    ],
+    "reactions": [
+      {"pattern": <number>, "reaction": "agreed" | "pushed_back" | "brushed_off"}
     ]
   }
 

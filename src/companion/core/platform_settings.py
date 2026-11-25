@@ -347,6 +347,8 @@ PATTERN_EXCLUSION_SUMMARY_DAYS = Setting(
     "pattern_exclusion_summary_days", read_whole_number
 )
 PATTERN_RULED_OUT_TOPICS = Setting("pattern_ruled_out_topics", read_text_list)
+PATTERNS_SHARED_PER_WEEK = Setting("patterns_shared_per_week", read_whole_number)
+PATTERN_SHARE_WAIT = Setting("pattern_share_wait_days", read_days)
 PATTERN_OTHER_SIDE_MODEL = Setting("pattern_other_side_model", read_text)
 PATTERN_OTHER_SIDE_THINKING = Setting("pattern_other_side_thinking", read_on_off)
 PATTERN_OTHER_SIDE_PROMPT = Setting("pattern_other_side_prompt", read_text)
@@ -1595,6 +1597,29 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
             "Topics, separated by commas, that no Pattern is shared from unless "
             "the User raised them: a Pattern resting on one Zeph asked about is "
             "never ready. Adding a topic counts for Conversations that end after."
+        ),
+    ),
+    EditableSetting(
+        PATTERNS_SHARED_PER_WEEK.key,
+        "New Patterns shared a week",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=7,
+        hint=(
+            "The most new Patterns Zeph tells one User in any 7 days, in chat "
+            "or as a Check-in, so each has room to sink in. 0 shares none."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_SHARE_WAIT.key,
+        "Days a ready Pattern waits for a moment in chat",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=90,
+        hint=(
+            "A ready Pattern the Reply Plan found no good moment for within "
+            "this many days goes out as a Check-in. 0 sends it with the next "
+            "Check-in."
         ),
     ),
     EditableSetting(

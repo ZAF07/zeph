@@ -230,6 +230,9 @@ def test_a_plain_users_understanding_and_reply_plan_show_shapes_and_never_words(
         "pattern_offered": False,
         "curiosities_offered": 0,
         "curiosity_asked": False,
+        "pattern_to_share_offered": False,
+        "pattern_share_planned": False,
+        "pattern_shared": None,
     }
     assert reply_plan["understanding_shape"] is None
     for words in (

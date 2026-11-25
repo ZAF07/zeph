@@ -36,7 +36,8 @@ export type ChatSetting =
   | "user_memory"
   | "photo_viewing"
   | "time_zone"
-  | "directness";
+  | "directness"
+  | "contested_gathering";
 
 /** How direct a User wants Zeph to be with its Read of what is going on. */
 export type Directness = "gentle" | "balanced" | "direct";
@@ -51,6 +52,9 @@ export type Directness = "gentle" | "balanced" | "direct";
  * `show_pattern_noticing_notice` says whether to show the notice that Zeph now
  * keeps quotes as evidence, until they press "Got it".
  * `directness` is how direct they want Zeph to be with its Read.
+ * `contested_gathering_enabled` is their own switch for letting Zeph keep
+ * noting evidence for a Pattern they disagreed with; it is shown only while
+ * `pattern_sharing_works`.
  */
 export type Me = {
   id: string;
@@ -66,6 +70,8 @@ export type Me = {
   photo_viewing_enabled: boolean;
   photo_viewing_available: boolean;
   directness: Directness;
+  contested_gathering_enabled: boolean;
+  pattern_sharing_works: boolean;
   personal_stickers_available: boolean;
   show_pattern_noticing_notice: boolean;
   onboarding_completed_at: string | null;
@@ -156,6 +162,7 @@ export type PreferenceChanges = {
   user_memory_enabled?: boolean;
   photo_viewing_enabled?: boolean;
   directness?: Directness;
+  contested_gathering_enabled?: boolean;
   country?: string;
   time_zone?: string;
 };
@@ -219,7 +226,8 @@ export type Feature =
   | "personal_stickers"
   | "curiosities"
   | "pattern_noticing"
-  | "pattern_exploring";
+  | "pattern_exploring"
+  | "pattern_sharing";
 
 /** A Feature's switch for everyone and who last changed it, and when. */
 export type FeatureSwitch = {
@@ -242,7 +250,8 @@ export type FeatureReason =
   | "off_for_user"
   | "turned_off_by_user"
   | "stickers_off"
-  | "pattern_noticing_off";
+  | "pattern_noticing_off"
+  | "pattern_exploring_off";
 
 /** Whether a Feature works for one User, why, and the Admin's switch for them. */
 export type UserFeatureStatus = {
@@ -542,13 +551,15 @@ export type CheckInKindInput = {
 
 /**
  * A Check-in Kind as Admins manage it. `sends_shared_photo` marks a Kind
- * that sends one of the User's Shared Photos and `raises_curiosity` one
- * that asks one of their Curiosities; Admins can't change either.
+ * that sends one of the User's Shared Photos, `raises_curiosity` one that
+ * asks one of their Curiosities and `shares_pattern` one that tells them a
+ * ready Pattern; Admins can't change any of them.
  */
 export type CheckInKind = CheckInKindInput & {
   id: string;
   sends_shared_photo: boolean;
   raises_curiosity: boolean;
+  shares_pattern: boolean;
 };
 
 /** A Check-in Kind and how many Check-ins of it were sent in 30 days. */
@@ -712,6 +723,7 @@ export type ModelStep =
   | "move_outcomes"
   | "pattern_tagging"
   | "pattern_other_side"
+  | "pattern_shared_check"
   | "pattern_matching"
   | "patterns"
   | "portrait"
@@ -761,9 +773,11 @@ export type UnderstandingShape = {
 
 /**
  * The shape of a Reply Plan: the Need, Move names, counts and whether a Read
- * was formed and said, never any words. `curiosities_offered` and
- * `curiosity_asked` are missing or null on a trace saved before they were
- * recorded.
+ * was formed and said, never any words. `curiosities_offered`,
+ * `curiosity_asked`, `pattern_to_share_offered` and `pattern_share_planned`
+ * are missing or null on a trace saved before they were recorded.
+ * `pattern_shared` is null unless the reply was to share a ready Pattern and
+ * the check after it has run.
  */
 export type ReplyPlanShape = {
   need: string;
@@ -783,6 +797,9 @@ export type ReplyPlanShape = {
   pattern_offered: boolean;
   curiosities_offered?: number | null;
   curiosity_asked?: boolean | null;
+  pattern_to_share_offered?: boolean | null;
+  pattern_share_planned?: boolean | null;
+  pattern_shared?: boolean | null;
 };
 
 /** The shape of a check on whether a reply brought up its Woven-in Check-in. */

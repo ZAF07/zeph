@@ -59,6 +59,8 @@ const onboardedUser: Me = {
   photo_viewing_enabled: true,
   photo_viewing_available: true,
   directness: "balanced",
+  contested_gathering_enabled: true,
+  pattern_sharing_works: false,
   personal_stickers_available: true,
   show_pattern_noticing_notice: false,
   onboarding_completed_at: "2026-11-11T09:00:00Z",
@@ -510,6 +512,45 @@ describe("AccountSettings", () => {
     expect(
       within(section).getByText(/How soon and how plainly Zeph tells you/),
     ).toBeInTheDocument();
+  });
+
+  it("hides the switch for noticing after a disagreement until Pattern sharing works", async () => {
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+
+    await screen.findByRole("region", { name: "How direct Zeph is" });
+    expect(
+      screen.queryByRole("region", { name: "Keep noticing after I disagree" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the switch for noticing after a disagreement, on, and saves it off", async () => {
+    apiClient.getMe.mockResolvedValue({
+      ...onboardedUser,
+      pattern_sharing_works: true,
+      changed_in_chat: { contested_gathering: "2026-11-07T09:00:00Z" },
+    });
+    const user = userEvent.setup();
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+
+    const section = await screen.findByRole("region", {
+      name: "Keep noticing after I disagree",
+    });
+    expect(
+      within(section).getByText(/it never brings it up again unless you do/),
+    ).toBeInTheDocument();
+    expect(
+      within(section).getByText("Changed in chat · 7 Nov"),
+    ).toBeInTheDocument();
+    const gathering = within(section).getByRole("switch", {
+      name: "Keep noticing after I disagree",
+    });
+    expect(gathering).toBeChecked();
+
+    await user.click(gathering);
+
+    expect(apiClient.updatePreferences).toHaveBeenCalledWith({
+      contested_gathering_enabled: false,
+    });
   });
 
   it("saves a new directness straight away", async () => {

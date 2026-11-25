@@ -38,6 +38,7 @@ from companion.core.models import (
 )
 from companion.core.pattern_catalog import PatternCatalogService
 from companion.core.pattern_scoring import PatternScorer
+from companion.core.pattern_sharing import PatternSharing
 from companion.core.photos import PhotoService, PhotoTools, SendPhotoTools
 from companion.core.platform_settings import (
     REPLY_DELETE_DATA_INSTRUCTIONS,
@@ -329,26 +330,28 @@ def build_settings_tools(repositories: Repositories) -> SettingsTools:
     clock = FakeClock(NOW)
     chat_channel = FakeChatChannel()
     features = FeatureService(repositories, clock, DASHBOARD_URL)
+    pattern_catalog = PatternCatalogService(repositories.pattern_catalog)
+    ready_keeper = ReadyKeeper(repositories, pattern_catalog, clock)
     user_memory = UserMemoryService(
         repositories,
         features,
-        PatternScorer(
-            repositories, PatternCatalogService(repositories.pattern_catalog), clock
-        ),
-        ReadyKeeper(
-            repositories, PatternCatalogService(repositories.pattern_catalog), clock
-        ),
+        PatternScorer(repositories, pattern_catalog, clock),
+        ready_keeper,
         clock,
     )
     usage_limiter = UsageLimiter(repositories, clock)
+    chat_model = recording_chat_model(repositories, clock)
     check_ins = CheckInService(
         repositories=repositories,
         features=features,
         user_snapshots=UserSnapshotLoader(repositories, clock),
-        chat_model=recording_chat_model(repositories, clock),
+        chat_model=chat_model,
         usage_limiter=usage_limiter,
         chat_channel=chat_channel,
         clock=clock,
+        pattern_sharing=PatternSharing(
+            repositories, ready_keeper, pattern_catalog, chat_model, clock
+        ),
     )
     users = UserService(
         repositories.users, features, user_memory, check_ins, clock, frozenset()

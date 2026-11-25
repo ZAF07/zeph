@@ -19,6 +19,9 @@ class Me:
         show_pattern_noticing_notice: Whether to show the notice saying Zeph now
             keeps quotes as evidence: Pattern noticing works for them and
             they haven't pressed "Got it" yet.
+        pattern_sharing_works: Whether Pattern sharing works for them, so
+            their switch for noting evidence on a Pattern they disagreed
+            with is shown.
     """
 
     user: User
@@ -26,6 +29,7 @@ class Me:
     photo_viewing_available: bool
     personal_stickers_available: bool
     show_pattern_noticing_notice: bool
+    pattern_sharing_works: bool
 
 
 class MeService:
@@ -61,4 +65,7 @@ class MeService:
             ),
             show_pattern_noticing_notice=user.pattern_noticing_told_at is None
             and self._features.works_for(user.id, Feature.PATTERN_NOTICING),
+            pattern_sharing_works=self._features.works_for(
+                user.id, Feature.PATTERN_SHARING
+            ),
         )

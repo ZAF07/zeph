@@ -644,4 +644,55 @@ If there is nothing, the section holds one line: "Nothing found."
 - **Impact:** once sharing exists, a Pattern could be shared right after a crisis.
 - **Suggested fix:** issue 08 looks again before sharing (noted on issue 08).
 
+## 08 — Sharing a ready Pattern (2026-11-25)
+
+### Asked for a pattern, the Read says one that code never offered
+
+- **Kind:** risk, needs the owner's decision
+- **What:** in the running app, with the Pattern only suspected and nothing offered by code, "what patterns do you see in me? tell me one" got: "One, plainly: the yes comes out before you've checked whether you want to give it", with Mei, Dana, Tom and Priya as examples. The Reply Plan built it as its Read from the Life Threads in mind and the Agenda (which shows the Pattern Type's name and if / then, marked never to say). The Pattern's approved wording, quotes and Prediction never reached the reply, and nothing was recorded as shared. A line was added to `reply_plan_prompt` ("a Read is about this situation, not about who they are: never call it a pattern"); it softened the wording in other replies but not when the User asks outright.
+- **Impact:** the gate holds for what code offers, but a User who asks gets much the same claim untested, with no Prediction and no record. This is where "the Read stays free" (decision 6) meets "code gates what it claims".
+- **Suggested fix:** decide which wins when they ask. Options: leave it (the Read is free); have code tell the Reply Plan, when a suspected or contested Pattern is close to what the Read says, to say it is still getting to know them; or stop showing the Agenda's if / then to the Reply Plan. Then add an Understanding Eval case for it.
+
+### The quotes a share used aren't stored, and a share can have no Prediction
+
+- **Kind:** limit
+- **What:** only the Prediction, as the check after the reply read it, is kept (`predictions`). Which quotes the reply used isn't kept, and a reply the check finds told the Pattern but gave no Prediction is still shared, with no Prediction row.
+- **Impact:** the Patterns tab (issue 18) can show all a Pattern's quotes but not which were said; issue 09 must cope with a shared Pattern that has no Prediction (make one).
+- **Suggested fix:** handle both in issues 09 and 18 (noted on them).
+
+### Agreement is kept and valued, but nothing reads a shared Pattern's score yet
+
+- **Kind:** limit
+- **What:** agreeing is kept as a reaction worth one weak sign for (`reaction_points`), and pushing back as one against. The only place that adds reactions to a score today is the logged score of the move to contested. Scoring never moves a shared Pattern, so the weak sign changes nothing a User or Admin sees until issue 09 confirms or closes shared Patterns.
+- **Impact:** none yet; issue 09 must add reactions when it reads a shared Pattern's score.
+- **Suggested fix:** noted on issue 09.
+
+### The check after the reply can fail after the Pattern was told
+
+- **Kind:** risk
+- **What:** the check runs once the reply is sent. If the call fails, or the reply was only partly sent, the Pattern stays ready and isn't counted, though the User may have read it. It can then be told again.
+- **Impact:** a rare double telling.
+- **Suggested fix:** if it shows up in real use, run the check before sending, as the Woven-in Check-in does (it costs a few seconds per sharing reply).
+
+### "It shows with colleague, family, friend" reads stiffly
+
+- **Kind:** polish
+- **What:** where a Pattern shows is given to the models as the raw tag values. The replies turned it into good prose ("the people closest to you get the real thing").
+- **Suggested fix:** leave unless replies start echoing it.
+
+### Migration 0100 reloads three prompts
+
+- **Kind:** note
+- **What:** `pattern_tagging_prompt`, `reply_plan_prompt` and `reply_settings_instructions` reload from the seed on deploy, so an Admin's edits to them are lost.
+
+### Design files changed by the agent again
+
+- **Kind:** note
+- **What:** `web/design/reference/Account.html` and `M-Account.html` gained the "Keep noticing after I disagree" card (a copy of the photo switch card with new words), and their two baselines were rebuilt on this machine. Fixture Alex has Pattern sharing working so the card is drawn. The words are drafts for the owner to correct under Copy.
+
+### The pixel test still can't run as shipped
+
+- **Kind:** bug, already known
+- **What:** `compare.cjs` hangs on Clerk's probe requests; a copy that blocks them was used and deleted. With it, `AdminModelCallTrace` and `AdminCheckInKinds` fail on page height only (0.02% and 0.08% of pixels differ), as noted before this work.
+
 ## Comments

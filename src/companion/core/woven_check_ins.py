@@ -95,19 +95,17 @@ def kinds_to_weave_in(kinds: Sequence[CheckInKind]) -> list[CheckInKind]:
     """List the Check-in Kinds a reply may weave in.
 
     Kinds with fixed behaviour are left out: a reply already raises
-    Curiosities and sends Shared Photos back by its own rules.
+    Curiosities, sends Shared Photos back and shares a ready Pattern by
+    its own rules.
 
     Args:
         kinds: Every Check-in Kind, in order.
 
     Returns:
-        The Kinds that send no Shared Photo and ask no Curiosity.
+        The Kinds that send no Shared Photo, ask no Curiosity and share no
+        Pattern.
     """
-    return [
-        kind
-        for kind in kinds
-        if not kind.sends_shared_photo and not kind.raises_curiosity
-    ]
+    return [kind for kind in kinds if not kind.has_fixed_behaviour]
 
 
 @dataclass(frozen=True)

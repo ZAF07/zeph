@@ -37,6 +37,7 @@ from companion.core.models import (
 from companion.core.move_outcomes import MoveOutcomeKeeper
 from companion.core.observations import PatternTagger
 from companion.core.pattern_scoring import PatternScorer
+from companion.core.pattern_sharing import PatternSharing
 from companion.core.patterns import PatternKeeper
 from companion.core.personal_stickers import PersonalStickerKeeper
 from companion.core.platform_settings import (
@@ -689,6 +690,7 @@ class PostConversationProcessor:
         pattern_tagger: PatternTagger,
         pattern_scorer: PatternScorer,
         ready_gate: ReadyGate,
+        pattern_sharing: PatternSharing,
         pattern_keeper: PatternKeeper,
         curiosity_keeper: CuriosityKeeper,
         agenda_keeper: AgendaKeeper,
@@ -717,6 +719,8 @@ class PostConversationProcessor:
                 Types while Pattern noticing works.
             ready_gate: Decides which suspected Patterns may be shared,
                 right after scoring.
+            pattern_sharing: Makes contested the Patterns the User pushed
+                back on, right after tagging.
             pattern_keeper: Notes the User's unmatched Patterns.
             curiosity_keeper: Writes, updates and closes the User's
                 Curiosities.
@@ -738,6 +742,7 @@ class PostConversationProcessor:
         self._pattern_tagger = pattern_tagger
         self._pattern_scorer = pattern_scorer
         self._ready_gate = ready_gate
+        self._pattern_sharing = pattern_sharing
         self._pattern_keeper = pattern_keeper
         self._curiosity_keeper = curiosity_keeper
         self._agenda_keeper = agenda_keeper
@@ -799,6 +804,7 @@ class PostConversationProcessor:
         touched = self._keep_life_threads(snapshot, conversation.id, messages)
         self._tag_observations(snapshot, conversation.id, messages, touched)
         if snapshot.works(Feature.PATTERN_NOTICING):
+            self._settle_reactions(snapshot, conversation.id)
             self._score_patterns(snapshot, conversation.id)
             self._check_ready(snapshot, conversation.id)
         self._keep_patterns(snapshot, conversation.id, messages, touched)
@@ -853,6 +859,19 @@ class PostConversationProcessor:
             self._pattern_tagger.tag_from(snapshot, conversation_id, messages, touched)
         except Exception:
             logger.exception("Could not tag Observations")
+
+    def _settle_reactions(self, snapshot: UserSnapshot, conversation_id: UUID) -> None:
+        """Make contested the Patterns the User pushed back on, never raising.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            conversation_id: The ended Conversation, in which the tagging
+                step read how they took the Patterns they were told.
+        """
+        try:
+            self._pattern_sharing.settle_reactions(snapshot, conversation_id)
+        except Exception:
+            logger.exception("Could not settle reactions to Patterns")
 
     def _score_patterns(self, snapshot: UserSnapshot, conversation_id: UUID) -> None:
         """Score the User's Patterns again, logging a failure instead of raising.

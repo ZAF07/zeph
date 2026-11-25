@@ -304,9 +304,7 @@ class LoadTestChatModel:
         offered = [
             kind
             for kind in self._repositories.check_ins.list_kinds()
-            if f"- {kind.name}:" in description
-            and not kind.sends_shared_photo
-            and not kind.raises_curiosity
+            if f"- {kind.name}:" in description and not kind.has_fixed_behaviour
         ]
         if not offered:
             return json.dumps({"decision": "skip", "reason": "No plain Kind offered."})

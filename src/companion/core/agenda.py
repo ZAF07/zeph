@@ -36,6 +36,7 @@ from companion.core.pattern_scoring import (
     observations_by_pattern_type,
     score_observations,
     scoring_numbers,
+    sign_strengths_of,
 )
 from companion.core.platform_settings import (
     AGENDA_SIZE,
@@ -1039,11 +1040,7 @@ def pattern_scores(
     Returns:
         Each score, by Pattern Type ID.
     """
-    sign_strengths = {
-        (entry.pattern_type.id, sign.id): sign.strength
-        for entry in catalog
-        for sign in (*entry.pattern_type.signs, *entry.pattern_type.signs_against)
-    }
+    sign_strengths = sign_strengths_of(entry.pattern_type for entry in catalog)
     numbers = scoring_numbers(settings)
     return {
         pattern_type_id: score_observations(

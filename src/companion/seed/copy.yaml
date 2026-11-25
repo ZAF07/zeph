@@ -2112,6 +2112,17 @@
       name: "How direct Zeph is: direct level"
       max_length: 20
       text: Direct
+    - key: account.contested_gathering.title
+      name: "Keep noticing after I disagree: heading and name read out by screen readers"
+      max_length: 60
+      text: Keep noticing after I disagree
+    - key: account.contested_gathering.explanation
+      name: "Keep noticing after I disagree: what the switch does; a blank line starts a new paragraph"
+      max_length: 1000
+      text: |-
+        When Zeph tells you something it has noticed about you and you disagree, it never brings it up again unless you do.
+
+        When on, Zeph still quietly notes what you say that fits it, in case it holds up after all. When off, it notes nothing new for it. Every quote Zeph keeps is listed on your Memories page, where you can delete any of them.
     - key: account.stickers.heading
       name: "Your stickers: heading"
       max_length: 40

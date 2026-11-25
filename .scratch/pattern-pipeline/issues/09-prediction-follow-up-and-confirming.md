@@ -28,3 +28,5 @@ After an Admin-set wait (start 7 days) the Companion asks how the Prediction wen
 - `08-sharing-a-ready-pattern.md`
 
 ## Comments
+
+- 25 Nov 2026 (from issue 08): sharing is built (`core/pattern_sharing.py`). For this issue: (1) the Prediction as told is in `predictions` (pattern, wording, when); a shared Pattern can have none, when the reply told the Pattern but gave no Prediction, so make one then; (2) reactions are in `pattern_reactions` and are worth points through `reaction_points` in `core/pattern_scoring.py`, but nothing adds them to a shared Pattern's score yet: do that where this issue reads the score to confirm or close; (3) `patterns.shared_at` says when it was first told; (4) the Reply Plan isn't shown shared Patterns yet (only the ready one and contested ones), so it can't follow one up after the Recent Messages have passed; (5) a contested Pattern stays contested even when they later agree.

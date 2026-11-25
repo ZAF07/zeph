@@ -1,4 +1,4 @@
-from collections.abc import Hashable, Mapping, Sequence
+from collections.abc import Hashable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date, datetime
 from uuid import UUID, uuid4
@@ -10,8 +10,11 @@ from companion.core.models import (
     ObservationDirection,
     PatternMove,
     PatternMoveCause,
+    PatternReaction,
     PatternState,
+    PatternType,
     PlatformSettings,
+    ReactionToPattern,
     ReadyCheck,
     SignStrength,
     User,
@@ -159,6 +162,62 @@ def observation_points(
     age_in_days = max((today - observation.day).days, 0)
     fading: float = 0.5 ** (age_in_days / numbers.half_life_days)
     return points * fading
+
+
+def sign_strengths_of(
+    pattern_types: Iterable[PatternType],
+) -> dict[tuple[str, str], SignStrength]:
+    """Read each sign's strength from some Pattern Types.
+
+    Args:
+        pattern_types: The Pattern Types, as the Pattern Catalog holds them now.
+
+    Returns:
+        The strength of every sign for and against, by Pattern Type ID and
+        sign ID.
+    """
+    return {
+        (pattern_type.id, sign.id): sign.strength
+        for pattern_type in pattern_types
+        for sign in (*pattern_type.signs, *pattern_type.signs_against)
+    }
+
+
+def reaction_points(
+    reactions: Sequence[ReactionToPattern],
+    numbers: ScoringNumbers,
+    today: date,
+    time_zone: str | None,
+) -> float:
+    """Work out what a User's reactions to one Pattern are worth today.
+
+    Agreeing counts as one weak sign for it and pushing back as one weak
+    sign against it, each halved every half-life since its day; brushing
+    it off counts nothing. So agreeing adds up and never settles it alone.
+
+    Args:
+        reactions: How they took the Pattern, one per Conversation.
+        numbers: The Admin-set numbers.
+        today: The User's day now.
+        time_zone: The User's IANA time zone, for the day of each reaction.
+
+    Returns:
+        The points; negative when they pushed back more than they agreed.
+    """
+    weak = numbers.sign_points[SignStrength.WEAK]
+    worth = {
+        PatternReaction.AGREED: weak,
+        PatternReaction.PUSHED_BACK: -weak,
+        PatternReaction.BRUSHED_OFF: 0,
+    }
+    points = 0.0
+    for reaction in reactions:
+        day = users_today(time_zone, reaction.reacted_at)
+        age_in_days = max((today - day).days, 0)
+        points += worth[reaction.reaction] * 0.5 ** (
+            age_in_days / numbers.half_life_days
+        )
+    return points
 
 
 def situation_of(observation: Observation) -> Hashable:
@@ -582,11 +641,9 @@ class PatternScorer:
         patterns = repositories.patterns.list_of_pattern_types(user.id)
         if not observations and not patterns:
             return
-        sign_strengths = {
-            (entry.pattern_type.id, sign.id): sign.strength
-            for entry in self._pattern_catalog.catalog()
-            for sign in (*entry.pattern_type.signs, *entry.pattern_type.signs_against)
-        }
+        sign_strengths = sign_strengths_of(
+            entry.pattern_type for entry in self._pattern_catalog.catalog()
+        )
         now = self._clock.now()
         planned = plan_pattern_moves(
             user.id,

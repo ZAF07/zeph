@@ -1,6 +1,7 @@
 import json
 import logging
 from typing import Any
+from uuid import UUID, uuid4
 
 import httpx
 import pytest
@@ -9,6 +10,7 @@ from sqlalchemy import Engine, text
 
 from companion.adapters.clerk.accounts import ClerkAccounts
 from companion.adapters.postgres.repositories import build_postgres_repositories
+from companion.core.models import PatternReaction, Prediction, ReactionToPattern
 from companion.core.user_data import UserDataService
 from tests.conftest import DASHBOARD_URL
 from tests.fakes import (
@@ -59,9 +61,10 @@ def set_up_user_with_every_kind_of_data(
     """Give a User messages, User Memory, a Check-in and a Telegram Connection.
 
     Their User Memory holds a Memory Item, a Day Summary, a Shared
-    Photo, two Life Threads, an Observation, an exclusion flag, a Pattern,
-    a Move Outcome and a User Portrait, and they have a Personal Sticker, a
-    Curiosity and an Exploration with its aimed Curiosity.
+    Photo, two Life Threads, an Observation, an exclusion flag, a Pattern
+    with a Prediction and a reaction to it, a Move Outcome and a User
+    Portrait, and they have a Personal Sticker, a Curiosity and an
+    Exploration with its aimed Curiosity.
 
     Returns:
         Their Dashboard API headers and their User ID.
@@ -190,7 +193,35 @@ def set_up_user_with_every_kind_of_data(
     chat_model.script("thanks for checking in")
     send_to_webhook(client, telegram_text_update("doing well, thanks"))
     user_id: str = client.get("/api/me", headers=headers).json()["id"]
+    add_prediction_and_reaction(client.engine, user_id, clock)
     return headers, user_id
+
+
+def add_prediction_and_reaction(engine: Engine, user_id: str, clock: FakeClock) -> None:
+    """Give a User's Pattern of a Pattern Type a Prediction and a reaction."""
+    patterns = build_postgres_repositories(engine).patterns
+    pattern = patterns.list_of_pattern_types(UUID(user_id))[0]
+    patterns.add_prediction(
+        Prediction(
+            id=uuid4(),
+            user_id=pattern.user_id,
+            pattern_id=pattern.id,
+            wording="Next time you fall short, notice what you say to yourself.",
+            made_at=clock.now(),
+        )
+    )
+    patterns.add_reactions(
+        [
+            ReactionToPattern(
+                id=uuid4(),
+                user_id=pattern.user_id,
+                pattern_id=pattern.id,
+                reaction=PatternReaction.AGREED,
+                conversation_id=None,
+                reacted_at=clock.now(),
+            )
+        ]
+    )
 
 
 def tables_with_a_user_id_column(engine: Engine) -> list[str]:

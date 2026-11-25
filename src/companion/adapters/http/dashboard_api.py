@@ -62,6 +62,8 @@ class MeResponse(BaseModel):
     photo_viewing_enabled: bool
     photo_viewing_available: bool
     directness: Directness
+    contested_gathering_enabled: bool
+    pattern_sharing_works: bool
     personal_stickers_available: bool
     show_pattern_noticing_notice: bool
     onboarding_completed_at: datetime | None
@@ -97,6 +99,7 @@ class PreferencesRequest(BaseModel):
     user_memory_enabled: bool | None = None
     photo_viewing_enabled: bool | None = None
     directness: Directness | None = None
+    contested_gathering_enabled: bool | None = None
     country: str | None = None
     time_zone: str | None = None
 
@@ -600,6 +603,8 @@ def to_me_response(me: Me) -> MeResponse:
         photo_viewing_enabled=user.photo_viewing_enabled,
         photo_viewing_available=me.photo_viewing_available,
         directness=user.directness,
+        contested_gathering_enabled=user.contested_gathering_enabled,
+        pattern_sharing_works=me.pattern_sharing_works,
         personal_stickers_available=me.personal_stickers_available,
         show_pattern_noticing_notice=me.show_pattern_noticing_notice,
         onboarding_completed_at=user.onboarding_completed_at,
@@ -806,6 +811,7 @@ def build_dashboard_api_router(
             user_memory_enabled=request.user_memory_enabled,
             photo_viewing_enabled=request.photo_viewing_enabled,
             directness=request.directness,
+            contested_gathering_enabled=request.contested_gathering_enabled,
             country=request.country,
             time_zone=request.time_zone,
         )

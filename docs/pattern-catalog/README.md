@@ -61,8 +61,8 @@ was last loaded. Zeph keeps replying either way.
 | `anyone_would` | When anyone would act this way, so it says nothing about the person. | The tagging model. |
 | `anyone_would_when` | Optional. The same, as situation tags: `relationship`, `power`, `setting`, `stance`. A match needs every tag it names. | Code: an Observation whose tags fit is situational and carries no weight. |
 | `exclusions` | When it must not be shared, and whether evidence from then is `ignored` or `counted_not_shared`. | The tagging model, which says which exclusions apply to a User now (from their open Life Threads and latest Day Summaries), and the ready gate: while one applies the Pattern is never ready, and with `ignored` the Observations tagged then carry no weight. |
-| `approved_wording` | The Pattern in warm, plain words, as Zeph's view. | Not read yet: sharing (issue 08). |
-| `prediction_wording` | One thing to notice next time, with a `{placeholder}` the model fills. | Not read yet: sharing (issue 08). |
+| `approved_wording` | The Pattern in warm, plain words, as Zeph's view. | Given to the Reply Plan, the reply, a Check-in that shares it and the tagging step (to read how they took it), once the Pattern is ready or told. A change applies from the next reply. |
+| `prediction_wording` | One thing to notice next time, with a `{placeholder}` the model fills. | Given to the reply or Check-in that shares the Pattern, which puts the User's own person or thing in the placeholder. The Prediction is kept as it was worded to them. |
 | `numbers.situations_needed` | Situations (Life Threads) needed before it can be Ready. | The ready gate: the Pattern needs this many situations, or the Admin-set number when that is more. |
 | `numbers.base_rate` | A first guess at how common it is, 0 to 1. | Not read yet: kept for when the score becomes a probability. |
 

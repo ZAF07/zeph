@@ -51,6 +51,8 @@ function newUser(overrides: Partial<Me> = {}): Me {
     photo_viewing_enabled: true,
     photo_viewing_available: true,
     directness: "balanced",
+    contested_gathering_enabled: true,
+    pattern_sharing_works: false,
     personal_stickers_available: false,
     show_pattern_noticing_notice: false,
     onboarding_completed_at: null,

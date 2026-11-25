@@ -21,6 +21,7 @@ export const modelSteps: { id: ModelStep; label: string }[] = [
   { id: "move_outcomes", label: "Move Outcomes" },
   { id: "pattern_tagging", label: "Pattern tagging" },
   { id: "pattern_other_side", label: "Other side" },
+  { id: "pattern_shared_check", label: "Pattern shared check" },
   { id: "pattern_matching", label: "Pattern matching" },
   { id: "patterns", label: "Pattern keeping" },
   { id: "portrait", label: "User Portrait" },
@@ -188,13 +189,44 @@ function curiosityFacts(
 }
 
 /**
+ * Says whether a Reply Plan was offered a ready Pattern to share and what
+ * came of it.
+ *
+ * @param shape - The Reply Plan's shape.
+ * @returns "Pattern to share: Shared", "Picked, not shared", "Picked",
+ * "Offered, not picked" or "None offered"; nothing for a trace saved before
+ * it was recorded.
+ */
+function patternToShareFacts(
+  shape: ReplyPlanShape,
+): { label: string; value: string }[] {
+  if (shape.pattern_to_share_offered == null) {
+    return [];
+  }
+  const label = "Pattern to share";
+  if (!shape.pattern_to_share_offered) {
+    return [{ label, value: "None offered" }];
+  }
+  if (!shape.pattern_share_planned) {
+    return [{ label, value: "Offered, not picked" }];
+  }
+  if (shape.pattern_shared == null) {
+    return [{ label, value: "Picked" }];
+  }
+  return [
+    { label, value: shape.pattern_shared ? "Shared" : "Picked, not shared" },
+  ];
+}
+
+/**
  * Lists the facts of a Reply Plan's shape, as labels and values.
  *
  * @param shape - The Reply Plan's shape.
  * @returns E.g. "Need picked: Be heard", "Lead Move: Calm", "Threads brought
  * up: 2 (1 lead, 1 weave)", "Read formed: Yes", "Read said: No", "Pattern:
  * Used, not offered", "Check-in Kinds offered: 2", "Check-in Kind chosen:
- * None", "Curiosities offered: 2", "Curiosity asked: Yes".
+ * None", "Curiosities offered: 2", "Curiosity asked: Yes", "Pattern to
+ * share: Shared".
  */
 export function replyPlanShapeFacts(
   shape: ReplyPlanShape,
@@ -224,5 +256,6 @@ export function replyPlanShapeFacts(
     },
     { label: "Check-in Kind chosen", value: shape.check_in_kind ?? "None" },
     ...curiosityFacts(shape),
+    ...patternToShareFacts(shape),
   ];
 }
