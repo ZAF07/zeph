@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
+from companion.adapters.evals.logged_failures import logged_failures
 from companion.adapters.evals.stand_ins import (
     CannedWebSearch,
     CountingChatModel,
@@ -739,23 +740,29 @@ class InProcessCompanion:
             self._repositories, self._pattern_catalog(), self._clock
         ).read(self._conversation_end_snapshot(), struggling=False)
 
-    def end_conversation(self) -> None:
+    def end_conversation(self) -> list[str]:
         """Let the made-up User's Conversation go quiet and run the scheduled work.
 
         The clock moves on by the Conversation quiet gap, then the work the
         scheduler runs on every tick runs once, as in the live app: the
         Conversation ends and every Conversation-end step runs on it.
 
+        Returns:
+            Each failure the app logged during that work, such as a
+            Conversation-end step that failed and was skipped.
+
         Raises:
             EvalSetupError: If no User is connected, they have no
-                Conversation, or it wasn't ended and processed.
+                Conversation, or it wasn't ended and processed; it then
+                names the failures logged.
         """
         if self._user_id is None:
             raise EvalSetupError("Connect the made-up User first")
         conversations = self._repositories.conversations
         settings = self._repositories.platform_settings.load()
         self._clock.move(settings.get(CONVERSATION_QUIET_GAP))
-        self._scheduler.run_tick()
+        with logged_failures() as failures:
+            self._scheduler.run_tick()
         conversation = conversations.get_latest_for_user(self._user_id)
         if conversation is None:
             raise EvalSetupError("The made-up User has no Conversation")
@@ -763,7 +770,10 @@ class InProcessCompanion:
             unprocessed.id == conversation.id
             for unprocessed in conversations.list_ended_unprocessed()
         ):
-            raise EvalSetupError("The Conversation-end steps didn't finish")
+            raise EvalSetupError(
+                "; ".join(["The Conversation-end steps didn't finish", *failures])
+            )
+        return failures
 
     def tag_observations(
         self, conversation_id: UUID, touched: Sequence[LifeThread]

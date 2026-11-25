@@ -336,13 +336,18 @@ class EvalCompanion(Protocol):
         """
         ...
 
-    def end_conversation(self) -> None:
+    def end_conversation(self) -> list[str]:
         """Let the made-up User's Conversation go quiet and run the scheduled work.
 
         The clock moves on by the Conversation quiet gap, then the work the
         scheduler runs on every tick runs once, as in the live app: the
         Conversation ends and every Conversation-end step runs on it, with
         the Eval database's Platform Settings.
+
+        Returns:
+            What failed and was skipped during that work, one line each,
+            such as a Conversation-end step: "Could not score Patterns:
+            ValueError('no settings')".
 
         Raises:
             EvalSetupError: If no User is connected, they have no

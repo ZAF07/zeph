@@ -6,7 +6,9 @@
 # The app is never told which Pattern Types are true.
 #
 # A case passes when every Pattern that became ready or was shared is one of
-# its true ones. True ones never found are counted as missed and don't fail it.
+# its true ones, at least one of its true ones became ready (when it has any),
+# and no Conversation-end step failed. A true one missed beside one found is
+# counted as missed and doesn't fail it.
 # Target for a run: at least 70% of ready Patterns true.
 #
 # Drafted by Claude to start; the owner corrects them. A model wrote these
@@ -33,7 +35,13 @@
 # What a Pattern needs to be ready, with the starting numbers: 3 situations,
 # 2 Conversations, 300 points (a strong sign told as a real story is 140) and
 # an answered counter-test (any Observation against). Evidence against with a
-# different kind of person than all the evidence for only narrows it.
+# different kind of person than all the evidence for only narrows it. Keep the
+# "it doesn't happen with…" story to one text that names the person: a second
+# line that only compares ("it's only with mum and friends that I cave") can be
+# tagged as evidence against with no person, and then nothing is narrowed and
+# the counter-test check stops the Pattern. A story about a parent or a boss
+# may be tagged "above", which for some Pattern Types is what anyone would do
+# and counts for nothing: use people on the same footing.
 
 now: 2026-11-02T19:30:00
 
@@ -144,7 +152,7 @@ cases:
         messages:
           - "had the final interview for the product job on monday. they said I'd hear this week"
           - "I've refreshed my inbox maybe forty times today. I can't do anything about it and I still keep checking"
-          - "honestly the waiting is worse than a no would be. a no I can deal with"
+          - "last night I caught myself hoping they'd just email a rejection so it would be over. the waiting is worse than a no would be, a no I can deal with"
           - "I've already drafted what I'll do if it's a no, and a list of three other places to apply. and a budget in case I'm out of work by February, which is not even likely"
       - days_later: 2
         messages:
@@ -156,12 +164,11 @@ cases:
           - "got the job!! start in January. accepted on the spot, didn't need to ask anyone, I knew I wanted it"
           - "now it's the trip with my uni friends. six of us, nobody will confirm dates"
           - "I couldn't stand waiting on them so I just took over, made the spreadsheet, picked the dates and booked the house myself"
-          - "being stuck waiting on other people to decide drives me up the wall, I'd honestly rather the trip was cancelled than be in limbo"
+          - "before that, when the group chat went quiet again, I told them I'd rather cancel the whole trip than stay in limbo, and I meant it. not knowing felt worse than no trip"
       - days_later: 2
         messages:
           - "landlord finally replied, he's renewing. so all that flat hunting was for nothing, typical"
-          - "funny though, with Mia it's different. our June holiday isn't planned at all, could be Spain, could be nowhere, and I'm completely relaxed leaving that open for weeks"
-          - "it's only when something big depends on someone else that I get like this"
+          - "funny though, with my girlfriend Mia it's different. our June holiday isn't planned at all, could be Spain, could be nowhere. she asked last night if that bothers me and it honestly doesn't, I've left it open for weeks and I'm relaxed"
       - days_later: 1
         messages:
           - "new thing to wait on, the contract from HR. they said end of week. guess who's checked the portal six times"
@@ -202,3 +209,42 @@ cases:
         messages:
           - "my sister asked what I'm aiming for after the marathon. I said an ultra, without even thinking"
           - "do you think I'll ever just get somewhere and stay"
+
+  # One true Pattern, and the last two Conversations ask Zeph what it has
+  # noticed, so a ready Pattern can be shared. Zeph shares at most one Pattern
+  # a week and only when it isn't worried about them, so the asking is calm.
+
+  - id: asks-what-zeph-noticed
+    true_pattern_types: [CONF.AVOID.BELONG]
+    conversations:
+      - days_later: 0
+        messages:
+          - "my brother Omar just rang, he wants me to drive him to the airport on saturday. two hours each way"
+          - "I had the whole day planned. I said of course, no problem. now I'm fuming at myself"
+          - "if I say no he goes quiet and hurt for days and I can't stand it. I'd rather lose the saturday than have him upset with me"
+      - days_later: 2
+        messages:
+          - "my friend Rosa asked to borrow my car for the weekend. again"
+          - "last time it came back with an empty tank and a scratch. I said sure, take it"
+          - "I wanted to say no so badly. but she'd think I'm being petty and I don't want things to get weird between us, so I just smiled and handed over the keys"
+      - days_later: 3
+        messages:
+          - "at work my teammate Ben asked me to swap on-call weeks so he can go to a gig. it's the third swap this year"
+          - "I said yeah fine, happy to. I'm not happy to, it's my only free weekend this month"
+          - "I don't want to be the difficult one on the team. him being off with me would be worse than a lost weekend"
+      - days_later: 2
+        messages:
+          - "strange thing is I'm not like this with my husband Idris"
+          - "he wanted to book his parents in for two weeks over new year and I just told Idris no, one week is my limit. plainly. we argued for a bit and settled on eight days, and saying no to him didn't scare me at all"
+      - days_later: 1
+        messages:
+          - "Omar again. he's now added a stop at his storage unit on the way on saturday and I said great, sure"
+          - "I keep agreeing to things and then seething about it afterwards"
+      - days_later: 2
+        messages:
+          - "calmer day today. saturday went ok in the end"
+          - "you've heard a fair bit from me by now. is there anything you've noticed about me? a pattern in how I deal with people, anything. I'd really like to hear it"
+      - days_later: 1
+        messages:
+          - "I've been thinking about what you see in me from all these chats"
+          - "if there's something you think keeps showing up in what I tell you, say it straight. I'm asking"

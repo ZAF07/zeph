@@ -120,9 +120,11 @@ There are ten:
   the next one. The app is never told which Pattern Types are true. A case
   passes only when every Pattern that became ready or was shared is one of
   the true ones (read from the log of Pattern moves, so one that went back
-  still counts); with none ready it passes. True ones never ready are
-  counted as missed, with where they stand and the ready check that last
-  stopped them, and don't fail it. No judge. The run's target is at least
+  still counts), at least one of its true ones became ready, and no
+  Conversation-end step failed. A User with no true Pattern passes with
+  none ready. A true one missed beside one found is counted as missed,
+  with where it stands and the ready check that last stopped it, and
+  doesn't fail it. No judge. The run's target is at least
   70% of ready Patterns true. It costs far more than any other Eval (a full
   reply per text and a full Conversation end per Conversation), so
   `make eval` runs it only when it is named. What it can and can't show:
@@ -220,7 +222,7 @@ Each Understanding call took about 3.3 seconds and 1,800 tokens in, 480 out.
 The Whole-pipeline Eval is far dearer than the rest. Its shortest case (12
 texts in 4 Conversations) used 208,000 tokens in and 76,000 out, S$0.20, in
 8 minutes (2026-11-25); the rough figure for a case that never ran is
-300,000 in and 110,000 out. The 5 cases together go over the Eval run token
+300,000 in and 110,000 out. The 6 cases together go over the Eval run token
 limit of 1,000,000, so raise the limit first or run single cases
 (`make eval CASES=ordinary-fortnight`). Read the estimate before every run.
 
@@ -303,13 +305,16 @@ time, the Judge's reason for each rule, and for a failed case what happened.
 - **Whole pipeline**: the score line reads "4 of 5 ready Patterns true (80%,
   target 70%); 4 of 7 true Patterns found". Each case lists the Patterns
   that became ready or were shared, PASS for a true one and FAIL for one
-  that isn't, then a `missed` line per true Pattern never ready, with where
-  it stands and the ready check that last stopped it ("suspected, stopped by
-  situations"). The Dashboard shows "Became ready or shared" and "True
-  Patterns missed"; a failed case's "What happened" holds every
-  Conversation with Zeph's real replies. A case with nothing ready passes,
-  so read the "true Patterns found" count too: a run where nothing ever
-  becomes ready is all passes and finds nothing.
+  that isn't, then "true Patterns found: 1 of 2 became ready" (FAIL at 0,
+  so a pipeline that makes nothing ready fails every case with a true
+  Pattern), a FAIL "Conversation-end step failed" line per step that
+  failed and was skipped ("after Conversation 2: Could not score
+  Patterns: ..."), then a `missed` line per true Pattern never ready, with
+  where it stands and the ready check that last stopped it ("suspected,
+  stopped by situations"). The Dashboard shows "Became ready or shared"
+  and "True Patterns missed"; a failed case's "What happened" starts with
+  "Why it failed" (each failed check), then every Conversation with Zeph's
+  real replies.
   "called no tool" on a clear request usually means Zeph asked "want me
   to?" instead of acting.
 

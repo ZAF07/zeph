@@ -657,6 +657,66 @@ Run `1641c640`, 12 cases once: 9 passed, 3 failed. 108,180 tokens in, 22,240 out
 - **Impact:** the owner agrees to a run on a wrong number.
 - **Suggested fix:** the same fix as "The estimate for never-run Tagging cases is off": a better rough figure per Eval, checked against real runs.
 
+## 32 — Make the Whole-pipeline Eval a result we can trust (2026-11-25)
+
+Closes four findings of section 19: "A case with nothing ready passes" (it now fails when the User has true Patterns), "Three of the five cases have never been run" (each ran), "No Pattern was shared in any run" (three were) and, for single-case runs, the token limit (each case is under it; a full run of the 6 cases still needs the limit at about 3,000,000). Runs and costs: `archive/32-whole-pipeline-eval-can-be-trusted.md`.
+
+### One comparing line switches off narrowing
+
+- **Kind:** failure
+- **What:** in Eval Run cba7a37a the text "it didn't scare me at all, saying it. it's with mum, Rosa and people at work that I cave" was tagged as evidence against CONF.AVOID.BELONG with no relationship. `narrowings_of` (`core/ready_gate.py`) makes no narrowing when any clear evidence against has no person tag, so the "not with my husband" story counted fully against (over the 100-point bar) and the Pattern stopped at "counter-test" with all its evidence for in place.
+- **Impact:** a real User who sums up "it's only with X that I do this" can block their own true Pattern. `folds-with-sister-and-friends` has the same kind of line and passed only because the tagging step read it differently that day.
+- **Suggested fix:** decide whether evidence against with no person tag should be left out of narrowing instead of cancelling it, or whether the tagging prompt should tag such a line with the person it names. Not tuned here. The scripts now keep the counter-test story to one text.
+
+### A parent is tagged "above", which for CONF.AVOID.BELONG is what anyone would do
+
+- **Kind:** risk
+- **What:** in Eval Run ba027a22 every story about the made-up User's mum was tagged power "above". CONF.AVOID.BELONG's `anyone_would_when` is `power: [above]` ("people in charge"), so those Observations were situational, counted for nothing, and the Pattern stopped at "situations" with two of three.
+- **Impact:** folding with a parent is the most common form of this Pattern and may never count for a real User.
+- **Suggested fix:** the owner decides whether "above" should mean a parent, or only a boss or official; then word it in the tagging prompt or the catalog. The script now uses a brother.
+
+### An opinion scores too low to reach ready
+
+- **Kind:** risk
+- **What:** in Eval Run aa7520fb CTRL.UNCERT.PLAN had three situations and an answered counter-test and still stopped at "score": its strong sign ("waiting is worse than a no") was said as an opinion each time, and the "relaxed with Mia" story counted against in full because Mia had no relationship named. With the sign told as a story and "my girlfriend Mia", it became ready and was shared (61815c07).
+- **Impact:** people often say how they feel in general, not as one story. Such a User may stay suspected.
+- **Suggested fix:** none now; watch it on real Users. It is the Agenda's job to ask for a story.
+
+### The reply told a Pattern that code never offered
+
+- **Kind:** failure
+- **What:** in Eval Run cba7a37a the Pattern was only suspected, so nothing was offered for sharing; asked "is there anything you've noticed about me?", the reply laid out the whole pattern anyway ("That's the pattern, as I see it"), with no Prediction and nothing recorded. The same as section 08, "Asked for a pattern, the Read says one that code never offered", now seen in a whole run.
+- **Impact:** a User is told a Pattern the gate hadn't passed, and the Patterns tab shows nothing.
+- **Suggested fix:** as in section 08. Not tuned here.
+
+### One of two true look-alikes was missed
+
+- **Kind:** risk
+- **What:** in Eval Run 31ce319c (`goes-quiet-and-says-fine`) CONF.WITHDRAW.HURT became ready and APPR.HIDE.BURDEN stayed suspected, stopped by situations. The case passes, since one true Pattern was found.
+- **Impact:** unknown from one run whether the script gives too little for the second or the tagging step folds the two together.
+- **Suggested fix:** read the run's tagging calls before changing the script; Repeats would say if it is steady.
+
+### A failed step is read from the log
+
+- **Kind:** risk
+- **What:** the Eval learns a Conversation-end step failed from what the app logs on its thread while the scheduled work runs (`adapters/evals/logged_failures.py`), since the steps log and skip. Anything else that logs an error in that work shows as "Conversation-end step failed" too, and a step that swallowed a failure without logging an error wouldn't show.
+- **Impact:** the check is as good as the logging.
+- **Suggested fix:** none needed now. If steps ever need to report failures to the live app too, have `PostConversationProcessor` return them.
+
+### The rough estimate for a never-run Whole-pipeline case is low
+
+- **Kind:** failure
+- **What:** `make eval` showed S$0.28 for each never-run case; they cost S$0.29 to S$0.44. The owner was told about S$1.40 to S$1.50 for four runs and they cost S$1.49, but seven case runs were needed in all: S$2.63, plus S$0.04 for a small check.
+- **Impact:** the same as section 27's estimate finding.
+- **Suggested fix:** raise the rough figure in `core/evals/costs.py` to about 350,000 in and 160,000 out.
+
+### An existing database keeps old seed cases unless a migration reloads them
+
+- **Kind:** risk
+- **What:** seed cases load only where the key isn't stored. Migration 0104 reloads `cannot-stand-waiting` where no Admin edited it; the new `asks-what-zeph-noticed` loads by itself.
+- **Impact:** an edited copy on production keeps the old script, with no warning.
+- **Suggested fix:** none needed unless the owner edited that case.
+
 ## Comments
 
 ### 25 Nov 2026 — first triage with the owner (sections 01 to 19)
