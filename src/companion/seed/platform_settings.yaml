@@ -1454,7 +1454,8 @@ pattern_tagging_prompt: |-
   Type's ID and the exclusion copied exactly. Name one only when it is
   plainly going on now, not for something long past. Check every Pattern
   Type, also those with no Observation. "exclusions" is an empty list when
-  none applies.
+  none applies. Still write every Observation as usual while an exclusion
+  applies: others decide what it counts for.
 
   Answer with JSON only, in exactly this shape:
   {

@@ -56,6 +56,7 @@ from companion.core.platform_settings import (
     PATTERN_READY_SITUATIONS,
     PATTERN_RULED_OUT_TOPICS,
     PATTERN_SAFEGUARD_QUIET,
+    thinking_to_use,
 )
 from companion.core.ports import Clock, Repositories
 from companion.core.timing import users_today
@@ -1011,7 +1012,11 @@ class ReadyGate:
                         snapshot=snapshot,
                         step=ModelStep.PATTERN_OTHER_SIDE,
                         model=settings.get(PATTERN_OTHER_SIDE_MODEL),
-                        thinking=settings.get(PATTERN_OTHER_SIDE_THINKING),
+                        thinking=thinking_to_use(
+                            settings,
+                            PATTERN_OTHER_SIDE_MODEL,
+                            PATTERN_OTHER_SIDE_THINKING,
+                        ),
                         instructions=settings.get(PATTERN_OTHER_SIDE_PROMPT),
                         history=[ChatLine(role=ChatRole.USER, text=description)],
                     )
