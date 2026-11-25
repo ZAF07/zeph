@@ -29,11 +29,13 @@ from tests.test_moves_migration import downgrade_to
 from tests.test_pattern_sharing import (
     APPROVED_WORDING,
     PREDICTION,
+    end_with,
     predictions_of,
     ready_to_share,
     share,
 )
-from tests.test_pattern_tagging import observations_of
+from tests.test_pattern_states import BELONG
+from tests.test_pattern_tagging import observation_entry, observations_of
 from tests.test_patterns import (
     GOES_QUIET,
     MUM,
@@ -49,6 +51,7 @@ EARNS_REST = (
 WORST_FIRST = "Names the worst version of a plan first, before anyone else can."
 HIDDEN = "Keeps busy so they never have to sit with a hard feeling."
 CLOSED = "Only feels calm when the house is spotless."
+UNCLEAR_QUOTE = "I've been thinking about why I do that"
 
 
 def patterns_shown(client: TestClient, headers: dict[str, str]) -> list[Any]:
@@ -274,7 +277,7 @@ def test_each_pattern_zeph_told_them_shows_and_no_other_is_returned(
     assert patterns_shown(client, headers) == []
 
 
-def test_deleting_a_pattern_removes_it_with_its_quotes_and_asks_for_a_new_portrait(
+def test_deleting_a_pattern_removes_it_with_its_own_quotes_and_rewrites_the_portrait(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -293,6 +296,20 @@ def test_deleting_a_pattern_removes_it_with_its_quotes_and_asks_for_a_new_portra
         seeded_settings,
     )
     headers = maya_headers(auth_verifier)
+    end_with(
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+        observations=[
+            observation_entry(
+                pattern_types=["ACH.WORTH.PERF", BELONG],
+                sign="I1",
+                quote=UNCLEAR_QUOTE,
+                thread=None,
+            )
+        ],
+    )
     end_conversation_with_portrait(
         client, chat_model, clock, scheduler, seeded_settings
     )
@@ -308,9 +325,13 @@ def test_deleting_a_pattern_removes_it_with_its_quotes_and_asks_for_a_new_portra
     assert deleted_again.status_code == 404
     assert patterns_shown(client, headers) == []
     assert patterns_of(client.engine, user_id) == []
-    assert observations_of(client.engine, user_id) == []
+    assert [
+        (observation.pattern_type_id, observation.second_pattern_type_id)
+        for observation in observations_of(client.engine, user_id)
+    ] == [("ACH.WORTH.PERF", BELONG)]
     assert predictions_of(client.engine, user_id) == []
-    assert client.get("/api/kept-quotes", headers=headers).json()["quotes"] == []
+    kept = client.get("/api/kept-quotes", headers=headers).json()["quotes"]
+    assert [quote["quote"] for quote in kept] == [UNCLEAR_QUOTE]
     assert len(chat_model.portrait_calls) == portraits_before + 1
     assert APPROVED_WORDING not in chat_model.portrait_calls[-1].history[0].text
     portrait = client.get("/api/user-portrait", headers=headers).json()["portrait"]

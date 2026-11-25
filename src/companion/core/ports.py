@@ -1383,8 +1383,11 @@ class ObservationRepository(Protocol):
         """
         ...
 
-    def delete_naming(self, user_id: UUID, pattern_type_id: str) -> None:
-        """Delete a User's Observations that name a Pattern Type, first or second.
+    def delete_of_pattern_type(self, user_id: UUID, pattern_type_id: str) -> None:
+        """Delete a User's Observations whose first Pattern Type is the one given.
+
+        An unclear Observation that names it second is kept: it belongs
+        first to another Pattern.
 
         Args:
             user_id: The User's ID.

@@ -259,8 +259,9 @@ class UserMemoryService:
     def delete_pattern(self, user_id: UUID, pattern_id: UUID) -> None:
         """Delete a Pattern Zeph told a User about, so it is gone at once.
 
-        Its Observations go with it, so the same quotes never bring it
-        back; its Predictions and the User's reactions to it go too. The
+        The Observations whose first Pattern Type is its own go with it,
+        so the quotes it showed never bring it back; its Predictions and
+        the User's reactions to it go too. The
         User is locked while it is deleted, as scoring locks them, and
         their other Patterns are scored again at once.
 
@@ -282,7 +283,9 @@ class UserMemoryService:
             ]
             if not told:
                 raise PatternNotFoundError
-            in_transaction.observations.delete_naming(user_id, told[0].pattern_type_id)
+            in_transaction.observations.delete_of_pattern_type(
+                user_id, told[0].pattern_type_id
+            )
             in_transaction.patterns.save_moves([], [], [pattern_id], [])
         self._score_patterns_again(user_id)
         self._rewrite_portrait(user_id)

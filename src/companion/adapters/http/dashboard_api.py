@@ -490,7 +490,7 @@ def to_pattern_response(told: ToldPattern) -> PatternResponse:
             )
             for where in told.where_it_shows
         ],
-        told_at=pattern.shared_at or pattern.updated_at,
+        told_at=told.told_at,
         quote_groups=[
             PatternQuoteGroupResponse(
                 life_thread=group.life_thread,

@@ -1,5 +1,6 @@
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID
 
 from companion.core.models import (
@@ -63,6 +64,7 @@ class ToldPattern:
         pattern: The Pattern.
         wording: Its Pattern Type's approved wording.
         where_it_shows: Where counter-tests showed it holds and doesn't.
+        told_at: When the Companion first told the User about it.
         quote_groups: Its quotes by Life Thread, the Thread with the newest
             quote first and quotes in no Thread last.
         predictions: The Predictions given for it, newest first.
@@ -71,6 +73,7 @@ class ToldPattern:
     pattern: CatalogPattern
     wording: str
     where_it_shows: tuple[WhereItShows, ...]
+    told_at: datetime
     quote_groups: tuple[QuotesFromLifeThread, ...]
     predictions: tuple[Prediction, ...]
 
@@ -88,6 +91,18 @@ def was_told(pattern: CatalogPattern) -> bool:
     if pattern.state == PatternState.CLOSED:
         return pattern.shared_at is not None
     return pattern.state in STATES_SHOWN_IN_ORDER
+
+
+def told_at(pattern: CatalogPattern) -> datetime:
+    """Say when the Companion first told the User about a Pattern.
+
+    Args:
+        pattern: A Pattern the User was told.
+
+    Returns:
+        When it was shared; when it last moved for one with no such time.
+    """
+    return pattern.shared_at or pattern.updated_at
 
 
 def where_it_shows(pattern: CatalogPattern) -> tuple[WhereItShows, ...]:
@@ -177,7 +192,7 @@ def told_patterns(
             for pattern in patterns
             if was_told(pattern) and pattern.pattern_type_id in pattern_types
         ),
-        key=lambda pattern: pattern.shared_at or pattern.updated_at,
+        key=told_at,
         reverse=True,
     )
     told.sort(key=lambda pattern: STATES_SHOWN_IN_ORDER.index(pattern.state))
@@ -189,6 +204,7 @@ def told_patterns(
                 pattern=pattern,
                 wording=pattern_type.approved_wording,
                 where_it_shows=where_it_shows(pattern),
+                told_at=told_at(pattern),
                 quote_groups=group_quotes(
                     [
                         observation
