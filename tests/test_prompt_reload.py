@@ -90,6 +90,17 @@ def test_a_prompt_not_stored_yet_is_left_alone_without_a_warning(
     assert caplog.text == ""
 
 
+def test_a_previous_seed_hash_that_is_not_a_prompt_hash_is_refused(
+    engine: Engine,
+) -> None:
+    store_prompt(engine, ADMIN_PROMPT)
+
+    with engine.begin() as connection, pytest.raises(ValueError, match=PROMPT_KEY):
+        reload_prompt_unless_edited(connection, PROMPT_KEY, "1b761f35…")
+
+    assert stored_prompt(engine) == ADMIN_PROMPT
+
+
 def test_the_seed_prompt_hash_is_the_hash_of_the_text_the_seed_loads() -> None:
     seed_yaml = f"other_setting: 4\n{PROMPT_KEY}: |\n  {PREVIOUS_SEED_PROMPT}"
 

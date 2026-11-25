@@ -44,7 +44,10 @@ def main() -> int:
         The process exit code.
     """
     if len(sys.argv) not in (2, 3):
-        print("Usage: python -m scripts.seed_prompt_hash <setting key> [git ref]")
+        print(
+            "Usage: python -m scripts.seed_prompt_hash <setting key> [git ref]",
+            file=sys.stderr,
+        )
         return 1
     key = sys.argv[1]
     git_ref = sys.argv[2] if len(sys.argv) == 3 else DEFAULT_GIT_REF

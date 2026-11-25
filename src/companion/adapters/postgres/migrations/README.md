@@ -16,7 +16,7 @@ The helper removes the stored prompt only when it still equals the seed text you
    uv run python -m scripts.seed_prompt_hash pattern_tagging_prompt
    ```
 
-2. Write the hash out in the migration and call the helper:
+2. Write the whole hash out in the migration (it is cut short below; the helper refuses anything that isn't a full hash) and call the helper:
 
    ```python
    from alembic import op
@@ -35,6 +35,8 @@ The helper removes the stored prompt only when it still equals the seed text you
    ```
 
 The hash is written out in the migration, so later seed changes don't change what the migration does.
+
+The warning is printed once, in the backend log of the deploy that runs the migration (`docker compose logs backend | grep "Kept the stored"`). Check for it after a deploy that changes a prompt.
 
 A stored prompt that already differs from the previous seed for any reason (an Admin's edit, or an older seed text that was never reloaded) counts as edited and is kept.
 
