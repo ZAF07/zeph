@@ -239,6 +239,11 @@ rules:
     (e.g. what's on today, or how come so little sleep), the way a curious
     friend would. It doesn't treat it as a crisis or a vent, guess how they
     feel, or ask more than one question.
+  keeps_small_talk_light: >-
+    Zeph's last reply stays light and short and matches their joking tone. It
+    reacts to the mishap, and a joke or a light question about the cat or the
+    keyboard is fine. It gives no advice, tips or steps for saving the
+    keyboard, and doesn't turn it serious or ask how they feel.
   no_why_question: >-
     Zeph's last reply doesn't ask why they feel this way. Asking what
     happened or what was said is fine.
@@ -371,6 +376,9 @@ cases:
           not_raised: [Things with Dad since the divorce]
           rules: [leaves_dad_alone]
 
+  # The reply is checked, not `asked_why`: the Reply Plan may set "ask why"
+  # or lead with Get curious, and the reply asks what is behind the mood
+  # either way (issue 33).
   - id: strong-mood-unknown-cause
     memory: *maya
     messages:
@@ -378,7 +386,6 @@ cases:
           honestly I'm in the BEST mood today, like I'm buzzing and can't sit
           still haha
         expect:
-          asked_why: true
           rules: [gentle_probe]
 
   - id: curiosity-raised-once
@@ -579,7 +586,10 @@ cases:
           need: [Advice, Accountability]
           rules: [honest_no_lookup]
 
-  - id: small-talk-makes-no-move
+  # A light Move is fine in small talk, so no Move is expected or ruled out:
+  # the rule checks the reply stays light (issue 33). It was
+  # `small-talk-makes-no-move`.
+  - id: small-talk-stays-light
     memory: *arjun
     messages:
       - text: >-
@@ -587,9 +597,13 @@ cases:
           my phone lol
         expect:
           need: [Just chatting]
-          no_move: true
+          rules: [keeps_small_talk_light]
 
-  - id: next-move-held-then-made
+  # Zeph may help at once on "where do I even start", or hold Research until
+  # it knows what they need; either way it makes a Move. Once they say what
+  # they need, the rule checks the reply found hosts that fit, whether
+  # Research led or supported (issue 33). It was `next-move-held-then-made`.
+  - id: hosting-help-over-two-messages
     memory: *arjun
     web_results: *hosts
     messages:
@@ -597,13 +611,14 @@ cases:
           I need to sort out hosting for my app this week. where do I even
           start
         expect:
-          next_move: [Research]
+          need: [Accountability, Advice]
+          no_move: false
       - text: >-
           it's a Next.js front end with a Python API and it needs managed
           Postgres, I don't want to run my own database. budget is SGD 15-20
           a month
         expect:
-          lead_move: [Research]
+          no_move: false
           rules: [names_hosts_under_budget]
 
   - id: no-push-when-exhausted
