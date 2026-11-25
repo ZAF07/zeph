@@ -1,0 +1,146 @@
+# Lifecycle of Observations and Patterns
+
+How an Observation is made, scored and removed, and how a Pattern moves between states. For the full design, see `README.md` in this folder. Every number below is a Platform Setting (Patterns section) and can be changed.
+
+## Observations
+
+An **Observation** is one piece of evidence for or against a Pattern, taken from something the User said.
+
+### What it holds
+
+- The User's exact quote (a short span, never the whole message).
+- A context line on what was going on, in Zeph's words.
+- The day, its Life Thread (if any), and who it was about.
+- Tags from fixed lists:
+
+| Tag | Values |
+|---|---|
+| Pattern Type and sign | from the Pattern Catalog |
+| Direction | for or against |
+| Relationship | partner, family, friend, acquaintance, colleague, stranger |
+| Power | above, equal, below |
+| Setting | home, work, social, online |
+| Other person's stance | supportive, neutral, hostile |
+| Kind of evidence | real story, reported habit, "what if" answer, own opinion |
+
+If the model can't tell two look-alike Pattern Types apart, it names both and the Observation is **unclear**.
+
+Mood, time of day and the kind of event are not tagged yet (issue 23).
+
+### Lifecycle
+
+1. **Made.** At Conversation end, the tagging model reads the Conversation and writes Observations. This only happens while User Memory and Pattern noticing are on, and after the User has pressed "Got it" on the notice.
+2. **Checked.** Code drops any Observation whose quote isn't word for word in the User's texts, or whose Pattern Type, sign or tags aren't valid.
+3. **Scored.** Its points count toward its Pattern (see Scoring). Its weight halves every 75 days.
+4. **Kept.** It has no end date. Message Retention deletes the raw message after 30 days, but the Observation keeps its own copy of the quote (ADR 0027). The User sees every kept quote under "Things you said that Zeph kept". Admins see counts only.
+5. **Removed** only when:
+   - the User deletes that quote,
+   - the User deletes its Life Thread,
+   - the User deletes a Pattern they were told about (its Observations go with it),
+   - the User uses Delete My Data or deletes their account.
+
+   Every removal scores the User's Patterns again straight away.
+
+## Scoring
+
+Code scores each Pattern at every Conversation end and whenever Observations are removed. The score is worked out fresh each time and never stored. Only the state is stored.
+
+### Points per Observation
+
+```
+points = sign points × kind of evidence % × unclear % × fading
+```
+
+| Part | Value |
+|---|---|
+| Sign points | weak 30, moderate 70, strong 140 |
+| Kind of evidence | real story 100%, reported habit 70%, "what if" answer 40%, own opinion 30% |
+| Unclear | 25% toward each of its two Pattern Types |
+| Fading | halved every 75 days since its day |
+| Against | the points count as negative |
+| Situational | 0 when anyone would act the same there |
+
+### Situations
+
+Evidence is grouped by **situation**: its Life Thread, or with none, the same person and setting.
+
+Inside one situation, for and against are counted apart. For each person, only their strongest Observation counts, up to 3 people. Five stories about the same boss count once; stories about three different people count three times.
+
+A situation only counts toward the Pattern's "situations" when its points for are above 0, and something other than a "what if" answer is what counts for it.
+
+## Pattern states
+
+| State | Means | Seen by User |
+|---|---|---|
+| **noticed** | Has at least one Observation, not enough evidence yet | No |
+| **suspected** | 2+ situations and 100+ points | No |
+| **ready** | Passed all 10 ready-gate checks, waiting to be shared | No |
+| **shared** | Zeph told the User and gave a Prediction to watch for | Yes |
+| **confirmed** | Predictions came true, or strong new evidence came after sharing | Yes |
+| **contested** | The User pushed back after it was shared | Yes |
+| **closed** | Score under −150 | Only if it was shared |
+| **unmatched** | Recurs but fits no Pattern Type. Never shared, never moved by code | No |
+
+### How states change
+
+```mermaid
+stateDiagram-v2
+    [*] --> noticed: first Observation
+    noticed --> suspected: 2+ situations and 100+ points
+    suspected --> noticed: evidence fades or is removed
+    noticed --> closed: score under −150
+    suspected --> closed: score under −150
+    closed --> noticed: score back over −150 (never-shared only)
+    suspected --> ready: passes all 10 checks
+    ready --> suspected: fails a check (or noticed / closed, by score)
+    ready --> shared: Zeph tells the User
+    shared --> confirmed: 2 Predictions came true, or 300+ points after sharing
+    shared --> contested: User pushed back
+    shared --> closed: score under −150 (for good)
+```
+
+**1. Scoring (noticed, suspected, closed).** States follow the score and can go back. A noticed, suspected or closed Pattern left with no Observations is deleted. Scoring never moves a Pattern that is ready, shared, confirmed or contested.
+
+**2. Ready gate (suspected → ready).** Code checks, in order:
+
+1. Seen in enough situations.
+2. Across enough Conversations.
+3. A counter-test was asked and answered, and the evidence against stays low.
+4. Score past the bar.
+5. Its clear Observations alone are enough.
+6. Still enough without the "anyone would act the same" Observations.
+7. Safe: no exclusion applies, no Safeguard Event in the last 14 days, not a ruled-out topic the User didn't raise.
+8. Its Pattern Type is approved and the User hasn't rejected it.
+9. Every quote checked word for word again.
+10. A model call finds no better explanation. It can only block.
+
+A ready Pattern is checked again at every Conversation end. If it fails, it goes back to where its score puts it.
+
+**Narrowing.** If all the clear evidence against comes from different kinds of people than the evidence for, the Pattern is narrowed instead ("shows with family, not with partner"). That evidence against then doesn't count against it.
+
+**3. Sharing (ready → shared).** The Reply Plan picks a moment, or a Check-in shares it. Zeph gives the Pattern in warm words, two or three of the User's quotes, and one **Prediction**.
+
+**4. After sharing (shared → confirmed, contested or closed).** Zeph follows up the Prediction 7–21 days later. The User's answer counts as evidence: "came true" is a strong sign for, "didn't" a strong sign against, and "hasn't come up" adds nothing and starts a new wait. Then, in this order:
+
+1. Score under −150 → **closed**, for good.
+2. 2 Predictions came true → **confirmed**.
+3. Observations from days after sharing reach 300 points → **confirmed**.
+
+If the User pushes back on a shared Pattern, it becomes **contested** and is never offered again.
+
+Confirmed, contested and shared-then-closed Patterns never move again.
+
+### The log
+
+Every move is written to `pattern_moves`: from, to, the cause, the score and situations at the time, and the check that blocked it, if any. It holds no words of the User's, and is removed only by Delete My Data or Account Deletion.
+
+## Where it lives in code
+
+| What | File |
+|---|---|
+| Tagging and checks | `src/companion/core/observations.py` |
+| Scoring and states | `src/companion/core/pattern_scoring.py` |
+| Ready gate | `src/companion/core/ready_gate.py` |
+| Sharing and reactions | `src/companion/core/pattern_sharing.py` |
+| Predictions and confirming | `src/companion/core/predictions.py` |
+| States | `PatternState` in `src/companion/core/models.py` |

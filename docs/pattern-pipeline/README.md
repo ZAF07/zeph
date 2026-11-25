@@ -1,6 +1,6 @@
 # How Zeph finds, tests and shares a Pattern
 
-Read this before planning or changing Patterns, Observations, Curiosities, the Agenda or Thought Experiments. Terms in **bold** are defined in `CONTEXT.md`. The reply path itself is in `docs/message-pipeline/README.md`.
+Read this before planning or changing Patterns, Observations, Curiosities, the Agenda or Thought Experiments. Terms in **bold** are defined in `CONTEXT.md`. The reply path itself is in `docs/message-pipeline/README.md`. A short guide to how Observations and Patterns are scored and move between states is in `lifecycle.md` in this folder.
 
 **Status:** target design, agreed 24 Nov 2026. **Not built yet**, except where a "Built" note says so. Every decision behind it, with starting numbers and the first fifteen Pattern Types, is in `.scratch/pattern-pipeline/grill-decisions.md`.
 
