@@ -1,8 +1,8 @@
 import json
 import logging
-from collections.abc import Hashable, Sequence
+from collections.abc import Hashable, Mapping, Sequence
 from dataclasses import dataclass, replace
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from uuid import UUID, uuid4
 
 from companion.core.agenda import observations_of
@@ -53,6 +53,11 @@ from companion.core.usage import UsageRecordingChatModel
 logger = logging.getLogger(__name__)
 
 FEWEST_QUOTES = 2
+STATES_A_REPLY_MAY_NAME = frozenset({PatternState.SHARED, PatternState.CONFIRMED})
+HOW_A_TOLD_PATTERN_STANDS = {
+    PatternState.SHARED: "being tested",
+    PatternState.CONFIRMED: "confirmed",
+}
 FIRST_PREDICTION_WORDING = 1
 MOST_QUOTES = 3
 SHARES_COUNTED_OVER = timedelta(days=7)
@@ -116,6 +121,43 @@ class ContestedPattern:
 
 
 @dataclass(frozen=True)
+class Showing:
+    """One time a Pattern showed up in what the User said, or they acted against it.
+
+    Attributes:
+        day: The day they said it, in their time zone.
+        about: Who it was about.
+        life_thread: The title of the Life Thread it belongs to; None for
+            none.
+    """
+
+    day: date
+    about: str
+    life_thread: str | None
+
+
+@dataclass(frozen=True)
+class ToldPatternInMind:
+    """A Pattern the Companion told the User, numbered for the Reply Plan.
+
+    Attributes:
+        number: Its number in the list the model is shown, from 1.
+        pattern: The Pattern, being tested (shared) or confirmed.
+        wording: The words it is shown to the User in.
+        last_showed: The newest time it showed up; None if no Observation
+            for it is kept.
+        last_acted_against: The newest time they acted against it; None
+            if none is kept.
+    """
+
+    number: int
+    pattern: CatalogPattern
+    wording: str
+    last_showed: Showing | None = None
+    last_acted_against: Showing | None = None
+
+
+@dataclass(frozen=True)
 class SharedCheck:
     """What the check after a message found.
 
@@ -152,6 +194,224 @@ def is_weighty_evidence_for(observation: Observation, pattern_type_id: str) -> b
         and not observation.excluded
         and not observation.situational
         and not on_topic_not_raised
+    )
+
+
+def wording_told(
+    pattern: CatalogPattern, pattern_types: Mapping[str, PatternType]
+) -> str | None:
+    """Find the words a Pattern is shown to the User in.
+
+    Args:
+        pattern: A Pattern the User was told.
+        pattern_types: The Pattern Types in the catalog now, by ID.
+
+    Returns:
+        The wording kept when it was shared; with none, its Pattern Type's
+        approved wording now; None when neither exists.
+    """
+    if pattern.shared_wording:
+        return pattern.shared_wording
+    pattern_type = pattern_types.get(pattern.pattern_type_id)
+    return pattern_type.approved_wording if pattern_type else None
+
+
+def newest_showing(
+    observations: Sequence[Observation],
+    direction: ObservationDirection,
+    thread_titles: Mapping[UUID, str],
+) -> Showing | None:
+    """Find the newest time a Pattern showed up, or the User acted against it.
+
+    Args:
+        observations: The Observations of the Pattern.
+        direction: For the Pattern, or against it.
+        thread_titles: The User's Life Thread titles by ID.
+
+    Returns:
+        The newest clear Observation that way that carries weight, as a
+        day, who it was about and its Life Thread; None for none.
+    """
+    counted = [
+        observation
+        for observation in observations
+        if observation.direction == direction
+        and not observation.unclear
+        and not observation.situational
+        and not observation.excluded
+    ]
+    if not counted:
+        return None
+    newest = max(
+        counted, key=lambda observation: (observation.day, observation.tagged_at)
+    )
+    return Showing(
+        day=newest.day,
+        about=newest.about,
+        life_thread=thread_titles.get(newest.thread_id) if newest.thread_id else None,
+    )
+
+
+def told_patterns_in_mind(
+    patterns: Sequence[CatalogPattern],
+    pattern_types: Mapping[str, PatternType],
+    observations: Sequence[Observation],
+    thread_titles: Mapping[UUID, str],
+) -> list[ToldPatternInMind]:
+    """Number the Patterns the Companion told the User that a reply may build on.
+
+    Args:
+        patterns: The User's Patterns of Pattern Types.
+        pattern_types: The Pattern Types in the catalog now, by ID.
+        observations: The User's Observations, as tagged when their
+            Conversations ended.
+        thread_titles: The User's Life Thread titles by ID.
+
+    Returns:
+        Those being tested (shared) and those confirmed that have words to
+        show, oldest told first, each with where it last showed up and
+        where they last acted against it. One they disagreed with or that
+        didn't hold up is never among them.
+    """
+    told: list[ToldPatternInMind] = []
+    for pattern in sorted(
+        patterns, key=lambda pattern: pattern.shared_at or pattern.updated_at
+    ):
+        wording = wording_told(pattern, pattern_types)
+        if pattern.state not in STATES_A_REPLY_MAY_NAME or wording is None:
+            continue
+        its_observations = observations_of(pattern.pattern_type_id, observations)
+        told.append(
+            ToldPatternInMind(
+                number=len(told) + 1,
+                pattern=pattern,
+                wording=wording,
+                last_showed=newest_showing(
+                    its_observations, ObservationDirection.FOR, thread_titles
+                ),
+                last_acted_against=newest_showing(
+                    its_observations, ObservationDirection.AGAINST, thread_titles
+                ),
+            )
+        )
+    return told
+
+
+def describe_showing(showing: Showing) -> str:
+    """Write one time a Pattern showed up, for the Reply Plan.
+
+    Args:
+        showing: When, about whom and in which Life Thread.
+
+    Returns:
+        E.g. "3 Nov 2026, about Mei, their sister (Life Thread: Falling-out
+        with Mei)".
+    """
+    life_thread = (
+        f" (Life Thread: {showing.life_thread})" if showing.life_thread else ""
+    )
+    return f"{format_calendar_day(showing.day)}, about {showing.about}{life_thread}"
+
+
+def describe_told(told: Sequence[ToldPatternInMind]) -> str:
+    """Write the Patterns the Companion told the User as the Reply Plan reads them.
+
+    Args:
+        told: The Patterns, numbered.
+
+    Returns:
+        The list with the rule for it; "" when there are none.
+    """
+    if not told:
+        return ""
+    lines = []
+    for item in told:
+        showed = (
+            f" Last showed up: {describe_showing(item.last_showed)}."
+            if item.last_showed
+            else ""
+        )
+        against = (
+            f" They last acted against it: {describe_showing(item.last_acted_against)}."
+            if item.last_acted_against
+            else ""
+        )
+        lines.append(
+            f"[{item.number}] ({HOW_A_TOLD_PATTERN_STANDS[item.pattern.state]}) "
+            f"{item.wording}{describe_where_it_shows(item.pattern.narrowings)}"
+            f"{showed}{against}"
+        )
+    return (
+        "\n\nPatterns you have told them, tested against their own words. One "
+        "being tested is still only your view; a confirmed one has held up. "
+        "Your Read may build on one. When what they are telling you now is a "
+        "clear case of one, or shows them acting against it, you may link to "
+        'it out loud: set "named_pattern" to its number. Not in every reply, '
+        "and never while they are venting or in a hurry:\n" + "\n".join(lines)
+    )
+
+
+def format_named_pattern_for_reply(named: ToldPatternInMind) -> str:
+    """Write the reply's section on a told Pattern it links today's story to.
+
+    Args:
+        named: The Pattern the Reply Plan named.
+
+    Returns:
+        The section.
+    """
+    how = (
+        "It has held up since you told them, so you may say it plainly"
+        if named.pattern.state == PatternState.CONFIRMED
+        else "You are still testing it together, so call it something like "
+        "“the thing we're testing”"
+    )
+    return (
+        "What they are telling you now links to something you told them "
+        f"before: {named.wording}{describe_where_it_shows(named.pattern.narrowings)} "
+        f"{how}, always as your view and never as fact. Say in a sentence or "
+        "two how today's story fits it, or how it goes against it. Don't "
+        "tell them the whole Pattern again and don't quote their old words "
+        "back."
+    )
+
+
+def format_asked_for_patterns_for_reply(told: Sequence[ToldPatternInMind]) -> str:
+    """Write the reply's section for a User who asks what patterns it sees in them.
+
+    The gate holds when they ask: only a Pattern that passed code's tests
+    and was told to them may be said as a pattern.
+
+    Args:
+        told: The Patterns the Companion told them that a reply may name.
+
+    Returns:
+        With none told, the rule to say it is still getting to know them
+        and to claim nothing about who they are; else the told Patterns
+        it may remind them of, and no other.
+    """
+    if not told:
+        return (
+            "They asked what patterns you see in them. Nothing you have "
+            "noticed has passed your tests yet, so you have no pattern to "
+            "tell them. Say plainly that you are still getting to know them "
+            "and would rather not guess at who they are. You may give your "
+            "view of one recent situation they told you about, as a view of "
+            "that situation only. Don't say they always, usually or tend to "
+            "act some way, don't link several people or moments into one "
+            "habit, and don't call anything a pattern."
+        )
+    lines = "\n".join(
+        f"- ({HOW_A_TOLD_PATTERN_STANDS[item.pattern.state]}) {item.wording}"
+        f"{describe_where_it_shows(item.pattern.narrowings)}"
+        for item in told
+    )
+    return (
+        "They asked what patterns you see in them. You may remind them of "
+        "what you have already told them, as your view and never as fact, "
+        "and say which is still being tested. Tell them no other pattern: "
+        "anything else you have noticed hasn't passed your tests yet.\n"
+        f"{lines}"
     )
 
 
@@ -543,6 +803,46 @@ class PatternSharing:
             ContestedPattern(number, pattern, pattern_types[pattern.pattern_type_id])
             for number, pattern in enumerate(known, start=1)
         ]
+
+    def told_patterns(
+        self, snapshot: UserSnapshot, struggling: bool
+    ) -> list[ToldPatternInMind]:
+        """List the Patterns the Companion told the User, for the Reply Plan.
+
+        Where each last showed up comes from the Observations tagged when
+        their Conversations ended, so no model is asked.
+
+        Args:
+            snapshot: The User being answered.
+            struggling: Whether the Understanding found them struggling.
+
+        Returns:
+            Those being tested and those confirmed, numbered from 1; none
+            while they are struggling or Pattern sharing doesn't work for
+            them. Nothing more is read for a User with none.
+        """
+        if struggling or not snapshot.works(Feature.PATTERN_SHARING):
+            return []
+        user_id = snapshot.user.id
+        patterns = [
+            pattern
+            for pattern in self._repositories.patterns.list_of_pattern_types(user_id)
+            if pattern.state in STATES_A_REPLY_MAY_NAME
+        ]
+        if not patterns:
+            return []
+        return told_patterns_in_mind(
+            patterns,
+            {
+                entry.pattern_type.id: entry.pattern_type
+                for entry in self._pattern_catalog.catalog()
+            },
+            self._repositories.observations.list_for_user(user_id),
+            {
+                thread.id: thread.title
+                for thread in self._repositories.life_threads.list_for_user(user_id)
+            },
+        )
 
     def record_if_shared(
         self,

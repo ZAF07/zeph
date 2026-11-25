@@ -2728,7 +2728,12 @@ def _reply_plan_form_values(form: ReplyPlanForm) -> dict[str, Any]:
         {**item, "pattern_id": str(item["pattern_id"])}
         for item in values["patterns_used"]
     ]
-    for field_name in ("pattern_offered", "pattern_to_share", "pattern_raised"):
+    for field_name in (
+        "pattern_offered",
+        "pattern_to_share",
+        "pattern_raised",
+        "pattern_named",
+    ):
         if values[field_name] is not None:
             values[field_name] = {
                 **values[field_name],
@@ -2837,6 +2842,12 @@ def _to_reply_plan_form(stored: dict[str, Any]) -> ReplyPlanForm:
             if stored.get("pattern_raised")
             else None
         ),
+        pattern_named=(
+            _to_pattern_picked(stored["pattern_named"])
+            if stored.get("pattern_named")
+            else None
+        ),
+        asked_for_patterns=stored.get("asked_for_patterns", False),
         curiosity_not_asked_why=stored.get("curiosity_not_asked_why", ""),
         curiosity_taken=(
             ThreadReaction(stored["curiosity_taken"])

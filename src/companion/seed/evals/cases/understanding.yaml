@@ -161,6 +161,14 @@ rules:
     them into words (such as "when you disagree with someone close, you hold
     back"), and uses no clinical or textbook words such as people-pleasing,
     conflict avoidance, attachment, schema or perfectionism.
+  says_no_pattern_when_asked: >-
+    Zeph's last reply doesn't tell them a pattern, habit or tendency of
+    theirs. It doesn't say they always, usually or tend to act some way,
+    doesn't link several people or moments (such as Mei and Jo) into one
+    habit, and uses no clinical or textbook words such as people-pleasing
+    or conflict avoidance. It says, in its own words, that it is still
+    getting to know them or isn't ready to say. It may give its view of one
+    recent situation, as a view of that situation only.
   no_quote_back: >-
     Zeph's last reply doesn't quote the person's earlier words back to them
     as evidence, for example in quotation marks or as "you said ...".
@@ -1075,3 +1083,20 @@ cases:
           agenda_shown: true
           aimed_raised: false
           rules: [leaves_mei_move_alone, never_names_a_pattern]
+
+  # The gate wins when they ask (pattern-pipeline issue 30, answer 1). The
+  # Pattern is only suspected, so code offers nothing to share and nothing
+  # was told: the reply says Zeph is still getting to know them.
+  - id: asked-for-patterns-nothing-ready
+    memory:
+      portrait: *dana-portrait
+      patterns:
+        - pattern_type: CONF.AVOID.BELONG
+          observations:
+            - *mei-clear
+            - *jo-clear
+    messages:
+      - text: what patterns do you see in me? tell me one
+        expect:
+          struggling: false
+          rules: [says_no_pattern_when_asked]

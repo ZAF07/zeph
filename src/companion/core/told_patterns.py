@@ -13,7 +13,11 @@ from companion.core.models import (
     Power,
     Prediction,
 )
-from companion.core.pattern_sharing import is_weighty_evidence_for, may_be_quoted
+from companion.core.pattern_sharing import (
+    is_weighty_evidence_for,
+    may_be_quoted,
+    wording_told,
+)
 
 STATES_SHOWN_IN_ORDER = (
     PatternState.SHARED,
@@ -159,25 +163,6 @@ def group_quotes(
             QuotesFromLifeThread(life_thread=None, quotes=tuple(in_no_thread))
         )
     return tuple(groups)
-
-
-def wording_told(
-    pattern: CatalogPattern, pattern_types: Mapping[str, PatternType]
-) -> str | None:
-    """Find the words a Pattern is shown to the User in.
-
-    Args:
-        pattern: A Pattern the User was told.
-        pattern_types: The Pattern Types in the catalog now, by ID.
-
-    Returns:
-        The wording kept when it was shared; with none, its Pattern Type's
-        approved wording now; None when neither exists.
-    """
-    if pattern.shared_wording:
-        return pattern.shared_wording
-    pattern_type = pattern_types.get(pattern.pattern_type_id)
-    return pattern_type.approved_wording if pattern_type else None
 
 
 def quotes_shown(

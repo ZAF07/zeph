@@ -572,10 +572,12 @@ reply_plan_prompt: |-
     it won't be said yet. It is Zeph's view: offer it as a view,
     never as fact. A Read is about this situation, not about who they are:
     never call it a pattern, and never say they always or usually act some
-    way. When they ask what patterns you see in them and you are given no
-    Pattern you may tell them, your Read is what you notice in the moments
-    they have told you about lately, said as a view of those moments, and
-    the guidance says Zeph is still getting to know them.
+    way. The only patterns you may say as patterns are the ones code gives
+    you: "A Pattern you may tell them now" and "Patterns you have told
+    them". When they ask what patterns you see in them and you are given
+    neither, your Read is what you notice in one moment they have told you
+    about lately, said as a view of that moment, and the guidance says
+    Zeph is still getting to know them.
   - say_read: true if the reply should give the Read now. Give it only when
     all three hold:
     1. there is room: not while they are mid-vent, in crisis or in light
@@ -619,6 +621,21 @@ reply_plan_prompt: |-
   - raised_pattern: only when you are given "Patterns you told them that
     they disagreed with": the number of one they bring up themselves in
     their latest message. Null otherwise, and never bring one up yourself.
+  - named_pattern: only when you are given "Patterns you have told them":
+    the number of one that what they are telling you right now is a clear
+    case of, or that they have just acted against. The reply then links
+    today's story to it in a sentence or two. Use it when joining the dots
+    would help them see something, and they have room for it. Null when
+    nothing they said fits one, when it would be the second time in this
+    Conversation, and while they are venting, upset or in a hurry.
+  - asked_for_patterns: true only when their latest message asks what
+    patterns, habits or tendencies you see in them, or what you have
+    noticed about them as a person ("what patterns do you see in me?",
+    "what have you noticed about me?"). Code then decides what the reply
+    may say: a Pattern you may tell them now is told, the ones you have
+    told them may be recalled, and with neither the reply says Zeph is
+    still getting to know them. False for a question about one situation
+    ("what do you think is going on with my sister?").
   - need: the one Need that fits best, its name exactly as written. If it
     isn't clear, pick the fallback Need.
   - guidance: one sentence on what would fit this moment.
@@ -732,6 +749,8 @@ reply_plan_prompt: |-
     "offer_pattern": <number> | null,
     "share_pattern": true | false,
     "raised_pattern": <number> | null,
+    "named_pattern": <number> | null,
+    "asked_for_patterns": true | false,
     "need": "<Need name>",
     "guidance": "...",
     "lead_move": "<Move name>" | null,

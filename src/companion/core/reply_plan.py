@@ -65,8 +65,12 @@ from companion.core.past_day import PastDayTool
 from companion.core.pattern_sharing import (
     ContestedPattern,
     PatternToShare,
+    ToldPatternInMind,
     describe_contested,
     describe_pattern_to_share,
+    describe_told,
+    format_asked_for_patterns_for_reply,
+    format_named_pattern_for_reply,
     format_pattern_to_share_for_reply,
     format_raised_pattern_for_reply,
 )
@@ -392,6 +396,7 @@ def describe_message_for_reply_plan(
     agenda: Sequence[AgendaEntry] = (),
     pattern_to_share: PatternToShare | None = None,
     contested: Sequence[ContestedPattern] = (),
+    told: Sequence[ToldPatternInMind] = (),
 ) -> str:
     """Write what the Reply Plan model is given about the Message.
 
@@ -423,6 +428,8 @@ def describe_message_for_reply_plan(
         pattern_to_share: The ready Pattern code offers it to share; None
             for none.
         contested: The Patterns the User disagreed with, numbered.
+        told: The Patterns the Companion told them that it may build on
+            and name, numbered, with where each last showed up.
 
     Returns:
         The time, the Understanding, how direct the User wants it to be
@@ -430,12 +437,13 @@ def describe_message_for_reply_plan(
         them (their Familiarity), Needs, Moves and which each
         Need allows, past Move Outcomes with their days, User Portrait, Goals,
         Memory Categories, recent Conversations, reminded Life Threads, the
-        Patterns in mind, the ready Pattern it may share and those the User
-        disagreed with, due Curiosities and how each Need treats them, the
-        topics they asked to drop, the Agenda with its earlier tries,
-        Knowledge documents, the due Check-in's Kinds when one is due,
-        where the previous Conversation was, earlier Reply Plans, earlier
-        messages across Conversations and latest message.
+        Patterns in mind, the ready Pattern it may share, the Patterns it
+        told them and those the User disagreed with, due Curiosities and
+        how each Need treats them, the topics they asked to drop, the
+        Agenda with its earlier tries, Knowledge documents, the due
+        Check-in's Kinds when one is due, where the previous Conversation
+        was, earlier Reply Plans, earlier messages across Conversations and
+        latest message.
     """
     fallback = fallback_need(needs)
     need_lines = "\n".join(f"- {need.name}: {need.when_it_fits}" for need in needs)
@@ -502,6 +510,7 @@ def describe_message_for_reply_plan(
         f"with it, but never offer it or say it as a pattern:\n"
         f"{describe_patterns_in_mind(patterns)}"
         f"{describe_pattern_to_share(pattern_to_share)}"
+        f"{describe_told(told)}"
         f"{describe_contested(contested)}"
         f"\n\nThings you've been wondering about them, whose time has come "
         f"{describe_due_curiosities(due, snapshot.user.time_zone)}"
@@ -728,6 +737,26 @@ def read_pattern_raised(
     return None
 
 
+def read_pattern_named(
+    value: Any, told: Sequence[ToldPatternInMind]
+) -> PatternPicked | None:
+    """Find the told Pattern the form links today's story to.
+
+    Args:
+        value: The `named_pattern` field's value: a number.
+        told: The Patterns the Companion told the User, numbered.
+
+    Returns:
+        The Pattern, with the wording it is shown in; None if the value
+        isn't one of their numbers.
+    """
+    number = read_number(value)
+    for item in told:
+        if item.number == number:
+            return PatternPicked(pattern_id=item.pattern.id, pattern=item.wording)
+    return None
+
+
 def read_patterns_picked(
     value: Any, by_number: dict[int, RemindedPattern]
 ) -> tuple[PatternPicked, ...]:
@@ -908,6 +937,7 @@ def read_reply_plan_form(
     patterns: Sequence[RemindedPattern] = (),
     pattern_to_share: PatternToShare | None = None,
     contested: Sequence[ContestedPattern] = (),
+    told: Sequence[ToldPatternInMind] = (),
 ) -> ReplyPlanForm | None:
     """Read the Reply Plan model's JSON form.
 
@@ -922,8 +952,10 @@ def read_reply_plan_form(
     from the Kinds offered. Patterns are named by their numbers in the
     Patterns in mind; one is offered only when the Read is said, and an
     offered one counts as used. A Pattern is shared only when code offered
-    a ready one, and one the User disagreed with is talked about only when
-    the form names it as raised by them.
+    a ready one, and always when code offered one and the form says they
+    asked what patterns the Companion sees in them. One the User disagreed
+    with is talked about only when the form names it as raised by them,
+    and one the Companion told them is named only from the list shown.
 
     Args:
         answer: The model's answer.
@@ -936,6 +968,7 @@ def read_reply_plan_form(
         patterns: The Patterns in mind the model was shown, numbered.
         pattern_to_share: The ready Pattern code offered it; None for none.
         contested: The Patterns the User disagreed with, numbered.
+        told: The Patterns the Companion told them, numbered.
 
     Returns:
         The form, or None if it has no JSON object naming a Need.
@@ -963,6 +996,7 @@ def read_reply_plan_form(
         else None
     )
     used = read_patterns_picked(parsed.get("patterns_used"), patterns_by_number)
+    asked_for_patterns = parsed.get("asked_for_patterns") is True
     form = ReplyPlanForm(
         need=need,
         guidance=read_form_text(parsed.get("guidance")),
@@ -987,9 +1021,11 @@ def read_reply_plan_form(
         patterns_used=tuple(dict.fromkeys([*used, *([offered] if offered else [])])),
         pattern_offered=offered,
         pattern_to_share=read_pattern_to_share(
-            parsed.get("share_pattern"), pattern_to_share
+            asked_for_patterns or parsed.get("share_pattern"), pattern_to_share
         ),
         pattern_raised=read_pattern_raised(parsed.get("raised_pattern"), contested),
+        pattern_named=read_pattern_named(parsed.get("named_pattern"), told),
+        asked_for_patterns=asked_for_patterns,
         curiosity_not_asked_why=read_form_text(parsed.get("no_curiosity_why")),
         curiosity_taken=read_curiosity_taken(parsed.get("curiosity_taken"), due),
     )
@@ -1306,6 +1342,7 @@ def format_pattern_for_reply(
     form: ReplyPlanForm,
     offered: PatternToShare | None,
     contested: Sequence[ContestedPattern],
+    told: Sequence[ToldPatternInMind] = (),
 ) -> str:
     """Write the reply's section on the Pattern it tells them or talks about.
 
@@ -1313,18 +1350,27 @@ def format_pattern_for_reply(
         form: The form the reply follows.
         offered: The ready Pattern code offered; None for none.
         contested: The Patterns the User disagreed with, numbered.
+        told: The Patterns the Companion told them, numbered.
 
     Returns:
         How to tell them the ready Pattern, when the form shares it; else
         how to talk about the one they disagreed with and raised
-        themselves; "" for neither.
+        themselves; else what to say when they ask what patterns the
+        Companion sees in them; else how to link today's story to a
+        Pattern it told them; "" for none of these.
     """
     if form.pattern_to_share is not None and offered is not None:
         return format_pattern_to_share_for_reply(offered)
     if form.pattern_raised is not None:
-        for item in contested:
-            if item.pattern.id == form.pattern_raised.pattern_id:
-                return format_raised_pattern_for_reply(item)
+        for raised in contested:
+            if raised.pattern.id == form.pattern_raised.pattern_id:
+                return format_raised_pattern_for_reply(raised)
+    if form.asked_for_patterns:
+        return format_asked_for_patterns_for_reply(told)
+    if form.pattern_named is not None:
+        for named in told:
+            if named.pattern.id == form.pattern_named.pattern_id:
+                return format_named_pattern_for_reply(named)
     return ""
 
 
@@ -1445,6 +1491,7 @@ class ReplyPlanService:
         agenda: Sequence[AgendaEntry] = (),
         pattern_to_share: PatternToShare | None = None,
         contested: Sequence[ContestedPattern] = (),
+        told: Sequence[ToldPatternInMind] = (),
     ) -> PlannedReply:
         """Make and save the Reply Plan of the Conversation's newest Message.
 
@@ -1487,6 +1534,8 @@ class ReplyPlanService:
             pattern_to_share: The ready Pattern code offers it to share;
                 None for none.
             contested: The Patterns the User disagreed with, numbered.
+            told: The Patterns the Companion told them that it may build
+                on and name, numbered.
 
         Returns:
             The saved Reply Plan, what it adds to the reply, the Check-in
@@ -1528,6 +1577,7 @@ class ReplyPlanService:
                 agenda,
                 pattern_to_share,
                 contested,
+                told,
             ),
             reminded,
             due,
@@ -1537,6 +1587,7 @@ class ReplyPlanService:
             patterns,
             pattern_to_share,
             contested,
+            told,
         )
         if model_form is None:
             need = fallback_need(needs)
@@ -1604,7 +1655,7 @@ class ReplyPlanService:
                 format_curiosities_for_reply(form.curiosities, need, asked_why),
                 past_days,
                 describe_open_needs_for_reply(agenda),
-                format_pattern_for_reply(form, pattern_to_share, contested),
+                format_pattern_for_reply(form, pattern_to_share, contested, told),
                 format_dropped_topics_for_reply(due),
             ),
             asks_a_question=asks_another_question or picked.asks_a_question,
@@ -1684,6 +1735,7 @@ class ReplyPlanService:
         patterns: Sequence[RemindedPattern] = (),
         pattern_to_share: PatternToShare | None = None,
         contested: Sequence[ContestedPattern] = (),
+        told: Sequence[ToldPatternInMind] = (),
     ) -> ReplyPlanForm | None:
         """Ask the model to fill in the form, with the Outlook before the prompt.
 
@@ -1703,6 +1755,7 @@ class ReplyPlanService:
             pattern_to_share: The ready Pattern code offered it; None for
                 none.
             contested: The Patterns the User disagreed with, numbered.
+            told: The Patterns the Companion told them, numbered.
 
         Returns:
             The form; None if the call failed or the answer can't be read.
@@ -1735,6 +1788,7 @@ class ReplyPlanService:
             patterns,
             pattern_to_share,
             contested,
+            told,
         )
         if form is None:
             logger.warning(

@@ -1744,6 +1744,11 @@ class ReplyPlanForm:
         pattern_raised: The Pattern the User disagreed with and has now
             raised themselves, which the reply may talk about; None for
             none.
+        pattern_named: The Pattern the Companion told them before (being
+            tested or confirmed) that the reply links today's story to;
+            None for none.
+        asked_for_patterns: Whether their latest message asks what
+            patterns the Companion sees in them.
         curiosity_not_asked_why: Why no Curiosity is asked, when the Need
             asks them by default and one was offered; "" otherwise.
         curiosity_taken: How the User took the Curiosity Zeph asked in its
@@ -1774,6 +1779,8 @@ class ReplyPlanForm:
     pattern_offered: PatternPicked | None = None
     pattern_to_share: PatternPicked | None = None
     pattern_raised: PatternPicked | None = None
+    pattern_named: PatternPicked | None = None
+    asked_for_patterns: bool = False
     curiosity_not_asked_why: str = ""
     curiosity_taken: ThreadReaction | None = None
 

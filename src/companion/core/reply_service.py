@@ -194,6 +194,9 @@ class ReplyService:
                 snapshot, understanding.form.struggling
             ),
             self._pattern_sharing.contested_patterns(snapshot),
+            self._pattern_sharing.told_patterns(
+                snapshot, understanding.form.struggling
+            ),
         )
         plan = planned.reply_plan.form
         attempt.raise_if_dropped()
