@@ -32,6 +32,7 @@ from companion.core.models import (
     PatternState,
     PauseLength,
     PersonalSticker,
+    PredictionOutcome,
     PreferenceChanges,
     SharedPhoto,
     User,
@@ -328,7 +329,7 @@ class PredictionResponse(BaseModel):
 
     wording: str
     made_at: datetime
-    outcome: str | None
+    outcome: PredictionOutcome | None
 
 
 class PatternResponse(BaseModel):
@@ -503,7 +504,9 @@ def to_pattern_response(told: ToldPattern) -> PatternResponse:
         ],
         predictions=[
             PredictionResponse(
-                wording=prediction.wording, made_at=prediction.made_at, outcome=None
+                wording=prediction.wording,
+                made_at=prediction.made_at,
+                outcome=prediction.outcome,
             )
             for prediction in told.predictions
         ],

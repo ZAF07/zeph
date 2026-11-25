@@ -756,4 +756,37 @@ If there is nothing, the section holds one line: "Nothing found."
 - **Kind:** note
 - **What:** the Tagging Eval hasn't seen the new `prediction_outcomes` part of the prompt, and none was run (Evals cost money).
 
+## 18 — The Patterns tab shows the Patterns Zeph told the User (2026-11-25)
+
+### Deleting a Pattern they disagreed with forgets the disagreement
+
+- **Kind:** risk
+- **What:** `UserMemoryService.delete_pattern` deletes the Pattern with its reactions and its own quotes. Nothing is kept to say the User rejected it (or that it didn't hold up).
+- **Impact:** if they later say new things that fit it, Zeph can notice it again from the start and, in time, tell them a Pattern they already said no to.
+- **Suggested fix:** the owner decides: either that is right ("delete means forget everything"), or keep a small "never again" mark per User and Pattern Type that the ready gate reads. About half a day.
+
+### A told Pattern whose Pattern Type left the catalog can't be seen or deleted
+
+- **Kind:** potential failure
+- **What:** `told_patterns` (`core/told_patterns.py`) shows only Patterns whose Pattern Type is in the catalog now, as there is no approved wording otherwise.
+- **Impact:** the User was told it, but can't see it or delete it from the tab; deleting all their data still removes it.
+- **Suggested fix:** keep the wording used on the Pattern when it is shared, and show that. Small.
+
+### The switch shows while Pattern sharing is off for them
+
+- **Kind:** note
+- **What:** "Keep noticing after I disagree" shows under "You disagreed" whenever they have such a Pattern; on Account & privacy it shows only while Pattern sharing works.
+- **Impact:** none known; the two pages differ slightly.
+- **Suggested fix:** owner's call; one line either way.
+
+### Design files changed by the agent again
+
+- **Kind:** note
+- **What:** the Patterns panel in `Memories--tab-patterns.html` and `M-Memories--tab-patterns.html` was redrawn from existing parts, the empty-state words in `States.html` changed, and three baselines were rebuilt on this machine. All the tab's words are drafts for the owner to correct under Copy.
+
+### The pixel test still can't run as shipped
+
+- **Kind:** bug, already known
+- **What:** `compare.cjs` hangs on Clerk's probe requests; a copy that blocks them was used and deleted. `Memories--tab-summaries` (0.75%), `M-Memories` (0.91%) and `M-Memories--tab-quotes` (0.64%) fail on main too.
+
 ## Comments

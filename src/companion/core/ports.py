@@ -1446,17 +1446,6 @@ class PatternRepository(Protocol):
         """
         ...
 
-    def list_confirmed(self, user_id: UUID) -> list[Pattern]:
-        """List the Patterns with no Pattern Type a User agreed with, newest first.
-
-        Args:
-            user_id: The User's ID.
-
-        Returns:
-            The confirmed Patterns, each with its evidence oldest first.
-        """
-        ...
-
     def find_close_ids(
         self, user_id: UUID, embedding: list[float], min_closeness: float
     ) -> list[UUID]:

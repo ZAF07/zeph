@@ -3677,24 +3677,6 @@ class PostgresPatternRepository:
                 .values(matched_pattern_type_id=pattern_type_id)
             )
 
-    def list_confirmed(self, user_id: UUID) -> list[Pattern]:
-        """List the Patterns a User agreed with, newest agreed first.
-
-        Args:
-            user_id: The User's ID.
-
-        Returns:
-            The confirmed Patterns, each with its evidence oldest first.
-        """
-        return self._list(
-            and_(
-                patterns.c.user_id == user_id,
-                HAS_NO_PATTERN_TYPE,
-                patterns.c.state == PatternState.CONFIRMED.value,
-            ),
-            [patterns.c.confirmed_at.desc(), patterns.c.id],
-        )
-
     def find_close_ids(
         self, user_id: UUID, embedding: list[float], min_closeness: float
     ) -> list[UUID]:

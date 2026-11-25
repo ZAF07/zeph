@@ -14,6 +14,7 @@ from companion.core.models import (
     PatternEvidence,
     PatternState,
     PatternToSave,
+    PredictionOutcome,
 )
 from tests.fakes import (
     FakeAuthVerifier,
@@ -230,6 +231,39 @@ def test_a_user_sees_a_pattern_zeph_told_them_with_quotes_by_thread_and_predicti
     assert datetime.fromisoformat(shown["told_at"]) == told_at
 
 
+def test_a_prediction_shows_how_it_went_once_it_is_known(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    told_belonging(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+    )
+    headers = maya_headers(auth_verifier)
+
+    outcomes_shown = []
+    for outcome in PredictionOutcome:
+        with client.engine.begin() as connection:
+            connection.execute(
+                text("UPDATE predictions SET outcome = :outcome, outcome_at = now()"),
+                {"outcome": outcome.value},
+            )
+        [shown] = patterns_shown(client, headers)
+        outcomes_shown.append(shown["predictions"][0]["outcome"])
+
+    assert outcomes_shown == ["came_true", "did_not", "not_come_up", "not_followed_up"]
+
+
 def test_each_pattern_zeph_told_them_shows_and_no_other_is_returned(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
@@ -310,11 +344,16 @@ def test_deleting_a_pattern_removes_it_with_its_own_quotes_and_rewrites_the_port
             )
         ],
     )
+    set_state(
+        client.engine, belonging(client.engine, user_id).id, PatternState.CONFIRMED
+    )
     end_conversation_with_portrait(
         client, chat_model, clock, scheduler, seeded_settings
     )
     [shown] = patterns_shown(client, headers)
     portraits_before = len(chat_model.portrait_calls)
+    assert shown["state"] == "confirmed"
+    assert APPROVED_WORDING in chat_model.portrait_calls[-1].history[0].text
 
     deleted = client.delete(f"/api/patterns/{shown['id']}", headers=headers)
     deleted_again = client.delete(f"/api/patterns/{shown['id']}", headers=headers)
