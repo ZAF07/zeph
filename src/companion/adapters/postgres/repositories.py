@@ -4226,6 +4226,7 @@ class PostgresPatternRepository:
                     outcome=_value_or_none(prediction.outcome),
                     outcome_at=prediction.outcome_at,
                     outcome_conversation_id=prediction.outcome_conversation_id,
+                    wording_number=prediction.wording_number,
                 )
             )
 
@@ -4283,6 +4284,7 @@ class PostgresPatternRepository:
                 outcome=PredictionOutcome(row.outcome) if row.outcome else None,
                 outcome_at=row.outcome_at,
                 outcome_conversation_id=row.outcome_conversation_id,
+                wording_number=row.wording_number,
             )
             for row in rows
         ]

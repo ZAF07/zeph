@@ -2,7 +2,7 @@
   "pattern_types": [
     {
       "id": "CONF.AVOID.BELONG",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "area": "conflict",
       "name": "Softening disagreement to protect belonging",
       "definition": "When disagreement arises with someone whose approval matters, the person suppresses, delays or dilutes their own position. The driver is fear that conflict will damage the relationship, not lack of opinion.",
@@ -95,7 +95,11 @@
         }
       ],
       "approved_wording": "You seem to protect closeness by keeping disagreements small, even when they matter to you.",
-      "prediction_wording": "Next time {person} asks for something you'd rather not do, notice whether you say yes before you've decided.",
+      "prediction_wordings": [
+        "Next time {person} asks for something you'd rather not do, notice whether you say yes before you've decided.",
+        "Next time you go along with {person} on something, notice how you feel about it a few hours later.",
+        "Next time you disagree with someone you're not close to, like {person}, notice whether saying so feels any easier."
+      ],
       "numbers": {
         "situations_needed": 3,
         "base_rate": 0.2
@@ -108,7 +112,7 @@
     },
     {
       "id": "CONF.DEFEND.SELF",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "area": "conflict",
       "name": "Pushing back at once when criticised",
       "definition": "When someone points out a fault or questions what the person did, they answer straight away with a counter-attack or a long explanation. The criticism lands as a threat to how they see themselves, so it has to be dealt with now, before it can be weighed.",
@@ -191,7 +195,11 @@
         }
       ],
       "approved_wording": "When someone finds fault with you, you seem to answer it straight away, before you've had a chance to weigh whether any of it is fair.",
-      "prediction_wording": "Next time {person} points out something you did, notice what you say in the first few seconds, and whether it's an answer or a question.",
+      "prediction_wordings": [
+        "Next time {person} points out something you did, notice what you say in the first few seconds, and whether it's an answer or a question.",
+        "Next time {person} points out something you did, notice what you think about it an hour later, once it has cooled.",
+        "Next time you spot a mistake of your own before anyone else does, notice how you talk to yourself about it."
+      ],
       "numbers": {
         "situations_needed": 3,
         "base_rate": 0.2
@@ -204,7 +212,7 @@
     },
     {
       "id": "CONF.WITHDRAW.HURT",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "area": "conflict",
       "name": "Going quiet and pulling away when hurt",
       "definition": "When someone close hurts or lets them down, the person goes quiet, keeps to themselves and waits for it to pass rather than saying they were hurt. Showing the hurt would mean showing they need the other person, and that feels riskier than the distance.",
@@ -296,7 +304,11 @@
         }
       ],
       "approved_wording": "When someone close hurts you, you seem to go quiet and keep your distance rather than let them see it landed.",
-      "prediction_wording": "Next time {person} lets you down, notice whether you tell them, or wait for them to work it out.",
+      "prediction_wordings": [
+        "Next time {person} lets you down, notice whether you tell them, or wait for them to work it out.",
+        "Next time you go quiet on {person}, notice what you're hoping they will do.",
+        "Next time someone you're not close to lets you down, like {person}, notice whether it's easier to say so."
+      ],
       "numbers": {
         "situations_needed": 3,
         "base_rate": 0.25
@@ -309,7 +321,7 @@
     },
     {
       "id": "APPR.CONFIRM.CHOICE",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "area": "approval",
       "name": "Asking others to confirm a choice already made",
       "definition": "After making a choice, the person asks one or more others whether it was right. They are not looking for new information; the choice is made. The asking quiets the fear of having got it wrong, until the next doubt.",
@@ -397,7 +409,11 @@
         }
       ],
       "approved_wording": "Once you've chosen, you seem to need someone else to say it was right before you can settle.",
-      "prediction_wording": "After your next {decision}, notice whether you ask anyone if it was right, and how long the relief lasts if they say yes.",
+      "prediction_wordings": [
+        "After your next {decision}, notice whether you ask anyone if it was right, and how long the relief lasts if they say yes.",
+        "Next time you decide something small, like {decision}, notice whether you can leave it alone without telling anyone.",
+        "Next time someone doubts a choice you've made about {decision}, notice what happens to how sure you felt a minute before."
+      ],
       "numbers": {
         "situations_needed": 3,
         "base_rate": 0.2
@@ -410,7 +426,7 @@
     },
     {
       "id": "APPR.GIVE.NEEDED",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "area": "approval",
       "name": "Saying yes and over-giving to feel needed",
       "definition": "When someone asks for help, the person says yes and then gives more than was asked, often at a cost to themselves. Being the one others rely on is part of how they know they matter, so saying no feels like losing a place.",
@@ -498,7 +514,11 @@
         }
       ],
       "approved_wording": "Being the one people turn to seems to matter a lot to you, so yes comes easily, even when it costs you.",
-      "prediction_wording": "Next time {person} asks you for something, notice whether you say yes before you've checked what it will cost you.",
+      "prediction_wordings": [
+        "Next time {person} asks you for something, notice whether you say yes before you've checked what it will cost you.",
+        "Next time you help {person}, notice whether you do more than they asked for, and how you feel if they don't mention it.",
+        "Next time {person} sorts something out without asking you, notice what you feel first."
+      ],
       "numbers": {
         "situations_needed": 3,
         "base_rate": 0.25
@@ -511,7 +531,7 @@
     },
     {
       "id": "APPR.HIDE.BURDEN",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "area": "approval",
       "name": "Saying \"I'm fine\" and hiding what's hard",
       "definition": "When something is hard, the person keeps it to themselves and tells others they are fine. They worry that sharing it would weigh on people or make them less welcome, so they carry it alone and show an easy face.",
@@ -598,7 +618,11 @@
         }
       ],
       "approved_wording": "When things are hard, you seem to keep them to yourself so you don't weigh on the people around you.",
-      "prediction_wording": "Next time someone asks how you are on a hard day, notice what you say, and what you'd have said if you weren't worried about weighing on them.",
+      "prediction_wordings": [
+        "Next time someone asks how you are on a hard day, notice what you say, and what you'd have said if you weren't worried about weighing on them.",
+        "Next time {person} offers to help or to listen, notice what you say first, and whether you change the subject.",
+        "Next time something small goes wrong, like {thing}, notice whether you tell anyone, and who."
+      ],
       "numbers": {
         "situations_needed": 3,
         "base_rate": 0.25
@@ -611,7 +635,7 @@
     },
     {
       "id": "CTRL.OPEN.FREEDOM",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "area": "control",
       "name": "Keeping options open and putting off committing",
       "definition": "When a choice would close off other options, the person puts it off, keeps several open or commits only loosely. Being tied down feels like losing freedom, so not choosing feels safer, even when waiting costs them.",
@@ -690,7 +714,11 @@
         }
       ],
       "approved_wording": "You seem to keep your options open for as long as you can, as if choosing one would take something away from you.",
-      "prediction_wording": "Next time you're asked to commit to {plan}, notice what you feel just before you answer, and whether \"maybe\" comes out first.",
+      "prediction_wordings": [
+        "Next time you're asked to commit to {plan}, notice what you feel just before you answer, and whether \"maybe\" comes out first.",
+        "Next time you do commit to {plan}, notice how you feel in the day after: settled, or looking for a way out.",
+        "Next time a choice is small and easy to undo, like {choice}, notice whether you decide quickly."
+      ],
       "numbers": {
         "situations_needed": 3,
         "base_rate": 0.2
@@ -703,7 +731,7 @@
     },
     {
       "id": "CTRL.SELF.RELY",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "area": "control",
       "name": "Doing it all themselves rather than leaning on others",
       "definition": "When a job could be shared or help is on offer, the person does it themselves. Relying on others has let them down before, or they expect it to, so carrying it alone feels safer than waiting on someone who might not come through.",
@@ -787,7 +815,11 @@
         }
       ],
       "approved_wording": "You seem to carry things yourself rather than lean on others, as if relying on someone is the bigger risk.",
-      "prediction_wording": "Next time someone offers to help with {task}, notice whether you say yes, and what you expect would happen if you did.",
+      "prediction_wordings": [
+        "Next time someone offers to help with {task}, notice whether you say yes, and what you expect would happen if you did.",
+        "Next time you hand {task} to someone else, notice whether you check on it or redo part of it.",
+        "Next time you're stretched thin, notice whether asking {person} for help crosses your mind, and what you tell yourself about it."
+      ],
       "numbers": {
         "situations_needed": 3,
         "base_rate": 0.2
@@ -800,7 +832,7 @@
     },
     {
       "id": "CTRL.UNCERT.PLAN",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "area": "control",
       "name": "Control-seeking under uncertainty",
       "definition": "When outcomes are uncertain, the person responds by planning, checking, gathering information or taking over. The discomfort comes from not knowing, and acting on it brings relief even when it changes nothing.",
@@ -894,7 +926,11 @@
         }
       ],
       "approved_wording": "Not knowing seems to weigh on you more than a bad answer would, so you reach for control.",
-      "prediction_wording": "Next time you're waiting on {outcome}, notice how often you check and what changes when you do.",
+      "prediction_wordings": [
+        "Next time you're waiting on {outcome}, notice how often you check and what changes when you do.",
+        "Next time a plan changes at the last minute, like {plan}, notice what you do in the first few minutes.",
+        "Next time you get a clear answer on {outcome}, even a bad one, notice whether you feel calmer than you did while waiting."
+      ],
       "numbers": {
         "situations_needed": 3,
         "base_rate": 0.2
@@ -907,7 +943,7 @@
     },
     {
       "id": "ACH.ABSORB.PULL",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "area": "achievement",
       "name": "Everything else goes quiet when something grabs them",
       "definition": "When a task, project or interest grabs them, the person goes all in and the rest of life drops away: meals, sleep, messages, plans. Being in the pull of it feels so good that stepping out feels like a loss.",
@@ -986,7 +1022,11 @@
         }
       ],
       "approved_wording": "When something grabs you, everything else seems to go quiet, and coming back to the rest of life can feel like a loss.",
-      "prediction_wording": "Next time {interest} pulls you in, notice what you let drop, and how you feel when something makes you stop.",
+      "prediction_wordings": [
+        "Next time {interest} pulls you in, notice what you let drop, and how you feel when something makes you stop.",
+        "Next time you're deep in {interest}, notice the first thing that pulls you away, and how long it takes before you want to go back.",
+        "On a day when nothing has grabbed you, notice how the ordinary things feel, and whether you go looking for the next thing to fall into."
+      ],
       "numbers": {
         "situations_needed": 3,
         "base_rate": 0.2
@@ -999,7 +1039,7 @@
     },
     {
       "id": "ACH.GOAL.MOVE",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "area": "achievement",
       "name": "Moving the goal as soon as they reach it",
       "definition": "When the person reaches a goal, they barely pause before setting a bigger one. The win counts for little because the next target is already in view. Keeping a goal ahead means never having to ask whether they've done enough.",
@@ -1078,7 +1118,11 @@
         }
       ],
       "approved_wording": "Each time you reach a goal, you seem to set the next one before the last one has had a chance to count.",
-      "prediction_wording": "When you next reach {goal}, notice how long you stay with it before your mind moves to what's next.",
+      "prediction_wordings": [
+        "When you next reach {goal}, notice how long you stay with it before your mind moves to what's next.",
+        "Next time someone congratulates you on {goal}, notice what you say back, and whether you mention what's still left to do.",
+        "Next time you finish something small, like {task}, notice whether it feels done, or whether a bigger version of it turns up at once."
+      ],
       "numbers": {
         "situations_needed": 3,
         "base_rate": 0.2
@@ -1091,7 +1135,7 @@
     },
     {
       "id": "ACH.WORTH.PERF",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "area": "achievement",
       "name": "Performance-contingent self-worth",
       "definition": "The person's sense of worth rises and falls with how well they perform. Falling short is felt as a verdict on the self, not on the work. High standards alone do not qualify; the marker is self-judgement after a miss.",
@@ -1185,7 +1229,11 @@
         }
       ],
       "approved_wording": "How well you perform seems to decide how much you allow yourself to feel okay.",
-      "prediction_wording": "After the next piece of feedback on {domain}, notice whether your first thought is about the work or about you.",
+      "prediction_wordings": [
+        "After the next piece of feedback on {domain}, notice whether your first thought is about the work or about you.",
+        "Next time you have {task} coming up that will be judged, notice how you get ready for it: more than it needs, or putting it off.",
+        "Next time something goes well in {domain}, notice how long the good feeling lasts, and what ends it."
+      ],
       "numbers": {
         "situations_needed": 3,
         "base_rate": 0.25
@@ -1198,7 +1246,7 @@
     },
     {
       "id": "REL.CHECK.SECURE",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "area": "relationships",
       "name": "Reading silence as something wrong and reaching out to check",
       "definition": "When someone close goes quiet, replies late or seems distant, the person reads it as a sign that something is wrong between them and reaches out to check. The checking is about the bond, and it settles them only once they hear things are okay.",
@@ -1298,7 +1346,11 @@
         }
       ],
       "approved_wording": "When someone close goes quiet, you seem to read it as something wrong between you, and you need to check before you can settle.",
-      "prediction_wording": "Next time {person} takes a while to reply, notice what story you tell yourself about why, and what you do with it.",
+      "prediction_wordings": [
+        "Next time {person} takes a while to reply, notice what story you tell yourself about why, and what you do with it.",
+        "Next time you reach out to check on things with {person}, notice how long the relief lasts after they answer.",
+        "Next time someone you're less close to goes quiet, like {person}, notice whether you read anything into it."
+      ],
       "numbers": {
         "situations_needed": 3,
         "base_rate": 0.2
@@ -1311,7 +1363,7 @@
     },
     {
       "id": "REL.DISTANCE.INDEP",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "area": "relationships",
       "name": "Pulling back when someone gets closer or needs more",
       "definition": "When someone wants to get closer, asks for more time or leans on them, the person pulls back: slower replies, fewer plans, a sudden need for space. Closeness that grows feels like a claim on them, and stepping back keeps them their own.",
@@ -1411,7 +1463,11 @@
         }
       ],
       "approved_wording": "When someone starts getting closer or needing more of you, you seem to step back to keep some room that's yours.",
-      "prediction_wording": "Next time {person} asks for more of your time, notice what you feel first, and whether you make a little more distance afterwards.",
+      "prediction_wordings": [
+        "Next time {person} asks for more of your time, notice what you feel first, and whether you make a little more distance afterwards.",
+        "After your next long stretch of time with {person}, notice whether you want room to yourself, and how you go about getting it.",
+        "Next time {person} gives you space without being asked, notice whether you move a little closer."
+      ],
       "numbers": {
         "situations_needed": 3,
         "base_rate": 0.2
@@ -1424,7 +1480,7 @@
     },
     {
       "id": "REL.MOOD.FIX",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "area": "relationships",
       "name": "Taking on other people's moods as theirs to fix",
       "definition": "When someone close is upset, tense or low, the person feels it as their own job to make it better, and steps in without being asked: cheering, smoothing, fixing. A calm mood around them is what lets them feel safe.",
@@ -1524,7 +1580,11 @@
         }
       ],
       "approved_wording": "When someone close is having a hard time, you seem to feel it's yours to fix, as if things aren't safe until they're calm again.",
-      "prediction_wording": "Next time {person} is in a low mood, notice how quickly you step in, and whether they asked you to.",
+      "prediction_wordings": [
+        "Next time {person} is in a low mood, notice how quickly you step in, and whether they asked you to.",
+        "Next time {person} is upset and you can't do anything about it, notice what that is like for you.",
+        "Next time the low mood belongs to someone you're not close to, like {person}, notice whether you feel the same pull to fix it."
+      ],
       "numbers": {
         "situations_needed": 3,
         "base_rate": 0.25

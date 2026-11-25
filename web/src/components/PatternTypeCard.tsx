@@ -152,9 +152,14 @@ export function PatternTypeCard({
         <PatternTypeLine label="Pattern">
           {patternType.approved_wording}
         </PatternTypeLine>
-        <PatternTypeLine label="Prediction">
-          {patternType.prediction_wording}
-        </PatternTypeLine>
+        {patternType.prediction_wordings.map((wording, index) => (
+          <PatternTypeLine
+            key={`${index}-${wording}`}
+            label={`Prediction ${index + 1}`}
+          >
+            {wording}
+          </PatternTypeLine>
+        ))}
       </PatternTypeGroup>
       <PatternTypeGroup id={groupId("status")} title="Numbers and status">
         <PatternTypeLine label="Situations">

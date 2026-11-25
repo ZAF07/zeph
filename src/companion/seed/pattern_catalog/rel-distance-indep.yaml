@@ -3,7 +3,7 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: REL.DISTANCE.INDEP
-version: 0.1.0
+version: 0.2.0
 area: relationships
 name: Pulling back when someone gets closer or needs more
 status: approved
@@ -91,9 +91,18 @@ exclusions:
 approved_wording: >-
   When someone starts getting closer or needing more of you, you seem to
   step back to keep some room that's yours.
-prediction_wording: >-
-  Next time {person} asks for more of your time, notice what you feel first,
-  and whether you make a little more distance afterwards.
+# Three Predictions, each testing a different side of the Pattern. Code gives
+# the first when the Pattern is shared, then one the User hasn't had.
+prediction_wordings:
+  - >-
+    Next time {person} asks for more of your time, notice what you feel
+    first, and whether you make a little more distance afterwards.
+  - >-
+    After your next long stretch of time with {person}, notice whether you
+    want room to yourself, and how you go about getting it.
+  - >-
+    Next time {person} gives you space without being asked, notice whether
+    you move a little closer.
 
 numbers:
   situations_needed: 3

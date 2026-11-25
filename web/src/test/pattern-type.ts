@@ -45,7 +45,10 @@ export const patternType: PatternType = {
     { text: "Job loss in the last month", evidence: "counted_not_shared" },
   ],
   approved_wording: "You seem to protect closeness.",
-  prediction_wording: "Next time {person} asks, notice what you say.",
+  prediction_wordings: [
+    "Next time {person} asks, notice what you say.",
+    "Next time you go along with {person}, notice how you feel later.",
+  ],
   numbers: { situations_needed: 3, base_rate: 0.2 },
   status: "draft",
   approved_by: null,

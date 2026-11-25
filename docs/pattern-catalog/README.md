@@ -62,7 +62,7 @@ was last loaded. Zeph keeps replying either way.
 | `anyone_would_when` | Optional. The same, as situation tags: `relationship`, `power`, `setting`, `stance`. A match needs every tag it names. | Code: an Observation whose tags fit is situational and carries no weight. |
 | `exclusions` | When it must not be shared, and whether evidence from then is `ignored` or `counted_not_shared`. | The tagging model, which says which exclusions apply to a User now (from their open Life Threads and latest Day Summaries), and the ready gate: while one applies the Pattern is never ready, and with `ignored` the Observations tagged then carry no weight. |
 | `approved_wording` | The Pattern in warm, plain words, as Zeph's view. | Given to the Reply Plan, the reply, a Check-in that shares it and the tagging step (to read how they took it), once the Pattern is ready or told. A change applies from the next reply. |
-| `prediction_wording` | One thing to notice next time, with a `{placeholder}` the model fills. | Given to the reply or Check-in that shares the Pattern, which puts the User's own person or thing in the placeholder. The Prediction is kept as it was worded to them. |
+| `prediction_wordings` | A list of Predictions: each is one thing to notice next time, with a `{placeholder}` the model fills. Each tests a **different side** of the Pattern. At least one; write three. | Code picks one: the first when the Pattern is shared, then the first this User's Pattern hasn't had (once all were given, the one given longest ago). The reply or Check-in puts the User's own person or thing in the placeholder. The Prediction is kept as it was worded to them, with its number. |
 | `numbers.situations_needed` | Situations (Life Threads) needed before it can be Ready. | The ready gate: the Pattern needs this many situations, or the Admin-set number when that is more. |
 | `numbers.base_rate` | A first guess at how common it is, 0 to 1. | Not read yet: kept for when the score becomes a probability. |
 
@@ -108,6 +108,51 @@ on the Dashboard's Platform settings page.
 6. Deploy. Then check the backend's start log, or the Pattern Catalog page,
    for the new version.
 
+## Writing and correcting Predictions
+
+Every Pattern Type has three Predictions under `prediction_wordings`. They
+were drafted by Claude on 25 Nov 2026 and are yours to correct.
+
+**Why three.** With one Prediction, a "new" one was the old one in other
+words, so "two came true" was one test passed twice. Now two that came true
+are two different tests: a Pattern is confirmed by Predictions only when two
+*different* wordings came true (and more came true than didn't).
+
+**What makes a good set.** Each one looks at the Pattern from a different
+side:
+
+1. **The moment itself.** What they do when the situation comes up. ("Next
+   time {person} asks for something you'd rather not do, notice whether you
+   say yes before you've decided.")
+2. **The cost, or what comes after.** What it is like later. ("Next time you
+   go along with {person} on something, notice how you feel about it a few
+   hours later.")
+3. **The edge.** Where the Pattern should *not* show, or its other side.
+   ("Next time you disagree with someone you're not close to, like {person},
+   notice whether saying so feels any easier.")
+
+**Rules for each one.**
+
+- One thing to notice, in one sentence, starting from a moment that will
+  come up in ordinary life within a week or two.
+- Ask them to **notice**, never to change or try something. A Prediction is
+  a test, not homework.
+- It must be able to come out either way. If any answer would fit the
+  Pattern, it tests nothing.
+- Use one `{placeholder}` (like `{person}` or `{task}`) where the reply
+  should put their own person or thing.
+- Plain, warm words. No clinical language (the same test checks them).
+
+**How to correct them.**
+
+1. Edit the list in the Pattern Type's YAML file. Change the words of one in
+   place; add a new one at the end; don't reorder them.
+2. Give the file a new `version` (the last number for wording: 0.4.0 →
+   0.4.1).
+3. Follow steps 4 and 6 of "How to change a Pattern Type" above. No Eval
+   run is needed for a wording change: the tagging step never reads
+   Predictions' wordings.
+
 ## How to add a Pattern Type
 
 What to add comes from the Dashboard (Admin → Unmatched Patterns): what Zeph
@@ -145,7 +190,7 @@ the whole catalog.
 | `anyone_would_when` | Changes which new Observations are situational. Past ones keep how they were marked. |
 | `exclusions` | Changes what the tagging step may flag, from the next Conversation end. An exclusion taken away stops applying at the User's next tagged Conversation. Observations already marked excluded stay so. |
 | `numbers.situations_needed` | The ready gate uses it from the next Conversation end; a ready Pattern that no longer has enough situations goes back to suspected. |
-| `approved_wording`, `prediction_wording` | Used from the next time a Pattern is shared, followed up or given a new Prediction. A follow-up Curiosity already waiting keeps the words it was written with. |
+| `approved_wording`, `prediction_wordings` | Used from the next time a Pattern is shared, followed up or given a new Prediction. A follow-up Curiosity already waiting keeps the words it was written with, and a Pattern already told keeps the wording it was told in (the User sees that wording on their Patterns tab). Keep the order of `prediction_wordings`: a Prediction remembers its place in the list, so moving one makes Zeph think a different one was given. Add new ones at the end. |
 | `numbers.base_rate` | Nothing yet. |
 | `status` draft → approved | Its Patterns may become ready from the next Conversation end. A draft gathers evidence silently and is never ready; approved → draft sends a ready Pattern back to suspected. Needs `approved_by` and `approved_on`. |
 | `status` → archived | Today nothing: the tagging step is sent every Pattern Type in the catalog, archived ones too, so an archived one is still looked for. To come: it stops being looked for and is never shared. Keep the file; never delete it. |

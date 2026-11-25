@@ -3,7 +3,7 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: CTRL.UNCERT.PLAN
-version: 0.2.0
+version: 0.3.0
 area: control
 name: Control-seeking under uncertainty
 status: approved
@@ -90,9 +90,18 @@ exclusions:
 approved_wording: >-
   Not knowing seems to weigh on you more than a bad answer would, so you reach
   for control.
-prediction_wording: >-
-  Next time you're waiting on {outcome}, notice how often you check and what
-  changes when you do.
+# Three Predictions, each testing a different side of the Pattern. Code gives
+# the first when the Pattern is shared, then one the User hasn't had.
+prediction_wordings:
+  - >-
+    Next time you're waiting on {outcome}, notice how often you check and
+    what changes when you do.
+  - >-
+    Next time a plan changes at the last minute, like {plan}, notice what
+    you do in the first few minutes.
+  - >-
+    Next time you get a clear answer on {outcome}, even a bad one, notice
+    whether you feel calmer than you did while waiting.
 
 numbers:
   situations_needed: 3

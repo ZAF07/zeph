@@ -629,6 +629,7 @@ predictions = Table(
         Uuid,
         ForeignKey("conversations.id", ondelete="SET NULL"),
     ),
+    Column("wording_number", Integer),
 )
 
 pattern_reactions = Table(

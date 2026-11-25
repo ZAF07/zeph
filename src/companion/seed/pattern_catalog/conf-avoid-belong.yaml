@@ -3,7 +3,7 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: CONF.AVOID.BELONG
-version: 0.3.0
+version: 0.4.0
 area: conflict
 name: Softening disagreement to protect belonging
 status: approved
@@ -90,9 +90,18 @@ exclusions:
 approved_wording: >-
   You seem to protect closeness by keeping disagreements small, even when they
   matter to you.
-prediction_wording: >-
-  Next time {person} asks for something you'd rather not do, notice whether
-  you say yes before you've decided.
+# Three Predictions, each testing a different side of the Pattern. Code gives
+# the first when the Pattern is shared, then one the User hasn't had.
+prediction_wordings:
+  - >-
+    Next time {person} asks for something you'd rather not do, notice
+    whether you say yes before you've decided.
+  - >-
+    Next time you go along with {person} on something, notice how you feel
+    about it a few hours later.
+  - >-
+    Next time you disagree with someone you're not close to, like {person},
+    notice whether saying so feels any easier.
 
 numbers:
   situations_needed: 3

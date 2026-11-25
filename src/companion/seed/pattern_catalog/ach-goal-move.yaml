@@ -3,7 +3,7 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: ACH.GOAL.MOVE
-version: 0.1.0
+version: 0.2.0
 area: achievement
 name: Moving the goal as soon as they reach it
 status: approved
@@ -76,9 +76,18 @@ exclusions:
 approved_wording: >-
   Each time you reach a goal, you seem to set the next one before the last
   one has had a chance to count.
-prediction_wording: >-
-  When you next reach {goal}, notice how long you stay with it before your
-  mind moves to what's next.
+# Three Predictions, each testing a different side of the Pattern. Code gives
+# the first when the Pattern is shared, then one the User hasn't had.
+prediction_wordings:
+  - >-
+    When you next reach {goal}, notice how long you stay with it before your
+    mind moves to what's next.
+  - >-
+    Next time someone congratulates you on {goal}, notice what you say back,
+    and whether you mention what's still left to do.
+  - >-
+    Next time you finish something small, like {task}, notice whether it
+    feels done, or whether a bigger version of it turns up at once.
 
 numbers:
   situations_needed: 3

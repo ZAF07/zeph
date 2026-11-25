@@ -1,6 +1,7 @@
 import json
 from dataclasses import replace
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -40,6 +41,8 @@ from companion.core.predictions import (
     SharedPatternFacts,
     counted_once,
     follow_up_window,
+    follow_ups_due_early,
+    next_prediction_wording,
     plan_follow_ups,
     read_given_check,
     shared_move,
@@ -266,7 +269,7 @@ def test_a_shared_pattern_gets_a_new_prediction_once_the_last_is_settled(
         None,
     )
     assert give.not_before is None
-    assert PATTERN_TYPES[BELONG].prediction_wording in give.question
+    assert PATTERN_TYPES[BELONG].prediction_wordings[0] in give.question
     assert planned([pattern], [settled], [give]).curiosities.added == []
 
 
@@ -669,3 +672,90 @@ def test_the_given_check_reads_whether_a_prediction_was_given() -> None:
     assert read_given_check('{"given": false}') == GivenCheck(False, "")
     assert read_given_check('{"given": "yes"}') is None
     assert read_given_check("no idea") is None
+
+
+def numbered(pattern: CatalogPattern, number: int | None, **changes: Any) -> Prediction:
+    """A Prediction given from one of its Pattern Type's wordings."""
+    return replace(prediction(pattern, **changes), wording_number=number)
+
+
+def test_a_new_prediction_uses_a_wording_the_pattern_has_not_had() -> None:
+    pattern = shared_pattern()
+    belonging = PATTERN_TYPES[BELONG]
+    wordings = belonging.prediction_wordings
+
+    first = next_prediction_wording(belonging, [])
+    second = next_prediction_wording(belonging, [numbered(pattern, 1)])
+    third = next_prediction_wording(
+        belonging, [numbered(pattern, 1), numbered(pattern, 2)]
+    )
+    before_they_were_numbered = next_prediction_wording(
+        belonging, [numbered(pattern, None)]
+    )
+
+    assert first == (1, wordings[0])
+    assert second == (2, wordings[1])
+    assert third == (3, wordings[2])
+    assert before_they_were_numbered == (1, wordings[0])
+
+
+def test_once_every_wording_was_given_the_one_given_longest_ago_comes_again() -> None:
+    pattern = shared_pattern()
+    belonging = PATTERN_TYPES[BELONG]
+    given = [numbered(pattern, number) for number in (1, 2, 3, 1)]
+
+    assert next_prediction_wording(belonging, given)[0] == 2
+
+
+def test_the_offer_of_a_new_prediction_carries_the_next_wording() -> None:
+    pattern = shared_pattern()
+    settled = numbered(pattern, 1, made_days_ago=8, outcome=PredictionOutcome.CAME_TRUE)
+
+    [give] = planned([pattern], [settled]).curiosities.added
+
+    wordings = PATTERN_TYPES[BELONG].prediction_wordings
+    assert wordings[1] in give.question
+    assert wordings[0] not in give.question
+
+
+def test_the_same_wording_coming_true_twice_is_one_test_passed() -> None:
+    pattern = shared_pattern()
+    came_true = PredictionOutcome.CAME_TRUE
+    same_twice = [numbered(pattern, 1, outcome=came_true) for _ in range(2)]
+    two_sides = [numbered(pattern, number, outcome=came_true) for number in (1, 2)]
+    not_numbered = [numbered(pattern, None, outcome=came_true) for _ in range(2)]
+
+    def came_true_of(predictions: list[Prediction]) -> int:
+        return shared_pattern_facts(
+            pattern, [], [], predictions, WEIGHING, "UTC"
+        ).came_true
+
+    assert came_true_of(same_twice) == 1
+    assert came_true_of(two_sides) == 2
+    assert came_true_of(not_numbered) == 2
+
+
+def test_a_follow_up_is_due_early_when_a_thread_of_the_pattern_is_in_mind() -> None:
+    pattern = shared_pattern()
+    with_mei = story(about="Mei")
+    given = prediction(pattern, made_days_ago=2)
+    [follow_up] = planned([pattern], [given]).curiosities.added
+    other_thread = uuid4()
+
+    def due_early(
+        thread_ids: set[Any], today: date = TODAY, asked: Prediction = given
+    ) -> frozenset[Any]:
+        return follow_ups_due_early(
+            [follow_up], [pattern], [with_mei], [asked], thread_ids, today, "UTC"
+        )
+
+    said_not_yet_today = replace(
+        given, outcome=PredictionOutcome.NOT_COME_UP, outcome_at=NOW
+    )
+    assert follow_up.not_before is not None
+    assert follow_up.not_before > TODAY
+    assert due_early({with_mei.thread_id}) == frozenset({follow_up.id})
+    assert due_early({other_thread}) == frozenset()
+    assert due_early(set()) == frozenset()
+    assert due_early({with_mei.thread_id}, TODAY - timedelta(days=2)) == frozenset()
+    assert due_early({with_mei.thread_id}, asked=said_not_yet_today) == frozenset()

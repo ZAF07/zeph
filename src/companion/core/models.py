@@ -3132,8 +3132,9 @@ class PatternType:
             when an Observation is situational.
         exclusions: When it must not be shared.
         approved_wording: How Zeph may word it to a User.
-        prediction_wording: How Zeph words its Prediction, with `{name}`
-            placeholders.
+        prediction_wordings: How Zeph words its Predictions, each testing
+            a different side of the Pattern, with `{name}` placeholders;
+            at least one.
         numbers: Its own numbers.
         status: Where it stands in review.
         approved_by: Who approved it; None unless approved.
@@ -3155,7 +3156,7 @@ class PatternType:
     anyone_would: str
     exclusions: tuple[PatternExclusion, ...]
     approved_wording: str
-    prediction_wording: str
+    prediction_wordings: tuple[str, ...]
     numbers: PatternTypeNumbers
     status: PatternTypeStatus
     approved_by: str | None
@@ -3420,6 +3421,9 @@ class Prediction:
         outcome_at: When the outcome was read or set; None without one.
         outcome_conversation_id: The Conversation the User said how it
             went in; None when code set the outcome or there is none.
+        wording_number: Which of its Pattern Type's Prediction wordings it
+            was given from, counted from 1; None for one given before
+            they were numbered.
     """
 
     id: UUID
@@ -3430,6 +3434,7 @@ class Prediction:
     outcome: PredictionOutcome | None = None
     outcome_at: datetime | None = None
     outcome_conversation_id: UUID | None = None
+    wording_number: int | None = None
 
     @property
     def is_open(self) -> bool:

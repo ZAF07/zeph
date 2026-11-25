@@ -53,6 +53,7 @@ from companion.core.usage import UsageRecordingChatModel
 logger = logging.getLogger(__name__)
 
 FEWEST_QUOTES = 2
+FIRST_PREDICTION_WORDING = 1
 MOST_QUOTES = 3
 SHARES_COUNTED_OVER = timedelta(days=7)
 EVIDENCE_KINDS_FROM_THEIR_LIFE = (
@@ -307,7 +308,7 @@ def describe_three_parts(to_share: PatternToShare) -> str:
         "saying what each was about:\n"
         f"{describe_quotes(to_share.quotes)}\n"
         "3. One Prediction, one thing for them to notice in their own life: "
-        f"{pattern_type.prediction_wording} Where it has a word in curly "
+        f"{pattern_type.prediction_wordings[0]} Where it has a word in curly "
         "brackets, put their own person or thing.\n"
         "Then ask them what would prove it wrong."
     )
@@ -402,7 +403,8 @@ def describe_message_for_shared_check(
     message = "\n".join(texts)
     return (
         f"The Pattern: {to_share.pattern_type.approved_wording}\n"
-        f"The Prediction it was to give: {to_share.pattern_type.prediction_wording}"
+        "The Prediction it was to give: "
+        f"{to_share.pattern_type.prediction_wordings[0]}"
         f"\n\nThe message:\n{message}"
     )
 
@@ -805,6 +807,7 @@ class PatternSharing:
                         pattern_id=pattern.id,
                         wording=check.prediction,
                         made_at=now,
+                        wording_number=FIRST_PREDICTION_WORDING,
                     )
                 )
         return True

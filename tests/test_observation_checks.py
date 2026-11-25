@@ -145,7 +145,7 @@ def test_a_valid_observation_is_kept_with_everything_it_needs() -> None:
     [observation] = planned.kept
     assert planned.dropped == 0
     assert observation.pattern_type_id == "CONF.AVOID.BELONG"
-    assert observation.pattern_type_version == "0.3.0"
+    assert observation.pattern_type_version == "0.4.0"
     assert observation.sign_id == "I2"
     assert observation.direction == ObservationDirection.FOR
     assert observation.quote == "I said yes to Mei again"
@@ -307,7 +307,7 @@ def test_two_pattern_types_make_an_unclear_observation() -> None:
 
     assert observation.unclear
     assert observation.second_pattern_type_id == "ACH.WORTH.PERF"
-    assert observation.second_pattern_type_version == "0.2.0"
+    assert observation.second_pattern_type_version == "0.3.0"
 
 
 def test_tags_that_do_not_apply_may_be_left_empty() -> None:

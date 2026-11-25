@@ -3,7 +3,7 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: ACH.ABSORB.PULL
-version: 0.1.0
+version: 0.2.0
 area: achievement
 name: Everything else goes quiet when something grabs them
 status: approved
@@ -76,9 +76,18 @@ exclusions:
 approved_wording: >-
   When something grabs you, everything else seems to go quiet, and coming
   back to the rest of life can feel like a loss.
-prediction_wording: >-
-  Next time {interest} pulls you in, notice what you let drop, and how you
-  feel when something makes you stop.
+# Three Predictions, each testing a different side of the Pattern. Code gives
+# the first when the Pattern is shared, then one the User hasn't had.
+prediction_wordings:
+  - >-
+    Next time {interest} pulls you in, notice what you let drop, and how you
+    feel when something makes you stop.
+  - >-
+    Next time you're deep in {interest}, notice the first thing that pulls
+    you away, and how long it takes before you want to go back.
+  - >-
+    On a day when nothing has grabbed you, notice how the ordinary things
+    feel, and whether you go looking for the next thing to fall into.
 
 numbers:
   situations_needed: 3

@@ -48,7 +48,7 @@ VALID: dict[str, Any] = {
     "anyone_would": "What anyone would do",
     "exclusions": [{"text": "Grief", "evidence": "ignored"}],
     "approved_wording": "You seem to do this.",
-    "prediction_wording": "Next time {person} asks, notice what you do.",
+    "prediction_wordings": ["Next time {person} asks, notice what you do."],
     "numbers": {"situations_needed": 3, "base_rate": 0.2},
 }
 
@@ -134,7 +134,7 @@ def test_no_pattern_type_in_the_repo_uses_clinical_terms_outside_its_frameworks(
             pattern_type.function,
             pattern_type.anyone_would,
             pattern_type.approved_wording,
-            pattern_type.prediction_wording,
+            *pattern_type.prediction_wordings,
             *(sign.text for sign in pattern_type.signs + pattern_type.signs_against),
             *(look_alike.tells_apart for look_alike in pattern_type.look_alikes),
             *(look_alike.name or "" for look_alike in pattern_type.look_alikes),
@@ -158,7 +158,7 @@ def test_a_pattern_type_is_read_with_all_its_details() -> None:
         if pattern_type.id == "CONF.AVOID.BELONG"
     )
 
-    assert conflict.version == "0.3.0"
+    assert conflict.version == "0.4.0"
     assert conflict.if_situation == "Disagreement with a valued other"
     assert conflict.then_behaviour == "Withholds or softens own view"
     assert conflict.function == "To protect belonging"
@@ -187,9 +187,32 @@ def test_a_pattern_type_is_read_with_all_its_details() -> None:
         ExcludedEvidence.IGNORED,
     ]
     assert conflict.approved_wording.startswith("You seem to protect closeness")
-    assert "{person}" in conflict.prediction_wording
+    assert len(conflict.prediction_wordings) == 3
+    assert all("{person}" in wording for wording in conflict.prediction_wordings)
     assert (conflict.numbers.situations_needed, conflict.numbers.base_rate) == (3, 0.2)
     assert (conflict.approved_by, conflict.approved_on) == ("Zaf", date(2026, 11, 24))
+
+
+def test_a_version_stored_with_one_prediction_wording_is_still_read() -> None:
+    content = without("prediction_wordings")
+    content["prediction_wording"] = "Next time {person} asks, notice what you do."
+
+    [pattern_type] = read_pattern_types(
+        [PatternTypeFile(name="a.yaml", content=content)]
+    )
+
+    assert pattern_type.prediction_wordings == (
+        "Next time {person} asks, notice what you do.",
+    )
+
+
+def test_a_pattern_type_needs_at_least_one_prediction_wording() -> None:
+    assert problems_of(changed(prediction_wordings=[])) == [
+        "a.yaml: prediction_wordings must hold at least one text."
+    ]
+    assert problems_of(without("prediction_wordings")) == [
+        "a.yaml: prediction_wordings is missing."
+    ]
 
 
 def test_a_missing_required_field_is_refused_by_name() -> None:
