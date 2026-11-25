@@ -17,7 +17,13 @@ from companion.adapters.chat_tools import (
     to_tool_schema,
     unknown_tool_message,
 )
-from companion.core.models import ChatLine, ChatRole, ModelAnswer, ToolCallRecord
+from companion.core.models import (
+    ChatLine,
+    ChatRole,
+    ModelAnswer,
+    ToolCallRecord,
+    join_instructions,
+)
 from companion.core.ports import ChatTool
 
 logger = logging.getLogger(__name__)
@@ -229,21 +235,30 @@ class DeepSeekChatModel:
         instructions: str,
         history: list[ChatLine],
         tools: Sequence[ChatTool] = (),
+        message_instructions: str = "",
     ) -> ModelAnswer:
         """Generate the next reply, calling tools first if the model wants to.
+
+        The two instructions are sent joined, the fixed ones first, because
+        DeepSeek caches the same start of a request by itself.
 
         Args:
             model: The model to use, e.g. "deepseek/deepseek-v4.1-flash-1017".
             thinking: Whether the model should think before it answers.
-            instructions: What the model should be and do (Persona and prompt).
+            instructions: What the model should be and do (Persona and
+                prompt): the part that stays the same from call to call.
             history: The Conversation so far, oldest first.
             tools: The tools the model may call; none by default.
+            message_instructions: The instructions made for this one call,
+                read after `instructions`; "" by default.
 
         Returns:
             The reply text and the tokens it took.
         """
         client = build_client(self._api_key, model, thinking)
-        messages = to_langchain_messages(instructions, history)
+        messages = to_langchain_messages(
+            join_instructions(instructions, message_instructions), history
+        )
         if not tools:
             response = client.invoke(messages)
             return to_model_answer(response.text, [response])

@@ -314,6 +314,66 @@ def test_a_deepseek_model_gets_no_caching_marker() -> None:
     assert "cache_control" not in requests[0].content.decode()
 
 
+def test_a_claude_model_gets_only_the_fixed_instructions_marked_for_caching() -> None:
+    requests: list[httpx.Request] = []
+    chat_model = openrouter_with(httpx.Response(200, json=openrouter_reply()), requests)
+
+    chat_model.generate(
+        model="anthropic/claude-haiku-5.5",
+        thinking=False,
+        instructions="Be Zeph.",
+        history=HISTORY,
+        message_instructions="They just asked about work.",
+    )
+
+    system_message = json.loads(requests[0].content)["messages"][0]
+    assert system_message == {
+        "role": "system",
+        "content": [
+            *CACHED_INSTRUCTIONS["content"],
+            {"type": "text", "text": "\n\nThey just asked about work."},
+        ],
+    }
+
+
+def test_a_claude_model_with_only_message_instructions_gets_them_unmarked() -> None:
+    requests: list[httpx.Request] = []
+    chat_model = openrouter_with(httpx.Response(200, json=openrouter_reply()), requests)
+
+    chat_model.generate(
+        model="anthropic/claude-haiku-5.5",
+        thinking=False,
+        instructions="",
+        history=HISTORY,
+        message_instructions="They just asked about work.",
+    )
+
+    system_message = json.loads(requests[0].content)["messages"][0]
+    assert system_message == {
+        "role": "system",
+        "content": "They just asked about work.",
+    }
+
+
+def test_a_deepseek_model_gets_the_two_instructions_joined_fixed_part_first() -> None:
+    requests: list[httpx.Request] = []
+    chat_model = openrouter_with(httpx.Response(200, json=openrouter_reply()), requests)
+
+    chat_model.generate(
+        model="deepseek/deepseek-v4-pro-0813",
+        thinking=False,
+        instructions="Be Zeph.",
+        history=HISTORY,
+        message_instructions="They just asked about work.",
+    )
+
+    system_message = json.loads(requests[0].content)["messages"][0]
+    assert system_message == {
+        "role": "system",
+        "content": "Be Zeph.\n\nThey just asked about work.",
+    }
+
+
 def test_the_cached_tokens_of_a_claude_reply_are_logged(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -347,7 +407,7 @@ def test_a_claude_reply_that_says_nothing_about_the_cache_is_logged_as_none_cach
     ]
 
 
-def test_the_cached_tokens_of_a_deepseek_reply_are_not_logged(
+def test_the_cached_tokens_of_a_deepseek_reply_are_logged(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     reply = openrouter_reply()
@@ -357,7 +417,10 @@ def test_the_cached_tokens_of_a_deepseek_reply_are_not_logged(
     with caplog.at_level(logging.INFO, logger=ADAPTER_LOGGER):
         generate(chat_model)
 
-    assert not caplog.text
+    assert caplog.messages == [
+        "A call to deepseek/deepseek-v4-pro-0813 read 30 of its 42 prompt tokens "
+        "from the cache and wrote 0 to it"
+    ]
 
 
 def tool_call_reply(

@@ -215,6 +215,7 @@ class LoadTestChatModel:
         instructions: str,
         history: list[ChatLine],
         tools: Sequence[ChatTool] = (),
+        message_instructions: str = "",
     ) -> ModelAnswer:
         """Wait, then give a canned answer that fits the call.
 
@@ -224,6 +225,8 @@ class LoadTestChatModel:
             instructions: The call's instructions, which tell its shape.
             history: The call's history; a Check-in's lists its Kinds.
             tools: The tools offered; never called.
+            message_instructions: The instructions made for this one call;
+                not used.
 
         Returns:
             The canned answer.

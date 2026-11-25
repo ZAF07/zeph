@@ -360,6 +360,7 @@ class CountingChatModel:
         instructions: str,
         history: list[ChatLine],
         tools: Sequence[ChatTool] = (),
+        message_instructions: str = "",
     ) -> ModelAnswer:
         """Generate an answer with the real chat model and count its tokens.
 
@@ -369,13 +370,14 @@ class CountingChatModel:
             instructions: What the model should be and do.
             history: The conversation so far, oldest first.
             tools: The tools the model may call.
+            message_instructions: The instructions made for this one call.
 
         Returns:
             The real chat model's answer.
         """
         recorded_tools = [self._recording(tool) for tool in tools]
         answer = self._chat_model.generate(
-            model, thinking, instructions, history, recorded_tools
+            model, thinking, instructions, history, recorded_tools, message_instructions
         )
         self._counter.add(model, answer)
         return answer

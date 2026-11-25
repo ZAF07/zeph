@@ -20,6 +20,7 @@ from companion.core.models import (
     StickerImage,
     ToolCallRecord,
     WebSearchResult,
+    join_instructions,
 )
 from companion.core.ports import ChatTool
 from companion.core.typing_keeper import TYPING_WAIT_PREFIX
@@ -341,10 +342,12 @@ class ChatModelCall:
     Attributes:
         model: The model name asked for.
         thinking: Whether the model was asked to think first.
-        instructions: The instructions given.
+        instructions: The instructions given, as the one text the model reads.
         history: The Conversation so far.
         tools: The tools the model was offered.
         tool_results: What each scripted tool call returned, in order.
+        fixed_instructions: The instructions given as the same for every call.
+        message_instructions: The instructions given as made for this one call.
     """
 
     model: str
@@ -353,6 +356,8 @@ class ChatModelCall:
     history: list[ChatLine]
     tools: list[ChatTool] = field(default_factory=list)
     tool_results: list[str] = field(default_factory=list)
+    fixed_instructions: str = ""
+    message_instructions: str = ""
 
 
 @dataclass(frozen=True)
@@ -894,6 +899,7 @@ class ScriptedChatModel:
         instructions: str,
         history: list[ChatLine],
         tools: Sequence[ChatTool] = (),
+        message_instructions: str = "",
     ) -> ModelAnswer:
         """Record the call and return the next scripted reply or answer.
 
@@ -903,17 +909,22 @@ class ScriptedChatModel:
             instructions: The instructions given.
             history: The Conversation so far.
             tools: The tools the model may call.
+            message_instructions: The instructions made for this one call.
 
         Returns:
             The next scripted reply, or Safeguard answer for a Safeguard call,
             with the same token counts for every call.
         """
+        fixed_instructions = instructions
+        instructions = join_instructions(fixed_instructions, message_instructions)
         call = ChatModelCall(
             model=model,
             thinking=thinking,
             instructions=instructions,
             history=history,
             tools=list(tools),
+            fixed_instructions=fixed_instructions,
+            message_instructions=message_instructions,
         )
         tool_calls: list[ToolCallRecord] = []
         if self.safeguard_prompt and instructions == self.safeguard_prompt:

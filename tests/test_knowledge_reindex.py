@@ -83,6 +83,7 @@ class EditingDuringDraftChatModel(ScriptedChatModel):
         instructions: str,
         history: list[ChatLine],
         tools: Sequence[ChatTool] = (),
+        message_instructions: str = "",
     ) -> ModelAnswer:
         while self.edit_while_drafting:
             service, document_id, text = self.edit_while_drafting.pop()

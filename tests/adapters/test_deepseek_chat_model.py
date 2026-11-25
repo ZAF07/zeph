@@ -11,6 +11,7 @@ from langchain_core.messages import (
 
 from companion.adapters.deepseek.chat_model import (
     MAX_TOOL_ROUNDS,
+    DeepSeekChatModel,
     UnsupportedModelError,
     answer_with_tools,
     build_client,
@@ -34,6 +35,31 @@ def test_history_becomes_langchain_messages_after_the_instructions() -> None:
         SystemMessage("You are Zeph."),
         HumanMessage("hi"),
         AIMessage("hey!"),
+    ]
+
+
+def test_the_two_instructions_are_sent_joined_with_the_fixed_part_first(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    chat = ScriptedLangChainModel(AIMessage("hey!"))
+    monkeypatch.setattr(
+        "companion.adapters.deepseek.chat_model.build_client",
+        lambda api_key, model, thinking: chat,
+    )
+
+    DeepSeekChatModel("key").generate(
+        model="deepseek/deepseek-v4-pro-0813",
+        thinking=False,
+        instructions="You are Zeph.",
+        history=[ChatLine(role=ChatRole.USER, text="hi")],
+        message_instructions="They just asked about work.",
+    )
+
+    assert chat.received == [
+        [
+            SystemMessage("You are Zeph.\n\nThey just asked about work."),
+            HumanMessage("hi"),
+        ]
     ]
 
 

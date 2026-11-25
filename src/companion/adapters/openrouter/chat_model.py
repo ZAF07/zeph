@@ -11,7 +11,14 @@ from companion.adapters.chat_tools import (
     to_tool_schema,
     unknown_tool_message,
 )
-from companion.core.models import ChatLine, ChatRole, ModelAnswer, ToolCallRecord
+from companion.core.models import (
+    INSTRUCTIONS_SEPARATOR,
+    ChatLine,
+    ChatRole,
+    ModelAnswer,
+    ToolCallRecord,
+    join_instructions,
+)
 from companion.core.ports import ChatTool
 
 logger = logging.getLogger(__name__)
@@ -30,19 +37,93 @@ class OpenRouterReplyError(RuntimeError):
     """Raised when OpenRouter answers without a reply, e.g. with an error body."""
 
 
+def model_maker(model: str) -> str:
+    """Name the provider that made a model.
+
+    Args:
+        model: The OpenRouter model name, e.g. "anthropic/claude-haiku-5.5".
+
+    Returns:
+        The part of the name before the "/", e.g. "anthropic".
+    """
+    return model.split("/")[0]
+
+
+def caches_prompts(model: str) -> bool:
+    """Say whether a model's instructions are marked for prompt caching.
+
+    Args:
+        model: The OpenRouter model name.
+
+    Returns:
+        True for Claude models (made by Anthropic), which cache only what is
+        marked; False for the rest, which get no marker.
+    """
+    return model_maker(model) == CLAUDE_MAKER
+
+
+def to_system_message(
+    model: str, instructions: str, message_instructions: str = ""
+) -> dict[str, Any]:
+    """Put a call's instructions into the system message.
+
+    A Claude model caches only what is marked, up to the marker. So its fixed
+    instructions go in a text part of their own carrying a `cache_control`
+    marker, and the tools (which come before them) and that part are read
+    from the cache on the next call. The instructions for this one call
+    follow in a second part with no marker. Empty fixed instructions get no
+    part, because Anthropic refuses an empty text part.
+
+    Any other model gets the two joined as plain text, the fixed
+    instructions first, so a provider that caches the same start of a
+    request by itself (e.g. DeepSeek) can.
+
+    Args:
+        model: The OpenRouter model name.
+        instructions: The instructions that stay the same from call to call.
+        message_instructions: The instructions made for this one call; "" if none.
+
+    Returns:
+        The system message.
+    """
+    if not caches_prompts(model) or not instructions:
+        return {
+            "role": "system",
+            "content": join_instructions(instructions, message_instructions),
+        }
+    parts: list[dict[str, Any]] = [
+        {
+            "type": "text",
+            "text": instructions,
+            "cache_control": {"type": "ephemeral"},
+        }
+    ]
+    if message_instructions:
+        parts.append(
+            {"type": "text", "text": INSTRUCTIONS_SEPARATOR + message_instructions}
+        )
+    return {"role": "system", "content": parts}
+
+
 def to_openrouter_messages(
-    instructions: str, history: list[ChatLine]
+    model: str,
+    instructions: str,
+    history: list[ChatLine],
+    message_instructions: str = "",
 ) -> list[dict[str, Any]]:
     """Turn instructions and Conversation history into Chat Completions messages.
 
     Args:
+        model: The OpenRouter model name, which decides how the instructions
+            are sent (see `to_system_message`).
         instructions: What the model should be and do.
         history: The Conversation so far, oldest first.
+        message_instructions: The instructions made for this one call; "" if none.
 
     Returns:
         A system message followed by one message per history line.
     """
-    messages: list[dict[str, Any]] = [{"role": "system", "content": instructions}]
+    messages = [to_system_message(model, instructions, message_instructions)]
     for line in history:
         role = "user" if line.role == ChatRole.USER else "assistant"
         messages.append({"role": role, "content": line.text})
@@ -154,56 +235,6 @@ def run_tool_call(
     return ToolCallRecord(name, arguments, result)
 
 
-def model_maker(model: str) -> str:
-    """Name the provider that made a model.
-
-    Args:
-        model: The OpenRouter model name, e.g. "anthropic/claude-haiku-5.5".
-
-    Returns:
-        The part of the name before the "/", e.g. "anthropic".
-    """
-    return model.split("/")[0]
-
-
-def caches_prompts(model: str) -> bool:
-    """Say whether a model's instructions are marked for prompt caching.
-
-    Args:
-        model: The OpenRouter model name.
-
-    Returns:
-        True for Claude models (made by Anthropic), which cache only what is
-        marked; False for the rest, which get no marker.
-    """
-    return model_maker(model) == CLAUDE_MAKER
-
-
-def with_instructions_marked_for_caching(
-    messages: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    """Mark the instructions so the provider caches them.
-
-    Args:
-        messages: The messages, starting with the system message, whose
-            content is the instructions as plain text.
-
-    Returns:
-        The same messages, with the instructions as one text part carrying
-        a `cache_control` marker. The given list is not changed. Empty
-        instructions are left as they are, because Anthropic refuses an
-        empty text part.
-    """
-    if not messages[0]["content"]:
-        return messages
-    instructions = {
-        "type": "text",
-        "text": messages[0]["content"],
-        "cache_control": {"type": "ephemeral"},
-    }
-    return [{**messages[0], "content": [instructions]}, *messages[1:]]
-
-
 def build_request(
     model: str,
     thinking: bool,
@@ -224,12 +255,10 @@ def build_request(
     A model that always thinks refuses to be told not to, so thinking off
     is left unsaid for it and it thinks only as much as it needs.
 
-    A Claude model gets its instructions marked for prompt caching.
-
     Args:
         model: The OpenRouter model name, sent as given.
         thinking: Whether the model should think before it answers.
-        messages: The messages so far.
+        messages: The messages so far, made for this model.
         tools: The tools offered; none sends no tools.
         may_call_tools: Whether the model may call a tool this round.
 
@@ -238,11 +267,7 @@ def build_request(
     """
     request: dict[str, Any] = {
         "model": model,
-        "messages": (
-            with_instructions_marked_for_caching(messages)
-            if caches_prompts(model)
-            else messages
-        ),
+        "messages": messages,
         "provider": {"only": [model_maker(model)]},
     }
     if thinking or model not in MODELS_THAT_ALWAYS_THINK:
@@ -323,17 +348,14 @@ def warn_if_paid_with_credits(model: str, body: dict[str, Any]) -> None:
 
 
 def log_cached_tokens(model: str, body: dict[str, Any]) -> None:
-    """Log how much of a Claude call's prompt came from the prompt cache.
+    """Log how much of a call's prompt came from the prompt cache.
 
-    Nothing is logged for a model whose instructions are not marked for
-    caching. A reply that says nothing about the cache counts as none.
+    A reply that says nothing about the cache counts as none.
 
     Args:
         model: The model that was asked.
         body: The reply body, whose usage holds the cached-token counts.
     """
-    if not caches_prompts(model):
-        return
     usage = body.get("usage") or {}
     details = usage.get("prompt_tokens_details") or {}
     logger.info(
@@ -394,6 +416,7 @@ class OpenRouterChatModel:
         instructions: str,
         history: list[ChatLine],
         tools: Sequence[ChatTool] = (),
+        message_instructions: str = "",
     ) -> ModelAnswer:
         """Generate the next reply, calling tools first if the model wants to.
 
@@ -401,9 +424,12 @@ class OpenRouterChatModel:
             model: The OpenRouter model name, sent as given, e.g.
                 "deepseek/deepseek-v4.1-flash-1017".
             thinking: Whether the model should think before it answers.
-            instructions: What the model should be and do (Persona and prompt).
+            instructions: What the model should be and do (Persona and
+                prompt): the part that stays the same from call to call.
             history: The Conversation so far, oldest first.
             tools: The tools the model may call; none by default.
+            message_instructions: The instructions made for this one call,
+                read after `instructions`; "" by default.
 
         Returns:
             The reply text, the tokens every round took, every tool call made
@@ -419,6 +445,6 @@ class OpenRouterChatModel:
                 self._api_key,
                 build_request(model, thinking, messages, tools, may_call_tools),
             ),
-            to_openrouter_messages(instructions, history),
+            to_openrouter_messages(model, instructions, history, message_instructions),
             tools,
         )

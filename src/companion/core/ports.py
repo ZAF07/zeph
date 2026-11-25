@@ -301,18 +301,27 @@ class ChatModel(Protocol):
         instructions: str,
         history: list[ChatLine],
         tools: Sequence[ChatTool] = (),
+        message_instructions: str = "",
     ) -> ModelAnswer:
         """Generate the next reply, calling tools first if the model wants to.
 
         A model that can't do the thinking asked for does the closest it can
         and logs a warning; it never fails for it.
 
+        The model reads `instructions` and then `message_instructions` as one
+        text (see `join_instructions`). They are given apart so a provider's
+        prompt cache can keep `instructions`, which stay the same from call
+        to call, and read them back on the next call.
+
         Args:
             model: The model to use, e.g. "deepseek/deepseek-v4.1-flash-1017".
             thinking: Whether the model should think before it answers.
-            instructions: What the model should be and do (Persona and prompt).
+            instructions: What the model should be and do (Persona and
+                prompt): the part that stays the same from call to call.
             history: The Conversation so far, oldest first.
             tools: The tools the model may call; none by default.
+            message_instructions: The instructions made for this one call,
+                read after `instructions`; "" by default.
 
         Returns:
             The reply text and the tokens it took.

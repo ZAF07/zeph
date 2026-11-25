@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 
 from companion.adapters.postgres.repositories import build_postgres_repositories
+from companion.core.models import join_instructions
 from companion.core.recent_messages import RecentMessages
 from companion.core.reply_tools import ReplyGuidance, ReplyOffer
 from companion.core.response_composition import (
@@ -14,6 +15,7 @@ from companion.core.response_composition import (
     MEMORY_HEADING,
     OPTIONAL_EXTRAS_HEADING,
     PRIORITY_ORDER,
+    ReplyInstructions,
     write_instructions,
 )
 from tests.fakes import (
@@ -42,15 +44,22 @@ def positions(instructions: str, *pieces: str) -> list[int]:
     return found
 
 
+def whole(instructions: ReplyInstructions) -> str:
+    """Join the two parts into the one text the model reads."""
+    return join_instructions(instructions.fixed, instructions.for_this_message)
+
+
 def test_the_sections_come_in_priority_order_with_the_clash_rule_once() -> None:
-    instructions = write_instructions(
-        voice="You are Zeph.",
-        response_prompt="Reply in short texts.",
-        boundaries=["Leave alone: their dog."],
-        asked_now=["You can search the web."],
-        guidance="Lead with a real read.",
-        memory="They work at a bank.",
-        optional_extras=["A Check-in is due."],
+    instructions = whole(
+        write_instructions(
+            voice="You are Zeph.",
+            response_prompt="Reply in short texts.",
+            boundaries=["Leave alone: their dog."],
+            asked_now=["You can search the web."],
+            guidance="Lead with a real read.",
+            memory="They work at a bank.",
+            optional_extras=["A Check-in is due."],
+        )
     )
 
     order = positions(
@@ -74,15 +83,57 @@ def test_the_sections_come_in_priority_order_with_the_clash_rule_once() -> None:
     assert instructions.count("the higher one wins") == 1
 
 
-def test_a_level_with_nothing_in_it_is_left_out_but_the_question_rule_stays() -> None:
+def test_the_fixed_part_ends_before_the_first_section() -> None:
     instructions = write_instructions(
         voice="You are Zeph.",
         response_prompt="Reply in short texts.",
-        boundaries=[""],
+        boundaries=["Leave alone: their dog."],
+        asked_now=["You can search the web."],
+        guidance="Lead with a real read.",
+        memory="They work at a bank.",
+        optional_extras=["A Check-in is due."],
+    )
+
+    assert instructions.fixed == (
+        f"You are Zeph.\n\nReply in short texts.\n\n{PRIORITY_ORDER}"
+    )
+    assert instructions.for_this_message.startswith(BOUNDARIES_HEADING)
+
+
+def test_the_fixed_part_is_the_same_whatever_the_message_needs() -> None:
+    full = write_instructions(
+        voice="You are Zeph.",
+        response_prompt="Reply in short texts.",
+        boundaries=["Leave alone: their dog."],
+        asked_now=["You can search the web."],
+        guidance="Lead with a real read.",
+        memory="They work at a bank.",
+        optional_extras=["A Check-in is due."],
+    )
+    bare = write_instructions(
+        voice="You are Zeph.",
+        response_prompt="Reply in short texts.",
+        boundaries=[],
         asked_now=[],
         guidance="",
         memory="",
-        optional_extras=["", ""],
+        optional_extras=[],
+    )
+
+    assert full.fixed == bare.fixed
+
+
+def test_a_level_with_nothing_in_it_is_left_out_but_the_question_rule_stays() -> None:
+    instructions = whole(
+        write_instructions(
+            voice="You are Zeph.",
+            response_prompt="Reply in short texts.",
+            boundaries=[""],
+            asked_now=[],
+            guidance="",
+            memory="",
+            optional_extras=["", ""],
+        )
     )
 
     assert BOUNDARIES_HEADING not in instructions
@@ -117,6 +168,8 @@ def test_the_composer_puts_each_input_at_its_level(engine: Engine) -> None:
     )
 
     [call] = chat_model.calls
+    assert call.fixed_instructions.endswith(PRIORITY_ORDER)
+    assert call.message_instructions.startswith(BOUNDARIES_HEADING)
     order = positions(
         call.instructions,
         "They cancelled deleting their data.",

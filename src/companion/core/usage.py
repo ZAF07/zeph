@@ -13,6 +13,7 @@ from companion.core.models import (
     PhotoImage,
     PlatformSettings,
     UserSnapshot,
+    join_instructions,
 )
 from companion.core.platform_settings import (
     DAILY_LIMIT_REPLY,
@@ -188,17 +189,24 @@ class UsageRecordingChatModel:
         instructions: str,
         history: list[ChatLine],
         tools: Sequence[ChatTool] = (),
+        message_instructions: str = "",
     ) -> str:
         """Generate an answer for a User and record the call.
+
+        The Model Call Log keeps the two instructions as the one text the
+        model reads.
 
         Args:
             snapshot: The User the answer is for.
             step: Which step the answer is for.
             model: The model to use, e.g. "deepseek/deepseek-v4.1-flash-1017".
             thinking: Whether the model should think before it answers.
-            instructions: What the model should be and do.
+            instructions: What the model should be and do: the part that
+                stays the same from call to call.
             history: The Conversation so far, oldest first.
             tools: The tools the model may call; none by default.
+            message_instructions: The instructions made for this one call,
+                read after `instructions`; "" by default.
 
         Returns:
             The answer text.
@@ -207,7 +215,12 @@ class UsageRecordingChatModel:
             Exception: Whatever the chat model raises, once it is recorded.
         """
         request = ModelCallRequest(
-            step, model, thinking, instructions, tuple(history), tools
+            step,
+            model,
+            thinking,
+            join_instructions(instructions, message_instructions),
+            tuple(history),
+            tools,
         )
         return self._ask_and_record(
             snapshot,
@@ -218,6 +231,7 @@ class UsageRecordingChatModel:
                 instructions=instructions,
                 history=history,
                 tools=tools,
+                message_instructions=message_instructions,
             ),
         )
 
