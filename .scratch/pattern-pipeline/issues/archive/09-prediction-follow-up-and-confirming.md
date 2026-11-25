@@ -57,4 +57,4 @@ Evidence (25 Nov 2026, worktree stack on 3010/8010, real model (`deepseek-v4.1-f
 ## Completion
 
 - Completed: 2026-11-25
-- Commit: <merge commit, filled in after the merge>
+- Commit: 2bf6396c (merge of `pattern-09-prediction-follow-up` into main; work commits 5d359df, 5290657, 296fdcc, 1fa7ff9, 2249b25)
