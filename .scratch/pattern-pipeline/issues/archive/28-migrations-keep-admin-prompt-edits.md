@@ -73,6 +73,28 @@ Design for many Users and more than one backend: the helper runs inside the migr
 
 **Not done: which prompts on prod differ from today's seed.** This needs a read of the production database, so it waits for the owner's go-ahead. Note that after 0100 and 0101 ran, the prompts those migrations dropped now hold the seed text, so a comparison can show which prompts are edited today but not what was already lost.
 
+### 25 Nov 2026: prod compared with the seed (read only, owner's go-ahead)
+
+Read over `ssh zeph-deploy`: only each text setting's hash, length and `updated_at`, no prompt text. Prod runs main as of 9d1af553 (deployed 24 Nov) and is at migration **0078**. So 0073 and 0078 have run there, but 0080, 0081, 0084, 0086, 0088, 0089, 0092, 0094, 0095, 0096, 0098, 0100 and 0101 have **not**. The "Why" above says they have; that was wrong for these.
+
+Five stored prompts match no version the seed file ever had (all 123 checked), so they are an Admin's edits:
+
+| Setting | Stored | Last saved | Dropped by a waiting migration? |
+| --- | --- | --- | --- |
+| `reply_plan_prompt` | 25,895 characters | 23 Nov | **Yes**: 0080, 0081, 0084, 0086, 0088, 0095, 0100 |
+| `persona` | 8,508 | 20 Nov | No |
+| `persona_outlook` | 4,741 | 20 Nov | No |
+| `response_prompt` | 6,110 | 24 Nov | No |
+| `understanding_prompt` | 14,583 | 23 Nov | No |
+
+- **The next deploy will wipe the edited `reply_plan_prompt`** and load the seed's (14,337 characters), with no warning, because those migrations use the plain delete.
+- `curiosity_keeping_prompt`, `pattern_keeping_prompt` and `reply_settings_instructions` are also dropped by waiting migrations, but on prod they still equal the seed, so nothing is lost.
+- The seed has not changed since the deploy for the other four edited prompts, so they miss nothing.
+- What 0073 and 0078 wiped earlier can't be seen: the edits above were saved after they ran.
+- Four stored settings are in no seed any more (`memory_retrieval_prompt`, `sticker_added_reply`, `sticker_already_in_library_reply`, `telegram_already_linked_reply`): leftovers, harmless.
+
+Owner to decide before the next deploy: save a copy of prod's `reply_plan_prompt` and merge it by hand after, or change the waiting migrations to use the helper (they have not run on prod).
+
 ## Completion
 
 - Completed: 2026-11-25
