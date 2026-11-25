@@ -98,4 +98,4 @@ Why the scripts failed, all reasons in the script: the new case's "not with my h
 ## Completion
 
 - Completed: 2026-11-25
-- Commit: <merge commit>
+- Commit: 0f5119eb (merge of pattern-32-whole-pipeline-eval-can-be-trusted into main; work commits a7326f49, 8e468e80 and bd0701bc)
