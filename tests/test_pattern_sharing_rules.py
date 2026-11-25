@@ -18,7 +18,11 @@ from companion.core.models import (
     ReactionToPattern,
     Relationship,
 )
-from companion.core.observations import not_gathered_pattern_types, plan_reactions
+from companion.core.observations import (
+    names_one_of,
+    not_gathered_pattern_types,
+    plan_reactions,
+)
 from companion.core.pattern_scoring import reaction_points
 from companion.core.pattern_sharing import (
     SharedCheck,
@@ -223,6 +227,15 @@ def test_gathering_off_stops_new_observations_for_patterns_they_disagreed_with()
         BELONG,
         WORTH,
     }
+
+
+def test_an_observation_names_a_pattern_type_first_or_second() -> None:
+    unclear = story(second=WORTH)
+
+    assert names_one_of(unclear, frozenset({BELONG}))
+    assert names_one_of(unclear, frozenset({WORTH}))
+    assert not names_one_of(story(), frozenset({WORTH}))
+    assert not names_one_of(story(), frozenset())
 
 
 def test_where_it_shows_is_put_in_plain_words() -> None:

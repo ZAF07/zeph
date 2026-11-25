@@ -1294,7 +1294,7 @@ def format_reply_guidance(
     )
 
 
-def pattern_section(
+def format_pattern_for_reply(
     form: ReplyPlanForm,
     offered: PatternToShare | None,
     contested: Sequence[ContestedPattern],
@@ -1596,7 +1596,7 @@ class ReplyPlanService:
                 format_curiosities_for_reply(form.curiosities, need, asked_why),
                 past_days,
                 describe_open_needs_for_reply(agenda),
-                pattern_section(form, pattern_to_share, contested),
+                format_pattern_for_reply(form, pattern_to_share, contested),
             ),
             asks_a_question=asks_another_question or picked.asks_a_question,
             may_send_photo=may_send_photo(understanding.form, form),

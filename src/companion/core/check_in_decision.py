@@ -82,7 +82,7 @@ class CheckInFacts:
     has_due_curiosity: bool
     curiosity_check_ins_this_week: int
     last_sent_at: datetime | None
-    pattern_waiting: bool = False
+    pattern_waiting: bool
 
 
 @dataclass(frozen=True)

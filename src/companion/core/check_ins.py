@@ -964,8 +964,10 @@ class CheckInService:
         curiosity_check_ins = repositories.check_ins.count_curiosity_check_ins_since(
             user_ids, now - CURIOSITY_CHECK_INS_COUNTED_OVER
         )
-        with_pattern_ready_long = repositories.patterns.list_users_with_ready_since(
-            user_ids, now - rules.pattern_share_wait
+        with_pattern_ready_long = (
+            repositories.patterns.list_users_with_pattern_ready_by(
+                user_ids, now - rules.pattern_share_wait
+            )
         )
         patterns_shared = repositories.patterns.count_shared_since(
             user_ids, now - SHARES_COUNTED_OVER
@@ -1061,7 +1063,7 @@ class CheckInService:
         """
         user = snapshot.user
         pattern_to_share = (
-            self._pattern_sharing.to_offer_in_check_in(snapshot)
+            self._pattern_sharing.pattern_to_offer_in_check_in(snapshot)
             if any(kind.shares_pattern for kind in plan.kinds)
             else None
         )
@@ -1131,7 +1133,7 @@ class CheckInService:
         if was_sent and curiosity is not None:
             self._repositories.curiosities.mark_raised([curiosity.id], None, now)
         if was_sent and pattern_to_share is not None and decision.message:
-            self._pattern_sharing.settle(
+            self._pattern_sharing.record_if_shared(
                 snapshot, pattern_to_share, [decision.message], ShareVia.CHECK_IN, None
             )
         if (

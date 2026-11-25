@@ -25,7 +25,6 @@ from companion.core.models import (
     Power,
     Prediction,
     ShareVia,
-    SignStrength,
     UserSnapshot,
 )
 from companion.core.observations import is_situational
@@ -36,6 +35,7 @@ from companion.core.pattern_scoring import (
     reaction_points,
     score_observations,
     scoring_numbers,
+    sign_strengths_of,
     situation_of,
 )
 from companion.core.platform_settings import (
@@ -451,7 +451,7 @@ class PatternSharing:
         self._chat_model = chat_model
         self._clock = clock
 
-    def to_offer(
+    def pattern_to_offer(
         self, snapshot: UserSnapshot, struggling: bool
     ) -> PatternToShare | None:
         """Find the ready Pattern a reply may share, if any.
@@ -470,7 +470,9 @@ class PatternSharing:
             return None
         return self._ready_longest(snapshot, ready_by=None)
 
-    def to_offer_in_check_in(self, snapshot: UserSnapshot) -> PatternToShare | None:
+    def pattern_to_offer_in_check_in(
+        self, snapshot: UserSnapshot
+    ) -> PatternToShare | None:
         """Find the ready Pattern a Check-in may share, if any.
 
         Args:
@@ -489,7 +491,7 @@ class PatternSharing:
         waited_since = self._clock.now() - snapshot.settings.get(PATTERN_SHARE_WAIT)
         return self._ready_longest(snapshot, ready_by=waited_since)
 
-    def contested(self, snapshot: UserSnapshot) -> list[ContestedPattern]:
+    def contested_patterns(self, snapshot: UserSnapshot) -> list[ContestedPattern]:
         """List the Patterns the User disagreed with, for the Reply Plan.
 
         Args:
@@ -522,7 +524,7 @@ class PatternSharing:
             for number, pattern in enumerate(known, start=1)
         ]
 
-    def settle(
+    def record_if_shared(
         self,
         snapshot: UserSnapshot,
         to_share: PatternToShare,
@@ -575,9 +577,11 @@ class PatternSharing:
         """Make contested each shared Pattern the User pushed back on.
 
         Runs when a Conversation ends, after the tagging step saved how the
-        User took the Patterns they were told. The User is locked, like
-        scoring, and the move is logged with the Pattern's score, which
-        counts its reactions.
+        User took the Patterns they were told. Every shared Pattern with a
+        push-back kept is looked at, whichever Conversation it was read
+        from, so one missed by a failed run is caught by the next. The
+        User is locked, like scoring, and the move is logged with the
+        Pattern's score, which counts its reactions.
 
         Args:
             snapshot: The User whose Conversation it was.
@@ -591,8 +595,7 @@ class PatternSharing:
             pushed_back_ids = {
                 reaction.pattern_id
                 for reaction in reactions
-                if reaction.conversation_id == conversation_id
-                and reaction.reaction == PatternReaction.PUSHED_BACK
+                if reaction.reaction == PatternReaction.PUSHED_BACK
             }
             rejected = [
                 pattern
@@ -605,14 +608,9 @@ class PatternSharing:
             now = self._clock.now()
             today = users_today(user.time_zone, now)
             numbers = scoring_numbers(settings)
-            sign_strengths: dict[tuple[str, str], SignStrength] = {
-                (entry.pattern_type.id, sign.id): sign.strength
-                for entry in self._pattern_catalog.catalog()
-                for sign in (
-                    *entry.pattern_type.signs,
-                    *entry.pattern_type.signs_against,
-                )
-            }
+            sign_strengths = sign_strengths_of(
+                entry.pattern_type for entry in self._pattern_catalog.catalog()
+            )
             observations = repositories.observations.list_for_user(user.id)
             changed, moves = [], []
             for pattern in rejected:

@@ -1589,7 +1589,7 @@ class PatternRepository(Protocol):
         """
         ...
 
-    def list_users_with_ready_since(
+    def list_users_with_pattern_ready_by(
         self, user_ids: Sequence[UUID], ready_by: datetime
     ) -> set[UUID]:
         """Find which of many Users have a Pattern ready since a time, in one query.

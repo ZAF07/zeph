@@ -180,8 +180,10 @@ class ReplyService:
             self._woven_check_ins.kinds_to_offer(snapshot, understanding.form),
             patterns,
             self._agenda.read(snapshot, understanding.form.struggling),
-            self._pattern_sharing.to_offer(snapshot, understanding.form.struggling),
-            self._pattern_sharing.contested(snapshot),
+            self._pattern_sharing.pattern_to_offer(
+                snapshot, understanding.form.struggling
+            ),
+            self._pattern_sharing.contested_patterns(snapshot),
         )
         plan = planned.reply_plan.form
         attempt.raise_if_dropped()
@@ -244,7 +246,7 @@ class ReplyService:
         self._curiosity_raiser.record_reaction(due, plan.curiosity_taken)
         self._curiosity_raiser.mark_raised(message.conversation_id, plan.curiosities)
         if planned.pattern_to_share is not None and planned.shape is not None:
-            shared = self._pattern_sharing.settle(
+            shared = self._pattern_sharing.record_if_shared(
                 snapshot,
                 planned.pattern_to_share,
                 reply.texts,

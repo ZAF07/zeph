@@ -43,6 +43,7 @@ from companion.core.pattern_scoring import (
     observation_points,
     score_observations,
     scoring_numbers,
+    sign_strengths_of,
     state_bars,
     state_for,
 )
@@ -901,11 +902,7 @@ class ReadyKeeper:
         pattern_types = {entry.pattern_type.id: entry.pattern_type for entry in catalog}
         now = self._clock.now()
         weighing = Weighing(
-            sign_strengths={
-                (pattern_type.id, sign.id): sign.strength
-                for pattern_type in pattern_types.values()
-                for sign in (*pattern_type.signs, *pattern_type.signs_against)
-            },
+            sign_strengths=sign_strengths_of(pattern_types.values()),
             numbers=scoring_numbers(settings),
             today=users_today(user.time_zone, now),
         )

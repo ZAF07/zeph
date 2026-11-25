@@ -1,4 +1,4 @@
-from collections.abc import Hashable, Mapping, Sequence
+from collections.abc import Hashable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date, datetime
 from uuid import UUID, uuid4
@@ -12,6 +12,7 @@ from companion.core.models import (
     PatternMoveCause,
     PatternReaction,
     PatternState,
+    PatternType,
     PlatformSettings,
     ReactionToPattern,
     ReadyCheck,
@@ -161,6 +162,25 @@ def observation_points(
     age_in_days = max((today - observation.day).days, 0)
     fading: float = 0.5 ** (age_in_days / numbers.half_life_days)
     return points * fading
+
+
+def sign_strengths_of(
+    pattern_types: Iterable[PatternType],
+) -> dict[tuple[str, str], SignStrength]:
+    """Read each sign's strength from some Pattern Types.
+
+    Args:
+        pattern_types: The Pattern Types, as the Pattern Catalog holds them now.
+
+    Returns:
+        The strength of every sign for and against, by Pattern Type ID and
+        sign ID.
+    """
+    return {
+        (pattern_type.id, sign.id): sign.strength
+        for pattern_type in pattern_types
+        for sign in (*pattern_type.signs, *pattern_type.signs_against)
+    }
 
 
 def reaction_points(
@@ -621,11 +641,9 @@ class PatternScorer:
         patterns = repositories.patterns.list_of_pattern_types(user.id)
         if not observations and not patterns:
             return
-        sign_strengths = {
-            (entry.pattern_type.id, sign.id): sign.strength
-            for entry in self._pattern_catalog.catalog()
-            for sign in (*entry.pattern_type.signs, *entry.pattern_type.signs_against)
-        }
+        sign_strengths = sign_strengths_of(
+            entry.pattern_type for entry in self._pattern_catalog.catalog()
+        )
         now = self._clock.now()
         planned = plan_pattern_moves(
             user.id,

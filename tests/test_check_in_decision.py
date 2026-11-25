@@ -54,6 +54,13 @@ WONDERING = CheckInKind(
     sort_order=2,
     raises_curiosity=True,
 )
+NOTICED = CheckInKind(
+    id=uuid4(),
+    name="Something I've noticed",
+    description="A Pattern Zeph has been waiting to tell them",
+    sort_order=3,
+    shares_pattern=True,
+)
 GAPS = {
     CheckInFrequency.WEEKLY: timedelta(hours=168),
     CheckInFrequency.FEW_TIMES_A_WEEK: timedelta(hours=48),
@@ -66,7 +73,7 @@ RULES = CheckInRules(
     quiet_gap=QUIET_GAP,
     ignore_threshold=3,
     curiosity_check_ins_per_week=1,
-    kinds=(HELLO, PHOTO_LOOK_BACK, WONDERING),
+    kinds=(HELLO, PHOTO_LOOK_BACK, WONDERING, NOTICED),
     pattern_share_wait=timedelta(days=5),
     patterns_shared_per_week=1,
 )
@@ -136,6 +143,7 @@ def facts(
         "has_due_curiosity": False,
         "curiosity_check_ins_this_week": 0,
         "last_sent_at": None,
+        "pattern_waiting": False,
     }
     return CheckInFacts(snapshot=snapshot, **(defaults | changes))
 
@@ -366,6 +374,12 @@ ASK_MODEL = AskModel(
             NOW,
             replace(ASK_MODEL, kinds=(HELLO, WONDERING)),
             id="a due Curiosity: the wondering Kind offered",
+        ),
+        pytest.param(
+            facts(pattern_waiting=True),
+            NOW,
+            replace(ASK_MODEL, kinds=(HELLO, NOTICED)),
+            id="a ready Pattern that waited: the Kind that shares one offered",
         ),
         pytest.param(
             facts(has_due_curiosity=True, admin_off=(Feature.CURIOSITIES,)),

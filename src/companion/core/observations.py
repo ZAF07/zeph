@@ -384,7 +384,7 @@ def not_gathered_pattern_types(
             Pattern they disagreed with.
 
     Returns:
-        None while their switch is on; with it off, the Pattern Types of
+        Empty while their switch is on; with it off, the Pattern Types of
         the Patterns they disagreed with, before or in this Conversation.
     """
     if gathering_enabled:
@@ -398,6 +398,22 @@ def not_gathered_pattern_types(
         pattern.pattern_type_id
         for pattern in told
         if pattern.state == PatternState.CONTESTED or pattern.id in pushed_back_ids
+    )
+
+
+def names_one_of(observation: Observation, pattern_type_ids: frozenset[str]) -> bool:
+    """Say whether an Observation names one of some Pattern Types.
+
+    Args:
+        observation: The Observation.
+        pattern_type_ids: The Pattern Types' IDs.
+
+    Returns:
+        True when its first or second Pattern Type is among them.
+    """
+    return (
+        observation.pattern_type_id in pattern_type_ids
+        or observation.second_pattern_type_id in pattern_type_ids
     )
 
 
@@ -1161,8 +1177,10 @@ class PatternTagger:
         Used when stored evidence is found to fit a Pattern Type after its
         Conversation ended. The same rules and checks as `tag_from` apply.
         An Observation already kept from that Conversation (the same
-        Pattern Type, sign and quote) is not kept twice. Exclusions are
-        left as they are: they say what applies now, not back then.
+        Pattern Type, sign and quote) is not kept twice, and none is kept
+        for a Pattern the User disagreed with while they have gathering on
+        those turned off. Exclusions are left as they are: they say what
+        applies now, not back then, and no reaction is read.
 
         Args:
             snapshot: The User whose Conversation it was.
@@ -1197,10 +1215,16 @@ class PatternTagger:
             )
             if observation.conversation_id == conversation_id
         }
+        not_gathered = not_gathered_pattern_types(
+            list(self._patterns_told(snapshot, pattern_types).values()),
+            [],
+            snapshot.user.contested_gathering_enabled,
+        )
         new = [
             observation
             for observation in tagged.planned.kept
             if repeat_key(observation) not in already_kept
+            and not names_one_of(observation, not_gathered)
         ]
         self._repositories.observations.add_many(new)
         return new
