@@ -13,8 +13,8 @@ from companion.adapters.evals.stand_ins import (
     CountingChatModel,
     CountingPhotoViewer,
     EvalAccounts,
-    IdleScheduler,
     InlineUserWorkQueue,
+    ManualScheduler,
     ManualTimer,
     RecordingChatChannel,
     RunningClock,
@@ -45,6 +45,7 @@ from companion.core.models import (
 from companion.core.move_outcomes import MoveOutcomeKeeper
 from companion.core.observations import PatternTagger, PlannedObservations
 from companion.core.pattern_catalog import PatternCatalogService
+from companion.core.platform_settings import CONVERSATION_QUIET_GAP
 from companion.core.ports import ChatModel, Embedder, PhotoViewer, Repositories
 from companion.core.post_conversation import DayMemoryWriter
 from companion.core.usage import UsageLimiter, UsageRecordingChatModel
@@ -177,8 +178,9 @@ class InProcessCompanion:
     """The whole app built on the Eval database, driven through its own API.
 
     Messages go through the real Telegram webhook, with the recording chat
-    channel, no web search, no scheduler and a clock that runs with real
-    time. The Model Call Log keeps full content, as in every Eval run.
+    channel, no web search, a scheduler that ticks only when asked and a
+    clock that runs with real time. The Model Call Log keeps full content, as
+    in every Eval run.
     """
 
     def __init__(
@@ -212,6 +214,7 @@ class InProcessCompanion:
         self._web_search = CannedWebSearch()
         self._accounts = EvalAccounts()
         self._timer = ManualTimer()
+        self._scheduler = ManualScheduler()
         self._clock = RunningClock(datetime.now(UTC))
         self._repositories = build_postgres_repositories(engine)
         self._user_id: UUID | None = None
@@ -231,7 +234,7 @@ class InProcessCompanion:
             knowledge_vector_store=PgvectorKnowledgeVectorStore(engine),
             web_search=self._web_search,
             clock=self._clock,
-            scheduler=IdleScheduler(),
+            scheduler=self._scheduler,
             timer=self._timer,
             work_queue=InlineUserWorkQueue(),
             telegram_webhook_secret=WEBHOOK_SECRET,
@@ -663,6 +666,53 @@ class InProcessCompanion:
             200,
             "Pressing Got it on the Pattern noticing notice",
         )
+
+    def turn_pattern_sharing_on(self) -> None:
+        """Turn Pattern noticing, exploring and sharing on for the made-up User.
+
+        An Admin switches each on for them, in the order they need each
+        other, and they press "Got it" on the Pattern noticing notice.
+
+        Raises:
+            EvalSetupError: If no User is connected.
+        """
+        self.turn_pattern_noticing_on()
+        for feature in ("pattern_exploring", "pattern_sharing"):
+            require_status(
+                self._client.put(
+                    f"/api/admin/users/{self._user_id}/features/{feature}",
+                    json={"switch": "on"},
+                    headers=self._admin_headers(),
+                ),
+                200,
+                f"Turning {feature} on",
+            )
+
+    def end_conversation(self) -> None:
+        """Let the made-up User's Conversation go quiet and run the scheduled work.
+
+        The clock moves on by the Conversation quiet gap, then the work the
+        scheduler runs on every tick runs once, as in the live app: the
+        Conversation ends and every Conversation-end step runs on it.
+
+        Raises:
+            EvalSetupError: If no User is connected, they have no
+                Conversation, or it wasn't ended and processed.
+        """
+        if self._user_id is None:
+            raise EvalSetupError("Connect the made-up User first")
+        conversations = self._repositories.conversations
+        settings = self._repositories.platform_settings.load()
+        self._clock.move(settings.get(CONVERSATION_QUIET_GAP))
+        self._scheduler.run_tick()
+        conversation = conversations.get_latest_for_user(self._user_id)
+        if conversation is None:
+            raise EvalSetupError("The made-up User has no Conversation")
+        if conversation.ended_at is None or any(
+            unprocessed.id == conversation.id
+            for unprocessed in conversations.list_ended_unprocessed()
+        ):
+            raise EvalSetupError("The Conversation-end steps didn't finish")
 
     def tag_observations(
         self, conversation_id: UUID, touched: Sequence[LifeThread]

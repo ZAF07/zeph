@@ -1,7 +1,7 @@
 # Pattern Evals: what they can and can't show
 
 How the Pattern pipeline (`docs/pattern-pipeline/README.md`) is tested, and how
-far to trust each test. Read this before reading a Tagging or whole-pipeline
+far to trust each test. Read this before reading a Tagging or Whole-pipeline
 Eval score as "Zeph's Patterns are right".
 
 **Evals cost money.** Every run calls the real model. Before any run, remind
@@ -60,18 +60,53 @@ added later.
     never marks theirs situational. Those cases expect the step to say
     nothing, or a sign against.
 
-### 3. The whole-pipeline Eval (later, issue 19)
+### 3. The Whole-pipeline Eval
 
-Made-up Users with hidden true Patterns talk over several Conversations; the
-Eval checks which Patterns became ready and how many were true. Target: at
-least 70% of Ready Patterns true, starting with 5 Users.
+It has its own Eval kind (`whole_pipeline`, in `evals/README.md`). A case is a
+made-up User with hidden true Pattern Types and a script of several
+Conversations, with the clock moved between them. Every text goes through
+the real reply path and every Conversation ends through the real
+Conversation-end steps, with Pattern noticing, exploring and sharing on. The
+result lists each Pattern that became ready or was shared and whether it is
+a true one, and the true ones missed with where they stopped. A case passes
+when every ready Pattern is a true one. Target for a run: at least 70% of
+ready Patterns true. The seed has 5 made-up Users: one true Pattern with a
+"not with my partner", two true look-alikes, none, one true whose look-alike
+is not, and one true beside a single story of its look-alike.
 
-- **Shows:** the pieces work together: tagging, scoring and the gate move
-  the right Patterns and leave the rest.
-- **Can't show:** truth. A model playing a User and a model tagging them
-  tend to agree: the player writes the Pattern the way a model expects it to
-  sound, and the tagger hears it. So this layer catches breakage, not
-  whether Patterns are true or new to real people.
+- **Shows:** the pieces work together: replies, Life Threads, tagging,
+  scoring, the Agenda, the gate and sharing move the right Patterns and
+  leave the rest. It catches a change that breaks the chain (nothing ever
+  becomes ready) or opens it too wide (a Pattern becomes ready from one
+  story, or a look-alike does).
+- **Can't show:**
+  - Truth. A model playing a User and a model tagging them tend to agree:
+    the player writes the Pattern the way a model expects it to sound, and
+    the tagger hears it. Here the player is Claude, who drafted every text
+    with the Pattern Catalog open. So this layer catches breakage, not
+    whether Patterns are true or new to real people.
+  - That 70% means anything for real Users. Five scripted Users give a
+    handful of ready Patterns, so one more or one fewer moves the share a
+    lot. Read each case, not only the share.
+  - Missed Patterns as failures. A case with nothing ready passes, so a
+    run can be all passes and find nothing: read "true Patterns found". A
+    Conversation-end step that fails is logged and skipped, as in the live
+    app, so scoring or the gate breaking part-way shows only as fewer
+    Patterns found (the case is an Error only when the Conversation isn't
+    processed at all or the tagging step didn't run).
+  - A share for the whole run on the Dashboard. The terminal report prints
+    it against the 70% target; the Dashboard shows each case's Patterns and
+    "true Patterns found", and the share is left to add up.
+  - A User who answers back. The texts are a script: they don't answer
+    Zeph's questions, so an aimed Curiosity, a Thought Experiment or a
+    shared Pattern never gets a real answer. The counter-test is met by a
+    scripted "it doesn't happen with…" story, not by Zeph asking.
+  - Sharing by Check-in, Prediction follow-ups, or anything over weeks: the
+    made-up User has Check-ins off and a script covers about two weeks, so
+    fading and the wait before a Check-in shares are never reached.
+  - A steady result. Zeph's replies and the tagging vary from run to run,
+    so the same case can find a Pattern one day and miss it the next. Use
+    Repeats before trusting a change.
 
 ## What only real use can show
 
@@ -93,6 +128,43 @@ replaces that.
 - **A psychologist's review.** Before Patterns are shared widely, someone
   trained reads the catalog, the signs and a sample of tagged Observations,
   and says where they are wrong or harmful.
+
+## First Whole-pipeline results (25 Nov 2026)
+
+Three case runs, on the live settings unless said:
+
+- `ordinary-fortnight` (no true Pattern): nothing became ready. Pass.
+- `folds-with-sister-and-friends` (CONF.AVOID.BELONG): it became ready after
+  5 Conversations. Pass, 1 of 1 true found.
+- The same case with "Situations to be ready" at 9: it stayed suspected,
+  stopped by situations. Pass, 0 of 1 found.
+
+So the chain works end to end and a gate number moves the result as it
+should. This says nothing yet about the 70% target: the look-alike cases
+(`goes-quiet-and-says-fine`, `cannot-stand-waiting`, `never-arrives`) have
+not been run, and no case has had a Pattern shared.
+
+## How to run the Whole-pipeline Eval
+
+It costs far more than the other Evals: every text is a full reply (the
+Safeguard, Understanding, Reply Plan and reply calls) and every Conversation
+a full Conversation end (about ten calls). Remind the owner and show the
+estimate before any run. The shortest case (`ordinary-fortnight`, 12 texts in
+4 Conversations) used 208,000 tokens in and 76,000 out, S$0.20, and took 8
+minutes (25 Nov 2026). Until a case has run once its estimate is a rough
+300,000 tokens in and 110,000 out. The 5 cases together pass the Eval run
+token limit (1,000,000 to start; Admin → Evals → Model Prices), and the run
+then stops between Conversations, so raise the limit first or run one case.
+
+Dashboard: Admin → Evals → New run, tick Whole pipeline (or open it and pick
+single cases), read the estimate, Start run. Each result shows "Became ready
+or shared" and "True Patterns missed". Add a Variant to try another gate
+number or prompt on the same Users. Terminal: `make eval
+EVALS=whole_pipeline`, or `make eval CASES=ordinary-fortnight`; a plain
+`make eval` leaves this Eval out. Cases are edited on Admin → Evals → Cases
+→ Whole pipeline; the seed is
+`src/companion/seed/evals/cases/whole_pipeline.yaml`, drafted by Claude for
+the owner to correct.
 
 ## How to run the Tagging Eval
 

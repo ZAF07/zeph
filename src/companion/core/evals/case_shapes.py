@@ -1630,6 +1630,82 @@ TAGGING_SHAPE = FormShape(
     ]
 )
 
+WHOLE_PIPELINE_SHAPE = FormShape(
+    [
+        ShapeSection(
+            "When",
+            "The time the made-up User's story starts.",
+            [
+                ShapeField(
+                    "now",
+                    "When the story starts",
+                    "In UTC, which is also the User's time zone. The first "
+                    "Conversation starts its days after this.",
+                    FieldKind.DATE_TIME,
+                    required=True,
+                ),
+            ],
+        ),
+        ShapeSection(
+            "Hidden true Patterns",
+            "What is true of the made-up User. The app is never told. The "
+            "case passes only when every Pattern that became ready or was "
+            "shared is one of these; true ones never found are counted as "
+            "missed and don't fail it.",
+            [
+                text_list_field(
+                    "true_pattern_types",
+                    "True Pattern Types",
+                    "Their IDs in the Pattern Catalog, e.g. CONF.AVOID.BELONG. "
+                    "Leave empty when no Pattern may become ready.",
+                    "Pattern Type ID",
+                ),
+            ],
+        ),
+        ShapeSection(
+            "Conversations",
+            "The script, in order. Every text goes through the real reply "
+            "path, and when a Conversation is over the clock moves past the "
+            "Conversation quiet gap and every Conversation-end step runs, as "
+            "in the live app. Pattern noticing, exploring and sharing are on "
+            "for the made-up User.",
+            [
+                group_list_field(
+                    "conversations",
+                    "Conversations",
+                    "A Pattern needs evidence from several Conversations and "
+                    "situations before it can be ready, so write several.",
+                    "Conversation",
+                    [
+                        ShapeField(
+                            "days_later",
+                            "Days after the one before",
+                            "How far the clock moves before this Conversation "
+                            "starts; for the first one, after the story's "
+                            "start. 0 starts it right after the one before "
+                            "ended.",
+                            FieldKind.WHOLE_NUMBER,
+                            required=True,
+                            minimum=0,
+                            default=1,
+                        ),
+                        text_list_field(
+                            "messages",
+                            "The User's texts",
+                            "What they send, in order, a minute apart. Zeph's "
+                            "replies are the real ones, so write texts that "
+                            "make sense whatever Zeph says.",
+                            "Text",
+                            required=True,
+                        ),
+                    ],
+                    required=True,
+                ),
+            ],
+        ),
+    ]
+)
+
 CASE_SHAPES: dict[EvalName, FormShape] = {
     EvalName.SAFEGUARD: SAFEGUARD_SHAPE,
     EvalName.PERSONA: PERSONA_SHAPE,
@@ -1640,4 +1716,5 @@ CASE_SHAPES: dict[EvalName, FormShape] = {
     EvalName.MOVE_OUTCOME: MOVE_OUTCOME_SHAPE,
     EvalName.DAY_SUMMARY: DAY_SUMMARY_SHAPE,
     EvalName.TAGGING: TAGGING_SHAPE,
+    EvalName.WHOLE_PIPELINE: WHOLE_PIPELINE_SHAPE,
 }

@@ -4,7 +4,7 @@ The evals measure how the Companion behaves with the real LLM. They are not
 tests: they cost money and their results vary a little from run to run. They
 never run in `make check`.
 
-There are nine:
+There are ten:
 
 - **Safeguard**: about 30 labelled messages (clear crises, subtle crises and
   false alarms like "this traffic is killing me"), and photos of test images
@@ -90,6 +90,23 @@ There are nine:
   who, Life Thread, context) and each one dropped with why. What this Eval
   can and can't show: `docs/pattern-evals/README.md`. A case makes one
   tagging call (two if the first answer can't be read).
+- **Whole pipeline**: each case is a made-up User with hidden true Pattern
+  Types and a script of several Conversations (the User's texts, and how
+  many days after the one before each starts). Pattern noticing, exploring
+  and sharing are on for them. Every text goes through the real reply path,
+  a minute apart. When a Conversation is over, the clock moves past the
+  Conversation quiet gap and the scheduled work runs once, so every
+  Conversation-end step runs as in the live app; then the clock moves on to
+  the next one. The app is never told which Pattern Types are true. A case
+  passes only when every Pattern that became ready or was shared is one of
+  the true ones (read from the log of Pattern moves, so one that went back
+  still counts); with none ready it passes. True ones never ready are
+  counted as missed, with where they stand and the ready check that last
+  stopped them, and don't fail it. No judge. The run's target is at least
+  70% of ready Patterns true. It costs far more than any other Eval (a full
+  reply per text and a full Conversation end per Conversation), so
+  `make eval` runs it only when it is named. What it can and can't show:
+  `docs/pattern-evals/README.md`.
 
 ## Where they run
 
@@ -105,8 +122,11 @@ through the real Telegram webhook and reply path, with the real DeepSeek
 model (for replies and for looking at photos) and the real fastembed
 embedder. The chat channel only records what Zeph sends and serves the test
 images, web search finds only the case's made-up pages (nothing, for most
-cases) and no scheduled Check-ins run (a case can still make one due for a
-reply to weave in), always, whatever the adapter settings say, so an Eval
+cases) and the scheduler never ticks by itself, so no scheduled Check-ins
+run (a case can still make one due for a reply to weave in; a
+Whole-pipeline case runs the scheduled work by hand after each
+Conversation, for a made-up User with Check-ins off), always, whatever the
+adapter settings say, so an Eval
 never reaches a real chat or spends Tavily credits. The live Needs, with
 their ruled-out Moves, and the live Moves are written in too, each changed
 by the Variant's Setting Overrides. The Model Call Log in the Eval database keeps full content.
@@ -133,7 +153,8 @@ From the terminal, with the stack running (`make up`, or `make restart` in a
 worktree, which runs its own stack and Eval database):
 
 ```sh
-make eval                                # all nine Evals
+make eval                                # every Eval but Whole pipeline
+make eval EVALS=whole_pipeline           # the costly one, only when named
 make eval EVALS=safeguard                # one Eval
 make eval EVALS=persona,understanding    # several
 make eval CASES=reminded-of-sister       # single cases, by key
@@ -175,6 +196,13 @@ Safeguard, Understanding and the calls after a Conversation (off for the
 reply and the judge). A whole run (2026-11-15) used about 382,000 tokens in
 and 44,000 out (the reasoning counts as output) and took about 9 minutes.
 Each Understanding call took about 3.3 seconds and 1,800 tokens in, 480 out.
+
+The Whole-pipeline Eval is far dearer than the rest. Its shortest case (12
+texts in 4 Conversations) used 208,000 tokens in and 76,000 out, S$0.20, in
+8 minutes (2026-11-25); the rough figure for a case that never ran is
+300,000 in and 110,000 out. The 5 cases together go over the Eval run token
+limit of 1,000,000, so raise the limit first or run single cases
+(`make eval CASES=ordinary-fortnight`). Read the estimate before every run.
 
 ## Reading the results
 
@@ -239,6 +267,16 @@ time, the Judge's reason for each rule, and for a failed case what happened.
   (quote not word for word, sign or Pattern Type not in the catalog, a tag
   off its list, no context or who, a repeat). Many drops for one reason
   point at the prompt.
+- **Whole pipeline**: the score line reads "4 of 5 ready Patterns true (80%,
+  target 70%); 4 of 7 true Patterns found". Each case lists the Patterns
+  that became ready or were shared, PASS for a true one and FAIL for one
+  that isn't, then a `missed` line per true Pattern never ready, with where
+  it stands and the ready check that last stopped it ("suspected, stopped by
+  situations"). The Dashboard shows "Became ready or shared" and "True
+  Patterns missed"; a failed case's "What happened" holds every
+  Conversation with Zeph's real replies. A case with nothing ready passes,
+  so read the "true Patterns found" count too: a run where nothing ever
+  becomes ready is all passes and finds nothing.
   "called no tool" on a clear request usually means Zeph asked "want me
   to?" instead of acting.
 
@@ -269,6 +307,10 @@ Run it after changing any of these:
   tools
 - the photo description prompt or photo model
 - the Pattern tagging prompt or model, or any Pattern Type file (Tagging)
+- anything in the Pattern pipeline that the Tagging Eval and the tests can't
+  see working together: the scoring numbers, the ready gate's bars, the
+  other-side prompt, the Agenda, sharing (Whole pipeline; costly, so not
+  after every change)
 - the Understanding prompt or model, the Needs, or the Life Thread,
   Curiosity and closeness settings
 - the embedding model
@@ -289,7 +331,7 @@ the test images in `src/companion/seed/evals/images/`. On start-up the
 backend adds every case whose key (its `id`) isn't in the database yet, with
 its images. It never changes a case already there, edited or archived, so
 editing a seed file doesn't change an existing case, and keys must be unique
-across all nine files. Each file explains its own format at the top; the
+across all ten files. Each file explains its own format at the top; the
 backend rewrites it into the form's shape when it reads it.
 
 - `safeguard.yaml`: add an `id`, a `kind` (`clear_crisis`, `subtle_crisis` or
@@ -329,6 +371,14 @@ backend rewrites it into the form's shape when it reads it.
   there is nothing to tag). Only CONF.AVOID.BELONG can be situational today
   (strangers, or someone above them). The quote must be the User's own
   words, so put the telling line in a User message.
+
+- `whole_pipeline.yaml`: add an `id`, the `true_pattern_types` (leave out
+  when none is true) and the `conversations`, each with `days_later` and the
+  User's `messages`. Zeph's replies are the real ones, so write texts that
+  make sense whatever Zeph says. A Pattern needs three situations, two
+  Conversations, 300 points and an Observation against before it can be
+  ready, so a true one needs at least three strong stories with different
+  people and one "it doesn't happen with…".
 
 Test images are small and made for the purpose (rendered text and shapes, no
 real people or real card numbers). Keep new ones small, too.

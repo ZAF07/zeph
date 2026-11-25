@@ -9,7 +9,7 @@ from companion.core.models import Move, Need
 
 
 class EvalName(StrEnum):
-    """One of the nine Evals."""
+    """One of the ten Evals."""
 
     SAFEGUARD = "safeguard"
     PERSONA = "persona"
@@ -20,6 +20,19 @@ class EvalName(StrEnum):
     MOVE_OUTCOME = "move_outcome"
     DAY_SUMMARY = "day_summary"
     TAGGING = "tagging"
+    WHOLE_PIPELINE = "whole_pipeline"
+
+
+EVALS_RUN_ONLY_WHEN_NAMED = frozenset({EvalName.WHOLE_PIPELINE})
+
+
+def evals_run_by_default() -> list["EvalName"]:
+    """List the Evals a run with no Eval named runs.
+
+    Returns:
+        Every Eval but the costly ones, which run only when named.
+    """
+    return [name for name in EvalName if name not in EVALS_RUN_ONLY_WHEN_NAMED]
 
 
 class EvalRunState(StrEnum):

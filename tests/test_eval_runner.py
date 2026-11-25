@@ -21,10 +21,19 @@ from companion.adapters.postgres.repositories import (
     PostgresNeedRepository,
     PostgresPlatformSettingsRepository,
 )
-from companion.core.evals.models import EvalCase, EvalName, EvalRunState
+from companion.core.evals.models import (
+    EvalCase,
+    EvalName,
+    EvalRunState,
+    evals_run_by_default,
+)
 from companion.core.evals.runner import EvalRunner
 from companion.core.models import Feature
-from companion.eval_terminal import build_eval_run_service, start_and_watch_run
+from companion.eval_terminal import (
+    build_eval_run_service,
+    read_evals,
+    start_and_watch_run,
+)
 from companion.main import SEED_DIR
 from tests.conftest import shared_postgres_url
 from tests.eval_run_helpers import (
@@ -49,9 +58,13 @@ from tests.fakes import (
     understanding_answer,
 )
 from tests.telegram_helpers import owner_headers
+from tests.test_life_threads import thread_keeping_answer
 from tests.test_moves import stored_rule_outs
 from tests.test_moves_that_ask_a_question import tick_asks_a_question
+from tests.test_pattern_states import BELONG, MEI_STORY, WORK, WORK_STORY
+from tests.test_pattern_tagging import MEI, TEXT
 from tests.test_post_conversation import processing_answer
+from tests.test_ready_gate import JUN_STORY, LATER_TEXT, NOT_WITH_SAM
 from tests.test_understanding import seeded_needs
 
 PERSONA_CASE = EvalCase(
@@ -2887,3 +2900,260 @@ def test_a_tagging_case_fails_when_a_kept_context_line_says_he_or_she(
             '"She agreed to help her sister Mei move again." says she, her',
         ),
     ]
+
+
+BELONGING_CASE = EvalCase(
+    key="folds-with-mei",
+    eval=EvalName.WHOLE_PIPELINE,
+    content={
+        "now": "2026-11-02T19:30:00",
+        "true_pattern_types": [BELONG],
+        "conversations": [
+            {"days_later": 0, "messages": [TEXT]},
+            {"days_later": 3, "messages": [LATER_TEXT]},
+        ],
+    },
+)
+
+
+def script_two_conversations_that_make_belonging_ready(
+    chat_model: ScriptedChatModel,
+) -> None:
+    """Script a first Conversation with two stories, then a third and a counter-test."""
+    chat_model.script("That sounds like a long night.", "Different with Sam, then.")
+    chat_model.script_processing(
+        processing_answer(summary="Said yes to Mei again.", mood="sad"),
+        processing_answer(summary="Went along with Jun.", mood="neutral"),
+    )
+    chat_model.script_thread_keeping(thread_keeping_answer([MEI, WORK]))
+    chat_model.script_pattern_tagging(
+        tagging_answer(MEI_STORY, WORK_STORY), tagging_answer(JUN_STORY, NOT_WITH_SAM)
+    )
+
+
+def test_a_whole_pipeline_case_runs_every_conversation_and_lists_ready_patterns(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, BELONGING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.WHOLE_PIPELINE)
+    script_two_conversations_that_make_belonging_ready(chat_model)
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "pass", result
+    assert [
+        (check["name"], check["passed"], check["detail"]) for check in result["checks"]
+    ] == [(BELONG, True, "ready, one of the true ones")]
+    assert result["whole_pipeline"] == {
+        "patterns": [
+            {
+                "pattern_type": BELONG,
+                "name": "Softening disagreement to protect belonging",
+                "is_true": True,
+                "shared": False,
+                "state": "ready",
+            }
+        ],
+        "missed": [],
+        "true_count": 1,
+        "conversations": 2,
+    }
+    assert [call.history[-1].text for call in chat_model.calls[-2:]] == [
+        TEXT,
+        LATER_TEXT,
+    ]
+    assert len(chat_model.pattern_tagging_calls) == 2
+    assert len(chat_model.other_side_calls) == 1
+    trace = client.get(
+        f"/api/admin/eval-runs/{run['id']}/results/{result['id']}", headers=admin
+    ).json()
+    steps = [call["step"] for call in trace["calls"]]
+    assert steps.count("reply") == 2
+    assert steps.count("pattern_tagging") == 2
+    assert "pattern_other_side" in steps
+
+
+def test_a_whole_pipeline_case_fails_when_a_ready_pattern_is_not_a_true_one(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    wrong_truth = EvalCase(
+        key="moves-the-goal",
+        eval=EvalName.WHOLE_PIPELINE,
+        content={**BELONGING_CASE.content, "true_pattern_types": ["ACH.GOAL.MOVE"]},
+    )
+    add_cases(engine, wrong_truth)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.WHOLE_PIPELINE)
+    script_two_conversations_that_make_belonging_ready(chat_model)
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "fail"
+    assert [
+        (check["name"], check["passed"], check["detail"]) for check in result["checks"]
+    ] == [(BELONG, False, "ready, not a true one")]
+    assert result["whole_pipeline"]["patterns"][0]["is_true"] is False
+    assert result["whole_pipeline"]["missed"] == [
+        {
+            "pattern_type": "ACH.GOAL.MOVE",
+            "name": "Moving the goal as soon as they reach it",
+            "state": None,
+            "blocked_by": None,
+        }
+    ]
+    notes = result["notes"]
+    assert "ACH.GOAL.MOVE: never noticed" in notes
+    assert "Conversation 1, 02 Nov 2026:" in notes
+    assert "Conversation 2, 05 Nov 2026:" in notes
+    assert f"Person: {LATER_TEXT}" in notes
+    assert "Zeph: Different with Sam, then." in notes
+
+
+def test_a_whole_pipeline_case_with_nothing_ready_passes_and_counts_the_missed(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, BELONGING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.WHOLE_PIPELINE)
+    chat_model.script("Mm.", "Mm.")
+    chat_model.script_processing(
+        processing_answer(summary="Said yes to Mei again.", mood="sad"),
+        processing_answer(summary="Went along with Jun.", mood="neutral"),
+    )
+    chat_model.script_thread_keeping(thread_keeping_answer([MEI, WORK]))
+    chat_model.script_pattern_tagging(tagging_answer(MEI_STORY, WORK_STORY))
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "pass", result
+    assert [
+        (check["name"], check["passed"], check["detail"]) for check in result["checks"]
+    ] == [("nothing ready", True, "no Pattern became ready; 1 true missed")]
+    assert result["whole_pipeline"]["patterns"] == []
+    assert result["whole_pipeline"]["missed"] == [
+        {
+            "pattern_type": BELONG,
+            "name": "Softening disagreement to protect belonging",
+            "state": "suspected",
+            "blocked_by": "situations",
+        }
+    ]
+
+
+def test_a_variant_s_override_changes_what_becomes_ready_in_a_whole_pipeline_case(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, BELONGING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(
+        client,
+        admin,
+        EvalName.WHOLE_PIPELINE,
+        variants=[{}, {"pattern_ready_situations": 9}],
+    )
+    script_two_conversations_that_make_belonging_ready(chat_model)
+    script_two_conversations_that_make_belonging_ready(chat_model)
+
+    runner.work_next_run()
+
+    results = {
+        result["variant"]: result["whole_pipeline"]
+        for result in open_run(client, admin, run["id"])["results"]
+    }
+    assert [pattern["pattern_type"] for pattern in results["A"]["patterns"]] == [BELONG]
+    assert results["B"]["patterns"] == []
+    assert results["B"]["missed"][0]["blocked_by"] == "situations"
+
+
+def test_a_whole_pipeline_case_naming_an_unknown_pattern_type_is_an_error(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    runner: EvalRunner,
+) -> None:
+    unknown = EvalCase(
+        key="unknown-truth",
+        eval=EvalName.WHOLE_PIPELINE,
+        content={**BELONGING_CASE.content, "true_pattern_types": ["NOT.A.TYPE"]},
+    )
+    add_cases(engine, unknown)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.WHOLE_PIPELINE)
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "error"
+    assert result["error"] == "Not in the Pattern Catalog: NOT.A.TYPE"
+    assert result["whole_pipeline"] is None
+
+
+def test_a_whole_pipeline_case_stops_between_conversations_once_over_the_limit(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, BELONGING_CASE)
+    set_token_limit(engine, 1)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.WHOLE_PIPELINE)
+    script_two_conversations_that_make_belonging_ready(chat_model)
+
+    runner.work_next_run()
+
+    stopped = open_run(client, admin, run["id"])
+    assert stopped["state"] == "stopped_over_limit"
+    [result] = stopped["results"]
+    assert result["outcome"] == "error"
+    assert result["error"] == (
+        "Stopped after 1 of 2 Conversations: the run went over its token limit."
+    )
+
+
+def test_the_terminal_runs_the_whole_pipeline_eval_only_when_it_is_named(
+    engine: Engine, chat_model: ScriptedChatModel, runner: EvalRunner, clock: FakeClock
+) -> None:
+    add_cases(engine, BELONGING_CASE)
+    service = build_eval_run_service(engine, clock)
+    script_two_conversations_that_make_belonging_ready(chat_model)
+    lines: list[str] = []
+
+    passed = start_and_watch_run(
+        service,
+        read_evals("whole_pipeline"),
+        [],
+        lines.append,
+        lambda _: runner.work_next_run(),
+    )
+
+    assert passed is True
+    assert lines[0].startswith("Estimate: 1 case, about S$")
+    assert any(line.startswith("PASS whole_pipeline/folds-with-mei") for line in lines)
+    assert (
+        "Whole pipeline: 1 of 1 ready Patterns true (100%, target 70%); "
+        "1 of 1 true Patterns found"
+    ) in lines
+    assert EvalName.WHOLE_PIPELINE not in read_evals("")
+    assert EvalName.WHOLE_PIPELINE not in evals_run_by_default()

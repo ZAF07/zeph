@@ -230,11 +230,40 @@ class TaggingResultResponse(BaseModel):
     expected: list[ExpectedObservationResponse]
 
 
+class ReadyPatternResponse(BaseModel):
+    """A Pattern that became ready or was shared in a Whole-pipeline case."""
+
+    pattern_type: str
+    name: str
+    is_true: bool
+    shared: bool
+    state: str | None
+
+
+class MissedPatternResponse(BaseModel):
+    """A true Pattern a Whole-pipeline case never made ready, and where it stopped."""
+
+    pattern_type: str
+    name: str
+    state: str | None
+    blocked_by: str | None
+
+
+class WholePipelineResultResponse(BaseModel):
+    """Which Patterns a Whole-pipeline case made ready, against the true ones."""
+
+    patterns: list[ReadyPatternResponse]
+    missed: list[MissedPatternResponse]
+    true_count: int
+    conversations: int
+
+
 class CaseResultResponse(BaseModel):
     """One case's result in a run.
 
     `day_summary` only for a checked Day Summary case, `tagging` only for a
-    checked Tagging case.
+    checked Tagging case, `whole_pipeline` only for a checked Whole-pipeline
+    case.
     """
 
     id: str
@@ -252,6 +281,7 @@ class CaseResultResponse(BaseModel):
     finished_at: datetime
     day_summary: DaySummaryResultResponse | None = None
     tagging: TaggingResultResponse | None = None
+    whole_pipeline: WholePipelineResultResponse | None = None
 
 
 class EvalRunDetailsResponse(EvalRunResponse):
@@ -594,6 +624,23 @@ def to_tagging_result(result: CaseResult) -> TaggingResultResponse | None:
     return TaggingResultResponse(**facts["tagging"])
 
 
+def to_whole_pipeline_result(result: CaseResult) -> WholePipelineResultResponse | None:
+    """Read which Patterns a Whole-pipeline case made ready from its result's facts.
+
+    Args:
+        result: The Case Result.
+
+    Returns:
+        The ready or shared Patterns and the true ones missed; None for
+        another Eval's case, or a Whole-pipeline case that couldn't be
+        checked.
+    """
+    facts = result.result.facts
+    if result.eval != EvalName.WHOLE_PIPELINE or "whole_pipeline" not in facts:
+        return None
+    return WholePipelineResultResponse(**facts["whole_pipeline"])
+
+
 def to_case_result_response(result: CaseResult) -> CaseResultResponse:
     """Turn a Case Result into its API shape.
 
@@ -627,6 +674,7 @@ def to_case_result_response(result: CaseResult) -> CaseResultResponse:
         finished_at=result.finished_at,
         day_summary=to_day_summary_result(result),
         tagging=to_tagging_result(result),
+        whole_pipeline=to_whole_pipeline_result(result),
     )
 
 

@@ -61,6 +61,62 @@ describe("CaseResultCard", () => {
     expect(within(card).queryByText("What happened")).not.toBeInTheDocument();
   });
 
+  it("shows a Whole-pipeline case's ready Patterns, the missed ones and what happened", () => {
+    renderWithQueries(
+      <ul>
+        <CaseResultCard
+          runId="run-1"
+          result={{
+            ...passedResult,
+            case_key: "folds-with-sister-and-friends",
+            eval: "whole_pipeline",
+            outcome: "fail",
+            checks: [
+              {
+                name: "APPR.GIVE.NEEDED",
+                passed: false,
+                detail: "ready, not a true one",
+                group: "",
+              },
+            ],
+            notes: ["True Patterns missed:", "Person: ugh"],
+            whole_pipeline: {
+              patterns: [
+                {
+                  pattern_type: "APPR.GIVE.NEEDED",
+                  name: "Saying yes and over-giving to feel needed",
+                  is_true: false,
+                  shared: false,
+                  state: "ready",
+                },
+              ],
+              missed: [
+                {
+                  pattern_type: "CONF.AVOID.BELONG",
+                  name: "Softening disagreement to protect belonging",
+                  state: "suspected",
+                  blocked_by: "situations",
+                },
+              ],
+              true_count: 1,
+              conversations: 5,
+            },
+          }}
+        />
+      </ul>,
+    );
+
+    const card = screen.getByRole("listitem", {
+      name: "folds-with-sister-and-friends",
+    });
+    expect(within(card).getByText("Whole pipeline")).toBeInTheDocument();
+    expect(within(card).getByText("Not true")).toBeInTheDocument();
+    expect(within(card).getByText("Missed")).toBeInTheDocument();
+    expect(within(card).getByText("Too few situations")).toBeInTheDocument();
+    expect(within(card).queryByText(/1 check/)).not.toBeInTheDocument();
+    expect(within(card).getByText("What happened")).toBeInTheDocument();
+  });
+
   it("shows another Eval's checks as before", () => {
     renderWithQueries(
       <ul>

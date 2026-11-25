@@ -789,4 +789,60 @@ If there is nothing, the section holds one line: "Nothing found."
 - **Kind:** bug, already known
 - **What:** `compare.cjs` hangs on Clerk's probe requests; a copy that blocks them was used and deleted. `Memories--tab-summaries` (0.75%), `M-Memories` (0.91%) and `M-Memories--tab-quotes` (0.64%) fail on main too.
 
+## 19 — A whole-pipeline Eval (2026-11-25)
+
+### A full run of the 5 cases stops at the starting token limit
+
+- **Kind:** failure
+- **What:** the Eval run token limit is 1,000,000. Real case runs used 284,000 (12 texts), 415,000 and 445,000 tokens (16 texts), so the 5 seeded cases need about 2,000,000 and the run stops between Conversations as Stopped over limit.
+- **Impact:** the first full score against the 70% target can't be had until the limit is raised.
+- **Suggested fix:** raise the limit on Admin → Evals → Model Prices to about 3,000,000 before a full run, or run single cases. A full run is about S$1.40 and over an hour.
+
+### Three of the five cases have never been run
+
+- **Kind:** risk
+- **What:** only `ordinary-fortnight` and `folds-with-sister-and-friends` were run with the real model (the owner chose the smallest proof). The look-alike cases (`goes-quiet-and-says-fine`, `cannot-stand-waiting`, `never-arrives`) are untested drafts.
+- **Impact:** nothing is known yet about look-alikes in the whole pipeline, or about the 70% target. A script may also simply not reach ready.
+- **Suggested fix:** run them one at a time (about S$0.30 each) and correct the scripts.
+
+### A case with nothing ready passes
+
+- **Kind:** risk
+- **What:** the issue's rule is "passes when every ready Pattern is one of the true ones", so a broken pipeline that makes nothing ready is all passes. A Conversation-end step that fails is also logged and skipped (`core/post_conversation.py`), so it shows only as fewer Patterns found.
+- **Impact:** a green run can hide a dead pipeline.
+- **Suggested fix:** read "true Patterns found" in the report; consider failing a run that finds none of its true Patterns.
+
+### No Pattern was shared in any run
+
+- **Kind:** risk
+- **What:** in the real run the true Pattern was ready at the end and was never shared: the last Conversation's two texts didn't lead the Reply Plan to share it. The made-up User has Check-ins off and the script ends a day later, so sharing by Check-in is never reached.
+- **Impact:** the "shared" half of the result has only been seen in tests of the result code, not in a real run.
+- **Suggested fix:** add a case whose last Conversations invite it ("anything you've noticed about me?"), or one with Check-ins on and a week's wait.
+
+### The scripted User never answers Zeph
+
+- **Kind:** risk
+- **What:** the texts are written into the case, so they don't answer Zeph's aimed Curiosities or Thought Experiments. The counter-test is met by a scripted "it doesn't happen with…" story.
+- **Impact:** Explorations and the Agenda are run but not really tested here.
+- **Suggested fix:** if that matters, add a model that plays the User from a hidden brief; it costs more and varies more.
+
+### The result panel has no reference file
+
+- **Kind:** risk
+- **What:** `web/src/components/WholePipelinePatterns.tsx` reuses the parts of the Tagging result, but its words ("Became ready or shared", "Got as far as", "Stands now", "True Patterns missed", "Stopped by", "True", "Not true", "Missed") are in no `web/design/reference` file, and fixture mode has no sample for `/admin/evals/cases/whole_pipeline/new`. No design file was changed.
+- **Impact:** no pixel test covers it; it was checked by eye at 1280 and 390.
+- **Suggested fix:** the owner adds a reference (like `AdminEvalTaggingCase`) or approves the words.
+
+### The Dashboard shows no share for the whole run
+
+- **Kind:** risk
+- **What:** only the terminal report prints "N of M ready Patterns true (X%, target 70%)". A Dashboard run shows each case's Patterns, so the share must be added up by hand.
+- **Suggested fix:** add a line to the run page once a reference shows where.
+
+### `make eval` no longer runs every Eval
+
+- **Kind:** risk
+- **What:** with no Eval named it leaves out Whole pipeline (`evals_run_by_default` in `core/evals/models.py`), because of its cost. Someone who expects "all Evals" gets nine of ten.
+- **Suggested fix:** none needed if the owner agrees; `evals/README.md` says so.
+
 ## Comments
