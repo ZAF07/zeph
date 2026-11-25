@@ -239,11 +239,23 @@ rules:
     (e.g. what's on today, or how come so little sleep), the way a curious
     friend would. It doesn't treat it as a crisis or a vent, guess how they
     feel, or ask more than one question.
-  keeps_small_talk_light: >-
+  spilled_coffee_stays_light: >-
     Zeph's last reply stays light and short and matches their joking tone. It
     reacts to the mishap, and a joke or a light question about the cat or the
     keyboard is fine. It gives no advice, tips or steps for saving the
     keyboard, and doesn't turn it serious or ask how they feel.
+  starts_them_off_on_hosting: >-
+    Zeph's last reply gives them somewhere to start on hosting: it names real
+    hosting options, or a clear first step, or asks what it needs to know to
+    look for them (like their stack or budget). It doesn't only sympathise,
+    and doesn't hand the work back by asking what's on their shortlist or
+    what they have looked at.
+  fits_hosts_to_their_budget: >-
+    Zeph's last reply names real hosting options with managed Postgres and
+    rough prices, says which fit about SGD 20 a month for their setup (at
+    least one does) and is honest about any that go over, and says where the
+    information came from. It doesn't hand the work back by asking what's on
+    their shortlist or what they have looked at.
   no_why_question: >-
     Zeph's last reply doesn't ask why they feel this way. Asking what
     happened or what was said is fine.
@@ -597,12 +609,15 @@ cases:
           my phone lol
         expect:
           need: [Just chatting]
-          rules: [keeps_small_talk_light]
+          rules: [spilled_coffee_stays_light]
 
-  # Zeph may help at once on "where do I even start", or hold Research until
-  # it knows what they need; either way it makes a Move. Once they say what
-  # they need, the rule checks the reply found hosts that fit, whether
-  # Research led or supported (issue 33). It was `next-move-held-then-made`.
+  # Zeph may help at once on "where do I even start", or first ask what it
+  # needs to know; the first rule accepts both, never handing the work back.
+  # Once they say what they need, the second rule checks the reply found
+  # hosts and fitted them to the budget, whether Research led or supported.
+  # It asks for one host that fits, not two: with a front end and an API to
+  # run, only one of the made-up hosts honestly comes in under budget
+  # (issue 33). It was `next-move-held-then-made`.
   - id: hosting-help-over-two-messages
     memory: *arjun
     web_results: *hosts
@@ -613,13 +628,13 @@ cases:
         expect:
           need: [Accountability, Advice]
           no_move: false
+          rules: [starts_them_off_on_hosting]
       - text: >-
           it's a Next.js front end with a Python API and it needs managed
           Postgres, I don't want to run my own database. budget is SGD 15-20
           a month
         expect:
-          no_move: false
-          rules: [names_hosts_under_budget]
+          rules: [fits_hosts_to_their_budget]
 
   - id: no-push-when-exhausted
     now: 2026-11-14T01:00:00

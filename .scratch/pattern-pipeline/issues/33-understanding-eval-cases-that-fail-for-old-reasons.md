@@ -49,7 +49,7 @@ Two more cases were only flaky and are left alone: `knowledge-for-a-reflective-q
 - 1, small talk: change the case. A light Move is fine.
 - 2, hosting: rewrite the case. Researching at once is fine.
 - 3, strong mood: no pick between the two choices. The owner said instead: use production's prompts from now on, for this and for 1 and 2, and allowed read-only access to production. So all six were first run on production's prompts, and 3 was settled from that run (below).
-- Eval money: up to S$1.00 in total without asking again. Spent: **S$0.45**.
+- Eval money: up to S$1.00 in total without asking again. Spent: **S$0.63**.
 
 **How it was run**
 
@@ -69,6 +69,14 @@ Two more cases were only flaky and are left alone: `knowledge-for-a-reflective-q
 | `3b8dc54e-3f78-4d46-b5b0-379b435d2bb6` | the three rewritten | 3 of 3 | 81,595 / 7,241 | S$0.042 |
 | `1a2256f5-31e9-40f7-b2dc-1ee55becb588` | the three rewritten | 3 of 3 | 87,999 / 6,620 | S$0.044 |
 | `7a565d1a-b2de-4bc6-9b64-e9e6093af636` | the three rewritten | 3 of 3 | 81,338 / 5,930 | S$0.040 |
+| `55be3db3-e09b-4351-8301-b381e94c0bb9` | hosting case, first rule added after review | fail | 42,085 / 4,067 | S$0.022 |
+| `603ac6ba-7c6b-48a4-bfe4-3d7b1ebee2fb` | hosting case, first rule added after review | pass | 36,050 / 4,249 | S$0.020 |
+| `d2bbfd96-b6cd-43e6-ad3a-adf3075429b2` | hosting case, first rule added after review | pass | 55,091 / 4,959 | S$0.029 |
+| `c0baee59-897e-47a6-84bc-b361d311a96a` | hosting case, first rule added after review | fail | 56,062 / 4,399 | S$0.028 |
+| `13200de3-1a29-4aa4-97ed-9db5032d39b6` | hosting case, as merged | pass | 35,854 / 3,959 | S$0.020 |
+| `3bc1be2c-eefa-482d-aff7-eafb760fb447` | hosting case, as merged | pass | 41,793 / 4,101 | S$0.022 |
+| `634a4cfe-dcde-4ad5-a0e9-656684cdf5bc` | hosting case, as merged | pass | 42,347 / 4,589 | S$0.023 |
+| `febb3550-8fdf-47b3-835c-2759891a2c2c` | hosting case, as merged | pass | 48,788 / 4,242 | S$0.025 |
 
 The runs live in this worktree's database, which is deleted at teardown. The reports were read first; what matters is below.
 
@@ -76,16 +84,24 @@ The runs live in this worktree's database, which is deleted at teardown. The rep
 
 | # | Case | As it was | Now | What was done |
 | --- | --- | --- | --- | --- |
-| 1 | `small-talk-makes-no-move` → `small-talk-stays-light` | 0 of 4 (led with Get curious every time) | 4 of 4 | Rewritten. It no longer expects no Move. It expects Just chatting and the new judge rule `keeps_small_talk_light`: light and short, a joke or light question is fine, no tips for the keyboard, not turned serious. |
-| 2 | `next-move-held-then-made` → `hosting-help-over-two-messages` | 0 of 4 (no Research held; it researched at once) | 3 of 4 | Rewritten. First Message: Advice or Accountability and a lead Move. Second Message: a lead Move and the rule `names_hosts_under_budget`, so Research may lead or support. The one fail is the rule doing its job: the reply named one host under budget and one over it. |
+| 1 | `small-talk-makes-no-move` → `small-talk-stays-light` | 0 of 4 (led with Get curious every time) | 4 of 4 | Rewritten. It no longer expects no Move. It expects Just chatting and the new judge rule `spilled_coffee_stays_light`: light and short, a joke or light question is fine, no tips for the keyboard, not turned serious. (The rule was named `keeps_small_talk_light` in those 4 runs; only the name changed after.) |
+| 2 | `next-move-held-then-made` → `hosting-help-over-two-messages` | 0 of 4 (no Research held; it researched at once) | 4 of 4 as merged | Rewritten. First Message: Advice or Accountability, a lead Move and the new rule `starts_them_off_on_hosting` (names hosts, gives a first step, or asks what it needs to know; never hands the work back). Second Message: the new rule `fits_hosts_to_their_budget`, so Research may lead or support. See "The hosting case, three tries" below. |
 | 3 | `strong-mood-unknown-cause` | 0 of 4 ("ask why" never set; led with Get curious) | 4 of 4 | `asked_why: true` removed; the rule `gentle_probe` stays. The reply asked what is behind the mood 8 of 8 times. Production's prompt says "Do not ask why reflexively", so the Reply Plan uses Get curious for this, and the case now checks what the person gets, not which of the two ways was used. |
 | 4 | `check-in-not-now-while-asking-for-help` | 4 of 4 | not run again | Left as it is. The Check-in was never woven in. |
 | 5 | `no-knowledge-for-a-vent` | 3 of 4 | not run again | Left as it is. No breathing tip in any try. The one fail was a silver lining ("the mistake wasn't anywhere near as bad as the moment made it feel"), a real fault in the reply. |
 | 6 | `guess-checked-gently` | 4 of 4 | not run again | Left as it is. Every reply asked "Where's home for her these days?" and never said Singapore. |
 
+**The hosting case, three tries**
+
+1. First rewrite (runs `03f0935a` to `7a565d1a`): 3 of 4. The second Message used the old rule `names_hosts_under_budget`.
+2. After the review a rule was added to the first Message, which could hardly fail before (runs `55be3db3` to `c0baee59`): 2 of 4. The new first rule passed 4 of 4. Both fails were the old second rule. It asks for two hosts under SGD 20, but with a front end and an API to run, only Railway honestly fits on the made-up pages (Render comes to about SGD 26). So a reply that said "Render goes over your budget" failed for being honest. The other fail was a real fault: the reply gave prices with no source.
+3. As merged (runs `13200de3` to `febb3550`): 4 of 4. The second rule is now `fits_hosts_to_their_budget`: real hosts with prices and sources, at least one that fits, honest about any that go over.
+
+The case `hosting-research` still uses `names_hosts_under_budget` and has the same weakness. It wasn't one of the six, so it was left; move it to the new rule if it turns flaky.
+
 **What was built**
 
-- `src/companion/seed/evals/cases/understanding.yaml`: the three cases and the rule `keeps_small_talk_light`. Two cases got new keys, since the old names said the opposite of what they now check.
+- `src/companion/seed/evals/cases/understanding.yaml`: the three cases and three rules (`spilled_coffee_stays_light`, `starts_them_off_on_hosting`, `fits_hosts_to_their_budget`). Two cases got new keys, since the old names said the opposite of what they now check.
 - Migration `0103_understanding_cases_follow_the_reply.py` calls `reload_eval_case_unless_edited` for the three old keys, so stacks that already hold them get the new ones. A case an Admin edited or archived is kept, with a warning in the backend log.
 - `tests/test_understanding_eval_helpers.py`: the seed-case tests follow the new cases.
 - Shared files touched: one migration (0103).
@@ -96,6 +112,15 @@ The runs live in this worktree's database, which is deleted at teardown. The rep
 - **After the next deploy, fault 4 may come back for a while.** That deploy replaces production's Reply Plan prompt with the seed's until you merge your edit back (see `prod-prompt-copies/README.md`). The seed's Reply Plan wove the Check-in into a request for help in more than half the tries. Merging your edit back should end it.
 - **Open question: should the seed take production's wording?** Not done here. Production's Reply Plan prompt has no rules for the new fields (Curiosity pace, Pattern sharing), so it can't replace the seed as it is.
 - **"Ask why" is hardly used on production's prompt**: set 0 of 8 times here. No seed case expects it set any more.
+- Three checks have no seed case left: "ask why" set, a held next Move, and "no Move". The checks and their unit tests are still there for cases an Admin writes.
+- If you edited or archived one of the two renamed cases on a stack, the old one stays beside the new one there. Archive the old one by hand.
+- Fault 3 was not a pick of yours between the two choices. I took "accept either" from the run on production's prompts. Say if you want the prompt to choose instead.
 - The two renamed cases start with no run history, and move to the end of the Understanding list.
 - The copies of production's prompts used here were kept only in the session's temp folder, not in the repo.
 - `20-findings-for-the-owner.md` was not edited (other agents work in it).
+
+**Checked in the running app.** On this worktree's stack, which held the three old cases unedited: the backend was rebuilt with 0103 (`alembic_version` 0103), the three old keys were gone, and `strong-mood-unknown-cause`, `small-talk-stays-light` and `hosting-help-over-two-messages` were stored with the new expectations. Production's Reply Plan prompt in the same database was untouched (same hash before and after). The Eval Runs above then ran those stored cases through the real reply path.
+
+**Review.** Standards and spec reviews run. Standards: no hard violations. Fixed after: a test name that no longer said what it checked, asserts that copied the case back, a rule name that read as general (`keeps_small_talk_light` → `spilled_coffee_stays_light`), and the first hosting Message, which could hardly fail (rule added). Not changed: faults 4, 5 and 6 still fail on the seed prompts; the owner said to go by production's, and it is flagged above.
+
+**Checks.** ruff clean, ruff format clean, mypy clean (279 files), pytest 2530 passed. No Dashboard code changed, so the web checks were not run.

@@ -656,8 +656,7 @@ def test_the_understanding_cases_check_moves_and_web_search() -> None:
     assert no_search.web_search is False
     assert no_search.messages[0].expect.rules == ["honest_no_lookup"]
     small_talk = cases["small-talk-stays-light"].messages[0].expect
-    assert small_talk.no_move is None and not small_talk.lead_move
-    assert small_talk.rules == ["keeps_small_talk_light"]
+    assert small_talk.rules == ["spilled_coffee_stays_light"]
 
 
 def test_a_supporting_move_without_a_lead_is_not_a_lead() -> None:
@@ -731,16 +730,15 @@ def test_the_next_move_in_mind_is_checked_ignoring_case() -> None:
     ]
 
 
-def test_the_understanding_cases_check_the_next_move_and_move_outcomes() -> None:
+def test_the_understanding_cases_check_hosting_help_and_move_outcomes() -> None:
     seed_cases: list[UnderstandingCase] = seeded(EvalName.UNDERSTANDING)
     cases = {case.id: case for case in seed_cases}
 
     first, second = cases["hosting-help-over-two-messages"].messages
-    assert first.expect.no_move is False and second.expect.no_move is False
-    assert not first.expect.next_move and not second.expect.lead_move
-    assert second.expect.rules == ["names_hosts_under_budget"]
+    assert first.expect.rules == ["starts_them_off_on_hosting"]
+    assert second.expect.rules == ["fits_hosts_to_their_budget"]
     strong_mood = cases["strong-mood-unknown-cause"].messages[0].expect
-    assert strong_mood.asked_why is None and strong_mood.rules == ["gentle_probe"]
+    assert strong_mood.rules == ["gentle_probe"]
     exhausted = cases["no-push-when-exhausted"]
     frustrated = cases["push-when-frustrated"]
     assert exhausted.memory == frustrated.memory
