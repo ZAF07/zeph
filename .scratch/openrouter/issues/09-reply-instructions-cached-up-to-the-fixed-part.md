@@ -1,6 +1,6 @@
 # 09 — Reply instructions cached up to the fixed part
 
-Status: needs-triage
+Status: ready-for-agent
 Blocked by: 06
 
 ## Parent
@@ -15,19 +15,25 @@ Measured in the issue 06 `/run` (haiku, two messages in a row): the first Reply 
 
 Safeguard, Understanding and Reply plan are not affected: their instructions are fixed, and the Reply plan read 4,674 of 8,249 prompt tokens from the cache on the second message.
 
-The fixed part of the Reply's instructions (and the tools, which come before it) should be cached on its own, so the second Reply reads it.
+The fixed part of the Reply's instructions (and the tools, which come before it) should be cached on its own, so the second Reply reads it. This must hold for every model that can be picked for the Reply: all Claude models (Haiku, Sonnet, Opus, Fable) and DeepSeek V4 Pro and Flash.
 
-## Open questions
+## Decisions (2026-11-25)
 
-- How the adapter learns where the fixed part ends. The `ChatModel` port takes one `instructions` text today. Options: the port takes the fixed part and the per-message part as two texts; or the per-message part moves out of the instructions into the messages.
-- Whether to stop marking the Reply for caching until this is built, so it doesn't cost more in the meantime.
-- Whether the same is true of other services not run in the issue 06 check (Check-ins, memory processing, the keeping steps).
+- The Reply already builds the fixed part and the per-message part separately (`write_instructions` in `response_composition.py`). It stops joining them into one text and passes them to the `ChatModel` port as two texts. The per-message text is optional and empty by default, so the other services don't change.
+- The fixed part is the Persona, the response prompt and the priority order. It ends before "## 1." (the boundaries and data deletion note change per User and message), not before "## 2.".
+- The Claude adapter marks only the fixed part for caching. For DeepSeek, which caches the same start of a request by itself, the two texts are joined with the fixed part first.
+- Caching must work for every model that can be picked: all Claude models (Haiku, Sonnet, Opus, Fable) and DeepSeek V4 Pro and Flash, not just Haiku.
+- Check first: each Claude model has a minimum size a cached block must reach, and some are higher than others. Find each picked model's minimum and check that tools plus the fixed part (about 2,500 tokens) reach it. If a model's minimum is not reached, say so in this issue before building, because the fix would not help that model.
+- Don't stop caching the Reply in the meantime. Just build the fix.
+- Other services (Check-ins, memory processing, the keeping steps): look at their cache numbers in the logs during this issue's `/run`, and file a separate issue for any that miss.
 
 ## Acceptance criteria
 
-- [ ] `/run`: with the Reply on a Claude model, the second of two messages in a row shows cached tokens in the logs
+- [ ] Each picked Claude model's minimum cached block size is checked and written in this issue
+- [ ] `/run`: with the Reply on each Claude model (Haiku, Sonnet, Opus, Fable), the second of two messages in a row shows cached tokens in the logs
+- [ ] `/run`: with the Reply on DeepSeek V4 Pro and Flash, the second of two messages in a row shows cached tokens in the logs
 - [ ] Services with fixed instructions still get cache hits
-- [ ] DeepSeek calls are unchanged
+- [ ] Cache numbers for Check-ins, memory processing and the keeping steps are looked at; any that miss get their own issue
 - [ ] The language's checks pass
 
 ## Blocked by
