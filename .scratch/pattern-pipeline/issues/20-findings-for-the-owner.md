@@ -277,4 +277,39 @@ If there is nothing, the section holds one line: "Nothing found."
 - **Impact:** an Admin can't tell a model failure from a real "no fit". The Pattern is asked about again on the next run, so nothing is lost.
 - **Suggested fix:** carry "couldn't be read" in `PatternMatch` and print it. Under an hour.
 
+### The unmatched review groups opposites together, and misses loose paraphrases
+
+- **Kind:** risk
+- **What:** entries are grouped by one closeness bar on the bge-small embedder (`unmatched_grouping_closeness_percent`, 80). Measured 25 Nov 2026: the same way in other words scores about 74 to 88, a different way up to about 78, and opposites about 91 ("Makes jokes when things get serious" and "Stops joking when things get serious").
+- **Impact:** an entry can hold Users showing the opposite way, and one way of acting can be listed twice. The User count of an entry is a rough number.
+- **Suggested fix:** if it shows up in real use, let the keeping model pick the entry (it is shown the existing descriptions, which hold no User details) instead of the embedder. Half a day, with a test.
+
+### An entry with one User can point at that User
+
+- **Kind:** risk
+- **What:** the review page lists entries from one User up. The Users page shows how many unmatched Patterns each User has.
+- **Impact:** with few Users (one live today), an Admin can tell who an entry is about, even though it holds no name or quote.
+- **Suggested fix:** list an entry only from an Admin-set number of Users (2 or 3). An hour. Left out because the issue asks for every entry with its count.
+
+### The code check on a general description can't catch every detail
+
+- **Kind:** risk
+- **What:** code drops a description with a digit, a quote mark, a capital after the first word or the User's name (`read_general_description`). A job or place written in lower case ("works at a bank near the river") passes; the prompt is what keeps those out.
+- **Impact:** a detail about a User could reach the Admin page if the model ignores its prompt.
+- **Suggested fix:** add general-description cases to the Pattern keeping Eval, or a small model check before a description is kept. Evals cost money, so the owner decides.
+
+### A dropped entry is judged only by its User count
+
+- **Kind:** risk
+- **What:** a dropped entry comes back when its count is above the count when it was dropped (`shown_mark`). If two Users leave and two others arrive, the count is the same and it stays dropped; if it came back and a Pattern is then matched, it reads as dropped again.
+- **Impact:** small: an entry may come back a little late.
+- **Suggested fix:** store which Users had it when dropped. Not done: it would put User IDs on entries, which hold none today.
+
+### Design files changed by the agent again
+
+- **Kind:** note
+- **What:** as issues 05, 10 and 14 did, issue 17 added a reference (`AdminUnmatchedPatterns.html`), its baseline, lines in `routes.json` and `manifest.json`, and the menu link on the other 13 admin references, though `web/design/README.md` says only the owner edits these. The page also puts the table template's filter pills above a card list. No other baseline changed.
+- **Impact:** none seen; the owner may want to look at the new reference.
+- **Suggested fix:** review `web/design/reference/AdminUnmatchedPatterns.html`, and say in the design README whether agents may add references when an issue asks.
+
 ## Comments
