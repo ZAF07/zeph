@@ -72,4 +72,4 @@ The fixed part of the Reply's instructions (and the tools, which come before it)
 ## Completion
 
 - Completed: 2026-11-25
-- Commit: <merge commit>
+- Commit: 280322b (merge of openrouter-09-reply-cache-fixed-part; work in 7aca021 f3a867a eb35521)
