@@ -69,4 +69,4 @@ Evidence (25 Nov 2026, worktree stack on 3030/8030, three made-up Users only (Te
 ## Completion
 
 - Completed: 2026-11-25
-- Commit: <filled in after the merge>
+- Commit: 3f27f6c (merge "Merge pattern-17-unmatched-review-page: Admins review what Zeph keeps noticing that fits no Pattern Type (general descriptions grouped by meaning with a count of Users, marked new Pattern Type, folded or dropped)"; work in b642bb4 "Pattern pipeline 17: Admins review what keeps turning up unmatched (general descriptions grouped by meaning with a count of Users, marked new Pattern Type, folded or dropped)", 1fdfaf3 "Pattern pipeline 17: review fixes (grouping one at a time under a lock, a vector index, descriptions with a capital after the first word are dropped, a User's name only counts with a capital, shared Pattern Type choices, measured closeness numbers)", 3c0e29e "Issue 17 done: unmatched review page archived with evidence, findings for the owner in issue 20")
