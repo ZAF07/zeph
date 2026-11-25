@@ -69,4 +69,4 @@ Evidence (25 Nov 2026, worktree stack on 3020/8020, a made-up run User signed in
 ## Completion
 
 - Completed: 2026-11-25
-- Commit: MERGE_COMMIT (merge of `pattern-18-patterns-tab` into main)
+- Commit: e09bae22 (merge of `pattern-18-patterns-tab` into main; work commits 4e0dc70, e3bc9df, 21310b1, 13d196b)
