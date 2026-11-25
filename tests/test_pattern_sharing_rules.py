@@ -22,6 +22,7 @@ from companion.core.observations import (
     names_one_of,
     not_gathered_pattern_types,
     plan_reactions,
+    reactions_to_keep,
 )
 from companion.core.pattern_scoring import reaction_points
 from companion.core.pattern_sharing import (
@@ -227,6 +228,22 @@ def test_gathering_off_stops_new_observations_for_patterns_they_disagreed_with()
         BELONG,
         WORTH,
     }
+
+
+def test_gathering_off_keeps_only_a_new_push_back_on_a_contested_pattern() -> None:
+    contested = pattern(PatternState.CONTESTED)
+    shared = pattern()
+    agreed_with_contested = reaction(PatternReaction.AGREED, pattern_id=contested.id)
+    pushed_back_again = reaction(PatternReaction.PUSHED_BACK, pattern_id=contested.id)
+    agreed_with_shared = reaction(PatternReaction.AGREED, pattern_id=shared.id)
+    reactions = [agreed_with_contested, pushed_back_again, agreed_with_shared]
+    told = [contested, shared]
+
+    assert reactions_to_keep(reactions, told, True) == reactions
+    assert reactions_to_keep(reactions, told, False) == [
+        pushed_back_again,
+        agreed_with_shared,
+    ]
 
 
 def test_an_observation_names_a_pattern_type_first_or_second() -> None:

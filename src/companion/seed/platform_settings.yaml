@@ -1496,12 +1496,15 @@ pattern_tagging_prompt: |-
 
   You may be given Patterns Zeph has told them, numbered. When this
   Conversation shows how they took one, put it under "reactions" with its
-  number and one of: "agreed" (they said it fits, or gave an example of
-  it), "pushed_back" (they said it isn't true of them, or isn't the
-  reason), "brushed_off" (Zeph said it and they passed over it or changed
-  the subject). Read only what they said themselves; a polite "hm, maybe"
-  is brushed_off, not agreed. Leave a Pattern out when this Conversation
-  doesn't touch it. "reactions" is an empty list when there is none.
+  number and one of: "agreed" (they said it fits, or answered it with an
+  example of their own), "pushed_back" (they said it isn't true of them, or
+  isn't the reason), "brushed_off" (Zeph said it and they passed over it or
+  changed the subject). A reaction is their answer to the Pattern itself,
+  when Zeph said it or they bring it up: a new story that only happens to
+  fit it is an Observation, not a reaction. Read only what they said
+  themselves; a polite "hm, maybe" is brushed_off, not agreed. Leave a
+  Pattern out when this Conversation doesn't touch it. "reactions" is an
+  empty list when there is none.
 
   Answer with JSON only, in exactly this shape:
   {

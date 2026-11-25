@@ -401,6 +401,37 @@ def not_gathered_pattern_types(
     )
 
 
+def reactions_to_keep(
+    reactions: Sequence[ReactionToPattern],
+    told: Sequence[CatalogPattern],
+    gathering_enabled: bool,
+) -> list[ReactionToPattern]:
+    """Leave out what would be gathering on a Pattern the User disagreed with.
+
+    Args:
+        reactions: How they took the Patterns in the Conversation being
+            tagged.
+        told: The Patterns the User was told.
+        gathering_enabled: The User's own switch for noting evidence on a
+            Pattern they disagreed with.
+
+    Returns:
+        Every reaction while their switch is on; with it off, a reaction to
+        a contested Pattern is kept only when they pushed back again.
+    """
+    if gathering_enabled:
+        return list(reactions)
+    contested_ids = {
+        pattern.id for pattern in told if pattern.state == PatternState.CONTESTED
+    }
+    return [
+        reaction
+        for reaction in reactions
+        if reaction.pattern_id not in contested_ids
+        or reaction.reaction == PatternReaction.PUSHED_BACK
+    ]
+
+
 def names_one_of(observation: Observation, pattern_type_ids: frozenset[str]) -> bool:
     """Say whether an Observation names one of some Pattern Types.
 
@@ -1333,7 +1364,11 @@ class PatternTagger:
             planned=planned,
             settled=read_settled_answer(answer),
             exclusion_flags=exclusion_flags,
-            reactions=reactions,
+            reactions=reactions_to_keep(
+                reactions,
+                list(told.values()),
+                snapshot.user.contested_gathering_enabled,
+            ),
         )
 
     def _patterns_told(
