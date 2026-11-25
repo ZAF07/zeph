@@ -1502,7 +1502,9 @@ def read_whole_pipeline_case(key: str, content: dict[str, Any]) -> WholePipeline
         now=to_utc(content["now"]),
         true_pattern_types=list(
             dict.fromkeys(
-                name.strip() for name in content.get("true_pattern_types") or []
+                name.strip()
+                for name in content.get("true_pattern_types") or []
+                if name.strip()
             )
         ),
         conversations=[

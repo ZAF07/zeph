@@ -27,6 +27,7 @@ from companion.core.pattern_catalog import PatternCatalogService
 MESSAGE_GAP = timedelta(minutes=1)
 STATES_THAT_COUNT = frozenset({PatternState.READY, PatternState.SHARED})
 NOTHING_READY = "nothing ready"
+TARGET_PERCENT_OF_READY_TRUE = 70
 
 
 def ready_pattern_types(moves: Sequence[PatternMove]) -> dict[str, bool]:
@@ -202,8 +203,8 @@ def check_whole_pipeline_case(
     Raises:
         CaseStoppedError: If the run is to stop before the last Conversation.
         EvalSetupError: If a true Pattern Type isn't in the Pattern Catalog,
-            or the tagging step didn't run, so the case is an Error, not a
-            Fail.
+            or the tagging step didn't run after a Conversation, so the case
+            is an Error, not a Fail.
     """
     repositories = companion.repositories
     names = {
@@ -235,11 +236,13 @@ def check_whole_pipeline_case(
             transcript += [transcript_line(False, reply) for reply in replies.texts]
             companion.move_clock(MESSAGE_GAP)
         companion.end_conversation()
-        if number == 1 and not any(
+        if not any(
             call.step == ModelStep.PATTERN_TAGGING
             for call in calls_in_new_traces(repositories, user_id, seen_trace_ids)
         ):
-            raise EvalSetupError("The tagging step didn't run for the made-up User")
+            raise EvalSetupError(
+                f"The tagging step didn't run after Conversation {number}"
+            )
 
     facts = pipeline_facts(
         case.true_pattern_types,

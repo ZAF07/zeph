@@ -89,7 +89,14 @@ is not, and one true beside a single story of its look-alike.
     handful of ready Patterns, so one more or one fewer moves the share a
     lot. Read each case, not only the share.
   - Missed Patterns as failures. A case with nothing ready passes, so a
-    run can be all passes and find nothing: read "true Patterns found".
+    run can be all passes and find nothing: read "true Patterns found". A
+    Conversation-end step that fails is logged and skipped, as in the live
+    app, so scoring or the gate breaking part-way shows only as fewer
+    Patterns found (the case is an Error only when the Conversation isn't
+    processed at all or the tagging step didn't run).
+  - A share for the whole run on the Dashboard. The terminal report prints
+    it against the 70% target; the Dashboard shows each case's Patterns and
+    "true Patterns found", and the share is left to add up.
   - A User who answers back. The texts are a script: they don't answer
     Zeph's questions, so an aimed Curiosity, a Thought Experiment or a
     shared Pattern never gets a real answer. The counter-test is met by a

@@ -260,10 +260,12 @@ class InlineUserWorkQueue:
 
 
 class ManualScheduler:
-    """Scheduler for Evals: never ticks on its own, so no Check-in runs unasked.
+    """Scheduler for Evals: never ticks on its own.
 
     An Eval that needs the scheduled work, e.g. to end a quiet Conversation,
-    runs one tick by hand.
+    runs one tick by hand. That tick does everything the live one does: it
+    also sends the Check-ins that are due and deletes expired messages on
+    the Eval database.
     """
 
     def __init__(self) -> None:

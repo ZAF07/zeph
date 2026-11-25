@@ -1315,14 +1315,14 @@ export type ReadyPattern = {
   name: string;
   is_true: boolean;
   shared: boolean;
-  state: string | null;
+  state: PatternState | null;
 };
 
 /** A true Pattern a Whole-pipeline case never made ready, and where it stopped. */
 export type MissedPattern = {
   pattern_type: string;
   name: string;
-  state: string | null;
+  state: PatternState | null;
   blocked_by: string | null;
 };
 

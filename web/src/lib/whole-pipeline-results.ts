@@ -1,6 +1,10 @@
-import type { MissedPattern, ReadyPattern } from "@/lib/api-client";
+import type {
+  MissedPattern,
+  PatternState,
+  ReadyPattern,
+} from "@/lib/api-client";
 
-const stateLabels: Record<string, string> = {
+const stateLabels: Record<PatternState, string> = {
   noticed: "Noticed",
   suspected: "Suspected",
   ready: "Ready",
@@ -41,8 +45,8 @@ export function describePattern(pattern: ReadyPattern | MissedPattern): string {
  * @param state - Its state; null when the User has no such Pattern.
  * @returns E.g. "Suspected"; "Never noticed" with no Pattern.
  */
-export function describeState(state: string | null): string {
-  return state === null ? "Never noticed" : (stateLabels[state] ?? state);
+export function describeState(state: PatternState | null): string {
+  return state === null ? "Never noticed" : stateLabels[state];
 }
 
 /**

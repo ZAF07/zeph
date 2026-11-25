@@ -10,7 +10,10 @@ from companion.core.evals.models import (
     EvalName,
     EvalRunOverview,
 )
-from companion.core.evals.whole_pipeline_eval import missed_line
+from companion.core.evals.whole_pipeline_eval import (
+    TARGET_PERCENT_OF_READY_TRUE,
+    missed_line,
+)
 
 EVAL_TITLES = {
     EvalName.SAFEGUARD: "Safeguard",
@@ -24,7 +27,6 @@ EVAL_TITLES = {
     EvalName.TAGGING: "Tagging",
     EvalName.WHOLE_PIPELINE: "Whole pipeline",
 }
-WHOLE_PIPELINE_TARGET_PERCENT = 70
 OUTCOME_MARKS = {
     CaseOutcome.PASS: "PASS",
     CaseOutcome.FAIL: "FAIL",
@@ -259,7 +261,7 @@ def whole_pipeline_score(results: Sequence[CaseResult]) -> str:
     percent = f"{round(100 * true_ready / len(ready))}%" if ready else "none ready"
     return (
         f"Whole pipeline: {true_ready} of {len(ready)} ready Patterns true "
-        f"({percent}, target {WHOLE_PIPELINE_TARGET_PERCENT}%); "
+        f"({percent}, target {TARGET_PERCENT_OF_READY_TRUE}%); "
         f"{true_count - missed} of {true_count} true Patterns found"
     )
 

@@ -172,7 +172,7 @@ def test_a_case_reads_its_conversations_and_each_true_pattern_type_once() -> Non
         "folds",
         {
             "now": "2026-11-02T19:30:00",
-            "true_pattern_types": [" CONF.AVOID.BELONG ", BELONG],
+            "true_pattern_types": [" CONF.AVOID.BELONG ", BELONG, " "],
             "conversations": [
                 {"days_later": 0, "messages": ["hey", "ugh"]},
                 {"days_later": 3, "messages": ["again"]},
