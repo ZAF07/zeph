@@ -2264,8 +2264,7 @@ def with_thinking_fitted_to_the_models(
 
     Returns:
         The values to save: the ones given, plus thinking off for each
-        service changed to a model that can't think while its thinking was
-        on.
+        service on a model that can't think whose thinking is saved as on.
 
     Raises:
         InvalidSettingError: If thinking would be turned on for a model
@@ -2282,7 +2281,8 @@ def with_thinking_fitted_to_the_models(
         if values.get(service.thinking_key):
             label = EDITABLE_SETTINGS_BY_KEY[service.thinking_key].label
             raise InvalidSettingError(f"The {label} can't be on: {model} can't think.")
-        fitted_values[service.thinking_key] = False
+        if settings.values[service.thinking_key]:
+            fitted_values[service.thinking_key] = False
     return fitted_values
 
 
@@ -2364,9 +2364,9 @@ class PlatformSettingsService:
         }
         settings = self._settings.load()
         check_waits_fit_under_the_cap(settings, checked_values)
-        validated_values = with_thinking_fitted_to_the_models(settings, checked_values)
-        if validated_values:
-            self._settings.save_many(validated_values, self._clock.now(), admin.id)
+        values_to_save = with_thinking_fitted_to_the_models(settings, checked_values)
+        if values_to_save:
+            self._settings.save_many(values_to_save, self._clock.now(), admin.id)
         return self.list_editable()
 
     def checked_value(self, key: str, value: Any) -> Any:

@@ -259,6 +259,32 @@ describe("PromptsAndModels", () => {
       response_model: "deepseek-v4-pro",
       response_thinking: false,
     });
+
+    await user.selectOptions(card.getByLabelText("Model"), "deepseek-flash");
+
+    expect(thinkingSwitch).toBeEnabled();
+    expect(thinkingSwitch).not.toBeChecked();
+  });
+
+  it("shows thinking off when it is saved on for a model that can't think", async () => {
+    apiClient.getCoreServices.mockResolvedValue({
+      ...coreServices,
+      models_that_cannot_think: ["deepseek-v4-pro"],
+    });
+    apiClient.getAdminSettings.mockResolvedValue({
+      ...settings,
+      response_model: { ...settings.response_model!, value: "deepseek-v4-pro" },
+      response_thinking: { ...settings.response_thinking!, value: true },
+    });
+    renderWithQueries(<PromptsAndModels />);
+    const card = within(
+      await screen.findByRole("region", { name: "Response composition" }),
+    );
+
+    expect(
+      card.getByRole("switch", { name: "Thinking for Response composition" }),
+    ).not.toBeChecked();
+    expect(card.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 
   it("lets thinking be switched on again for a model that can think", async () => {

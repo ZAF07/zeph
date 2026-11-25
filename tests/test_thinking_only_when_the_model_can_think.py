@@ -20,8 +20,8 @@ from tests.telegram_helpers import (
 )
 from tests.test_conversation import set_platform_setting
 
-THINKS = "deepseek/deepseek-v4.1-flash-1017"
-CANT_THINK = "deepseek/deepseek-v4-pro-0813"
+MODEL_THAT_THINKS = "deepseek/deepseek-v4.1-flash-1017"
+MODEL_THAT_CANT_THINK = "deepseek/deepseek-v4-pro-0813"
 
 
 def settings_with(model: str, thinking: bool) -> PlatformSettings:
@@ -36,7 +36,7 @@ def settings_with(model: str, thinking: bool) -> PlatformSettings:
     """
     return PlatformSettings(
         {
-            "models_that_cannot_think": [CANT_THINK],
+            "models_that_cannot_think": [MODEL_THAT_CANT_THINK],
             "response_model": model,
             "response_thinking": thinking,
         }
@@ -58,19 +58,19 @@ def saved_values(client: TestClient, headers: dict[str, str]) -> dict[str, Any]:
 
 
 def test_a_model_that_can_think_thinks_when_its_switch_is_on() -> None:
-    settings = settings_with(THINKS, thinking=True)
+    settings = settings_with(MODEL_THAT_THINKS, thinking=True)
 
     assert thinking_to_use(settings, RESPONSE_MODEL, RESPONSE_THINKING) is True
 
 
 def test_a_model_that_can_think_does_not_think_when_its_switch_is_off() -> None:
-    settings = settings_with(THINKS, thinking=False)
+    settings = settings_with(MODEL_THAT_THINKS, thinking=False)
 
     assert thinking_to_use(settings, RESPONSE_MODEL, RESPONSE_THINKING) is False
 
 
 def test_a_model_that_cant_think_never_thinks() -> None:
-    settings = settings_with(CANT_THINK, thinking=True)
+    settings = settings_with(MODEL_THAT_CANT_THINK, thinking=True)
 
     assert thinking_to_use(settings, RESPONSE_MODEL, RESPONSE_THINKING) is False
 
@@ -89,31 +89,37 @@ def test_core_services_say_which_models_cant_think(
     client: TestClient, engine: Engine, auth_verifier: FakeAuthVerifier
 ) -> None:
     headers = owner_headers(client, auth_verifier)
-    set_platform_setting(engine, "models_that_cannot_think", [CANT_THINK])
+    set_platform_setting(engine, "models_that_cannot_think", [MODEL_THAT_CANT_THINK])
 
     response = client.get("/api/admin/core-services", headers=headers).json()
 
-    assert response["models_that_cannot_think"] == [CANT_THINK]
+    assert response["models_that_cannot_think"] == [MODEL_THAT_CANT_THINK]
 
 
 def test_thinking_cant_be_turned_on_with_a_model_that_cant_think(
     client: TestClient, engine: Engine, auth_verifier: FakeAuthVerifier
 ) -> None:
     headers = owner_headers(client, auth_verifier)
-    set_platform_setting(engine, "models_that_cannot_think", [CANT_THINK])
+    set_platform_setting(engine, "models_that_cannot_think", [MODEL_THAT_CANT_THINK])
 
     response = client.patch(
         "/api/admin/settings",
-        json={"values": {"response_model": CANT_THINK, "response_thinking": True}},
+        json={
+            "values": {
+                "response_model": MODEL_THAT_CANT_THINK,
+                "response_thinking": True,
+            }
+        },
         headers=headers,
     )
 
     assert response.status_code == 422
     assert response.json()["detail"] == (
-        f"The Response composition thinking can't be on: {CANT_THINK} can't think."
+        "The Response composition thinking can't be on: "
+        f"{MODEL_THAT_CANT_THINK} can't think."
     )
     saved = saved_values(client, headers)
-    assert saved["response_model"] == THINKS
+    assert saved["response_model"] == MODEL_THAT_THINKS
     assert saved["response_thinking"] is False
 
 
@@ -121,8 +127,8 @@ def test_thinking_cant_be_turned_on_when_the_saved_model_cant_think(
     client: TestClient, engine: Engine, auth_verifier: FakeAuthVerifier
 ) -> None:
     headers = owner_headers(client, auth_verifier)
-    set_platform_setting(engine, "models_that_cannot_think", [CANT_THINK])
-    set_platform_setting(engine, "response_model", CANT_THINK)
+    set_platform_setting(engine, "models_that_cannot_think", [MODEL_THAT_CANT_THINK])
+    set_platform_setting(engine, "response_model", MODEL_THAT_CANT_THINK)
 
     response = client.patch(
         "/api/admin/settings",
@@ -138,49 +144,74 @@ def test_changing_to_a_model_that_cant_think_saves_thinking_as_off(
     client: TestClient, engine: Engine, auth_verifier: FakeAuthVerifier
 ) -> None:
     headers = owner_headers(client, auth_verifier)
-    set_platform_setting(engine, "models_that_cannot_think", [CANT_THINK])
+    set_platform_setting(engine, "models_that_cannot_think", [MODEL_THAT_CANT_THINK])
     set_platform_setting(engine, "response_thinking", True)
     set_platform_setting(engine, "safeguard_thinking", True)
 
     response = client.patch(
         "/api/admin/settings",
-        json={"values": {"response_model": CANT_THINK}},
+        json={"values": {"response_model": MODEL_THAT_CANT_THINK}},
         headers=headers,
     )
 
     assert response.status_code == 200
-    saved = saved_values(client, headers)
-    assert saved["response_model"] == CANT_THINK
-    assert saved["response_thinking"] is False
-    assert saved["safeguard_thinking"] is True
+    settings = response.json()["settings"]
+    assert settings["response_model"]["value"] == MODEL_THAT_CANT_THINK
+    assert settings["response_thinking"]["value"] is False
+    assert settings["response_thinking"]["updated_by"] == "owner@example.com"
+    assert settings["safeguard_thinking"]["value"] is True
+    assert settings["safeguard_thinking"]["updated_by"] is None
 
 
 def test_thinking_off_can_be_saved_with_a_model_that_cant_think(
     client: TestClient, engine: Engine, auth_verifier: FakeAuthVerifier
 ) -> None:
     headers = owner_headers(client, auth_verifier)
-    set_platform_setting(engine, "models_that_cannot_think", [CANT_THINK])
+    set_platform_setting(engine, "models_that_cannot_think", [MODEL_THAT_CANT_THINK])
 
     response = client.patch(
         "/api/admin/settings",
-        json={"values": {"response_model": CANT_THINK, "response_thinking": False}},
+        json={
+            "values": {
+                "response_model": MODEL_THAT_CANT_THINK,
+                "response_thinking": False,
+            }
+        },
         headers=headers,
     )
 
     assert response.status_code == 200
-    assert saved_values(client, headers)["response_model"] == CANT_THINK
+    assert saved_values(client, headers)["response_model"] == MODEL_THAT_CANT_THINK
+
+
+def test_thinking_already_off_is_not_saved_again_for_a_model_that_cant_think(
+    client: TestClient, engine: Engine, auth_verifier: FakeAuthVerifier
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+    set_platform_setting(engine, "models_that_cannot_think", [MODEL_THAT_CANT_THINK])
+
+    response = client.patch(
+        "/api/admin/settings",
+        json={"values": {"response_model": MODEL_THAT_CANT_THINK}},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["settings"]["response_thinking"]["updated_by"] is None
 
 
 def test_thinking_can_be_turned_on_with_a_model_that_can_think(
     client: TestClient, engine: Engine, auth_verifier: FakeAuthVerifier
 ) -> None:
     headers = owner_headers(client, auth_verifier)
-    set_platform_setting(engine, "models_that_cannot_think", [CANT_THINK])
-    set_platform_setting(engine, "response_model", CANT_THINK)
+    set_platform_setting(engine, "models_that_cannot_think", [MODEL_THAT_CANT_THINK])
+    set_platform_setting(engine, "response_model", MODEL_THAT_CANT_THINK)
 
     response = client.patch(
         "/api/admin/settings",
-        json={"values": {"response_model": THINKS, "response_thinking": True}},
+        json={
+            "values": {"response_model": MODEL_THAT_THINKS, "response_thinking": True}
+        },
         headers=headers,
     )
 
@@ -196,15 +227,15 @@ def test_a_call_for_a_model_that_cant_think_is_made_with_thinking_off(
     chat_model: ScriptedChatModel,
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
-    set_platform_setting(engine, "models_that_cannot_think", [CANT_THINK])
-    set_platform_setting(engine, "response_model", CANT_THINK)
+    set_platform_setting(engine, "models_that_cannot_think", [MODEL_THAT_CANT_THINK])
+    set_platform_setting(engine, "response_model", MODEL_THAT_CANT_THINK)
     set_platform_setting(engine, "response_thinking", True)
     chat_model.script("ok")
 
     send_to_webhook(client, telegram_text_update("hello"))
 
     [call] = chat_model.calls
-    assert call.model == CANT_THINK
+    assert call.model == MODEL_THAT_CANT_THINK
     assert call.thinking is False
 
 
