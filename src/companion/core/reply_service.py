@@ -82,7 +82,7 @@ class ReplyService:
             thread_reminder: Finds the Life Threads each Message touches and
                 marks those brought up.
             curiosity_raiser: Lists the Curiosities whose day has come and
-                marks those brought up.
+                marks raised those the reply really asked.
             move_outcome_finder: Finds the User's past Move Outcomes that fit
                 each Message.
             understanding: Reads each Message before the reply is planned.
@@ -102,8 +102,8 @@ class ReplyService:
                 when it was.
             prediction_keeper: Keeps the new Prediction a reply gave a
                 shared Pattern.
-            model_call_log: Records whether the Pattern was shared, on the
-                Reply Plan's shape.
+            model_call_log: Records whether the Curiosity was really asked
+                and the Pattern shared, on the Reply Plan's shape.
         """
         self._reply_gate = reply_gate
         self._conversations = conversations
@@ -249,11 +249,18 @@ class ReplyService:
             raise
         self._thread_reminder.mark_raised(message.conversation_id, plan.bring_up)
         self._curiosity_raiser.record_reaction(due, plan.curiosity_taken)
-        self._curiosity_raiser.mark_raised(message.conversation_id, plan.curiosities)
-        self._prediction_keeper.record_given(
-            snapshot, [item.curiosity_id for item in plan.curiosities], reply.texts
+        asked = self._curiosity_raiser.mark_asked(
+            snapshot, message.conversation_id, plan.curiosities, reply.texts
         )
-        if planned.pattern_to_share is not None and planned.shape is not None:
+        self._prediction_keeper.record_given(
+            snapshot, [item.curiosity_id for item in asked], reply.texts
+        )
+        if planned.shape is None:
+            return
+        shape = planned.shape
+        if plan.curiosities:
+            shape = replace(shape, curiosity_asked=bool(asked))
+        if planned.pattern_to_share is not None:
             shared = self._pattern_sharing.record_if_shared(
                 snapshot,
                 planned.pattern_to_share,
@@ -261,6 +268,6 @@ class ReplyService:
                 ShareVia.CHAT,
                 message.conversation_id,
             )
-            self._model_call_log.record_reply_plan_shape(
-                snapshot, replace(planned.shape, pattern_shared=shared)
-            )
+            shape = replace(shape, pattern_shared=shared)
+        if shape != planned.shape:
+            self._model_call_log.record_reply_plan_shape(snapshot, shape)

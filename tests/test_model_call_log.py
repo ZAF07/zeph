@@ -104,9 +104,21 @@ def test_a_plain_users_message_makes_a_trace_with_no_content(
     assert trace["has_content"] is False
     opened = open_trace(client, admin, trace["trace_id"])
     steps = [call["step"] for call in opened["calls"]]
-    assert steps == ["safeguard", "understanding", "reply_plan", "reply"]
-    assert [call["thinking"] for call in opened["calls"]] == [True, True, True, False]
-    reply = opened["calls"][-1]
+    assert steps == [
+        "safeguard",
+        "understanding",
+        "reply_plan",
+        "reply",
+        "settings_claim_check",
+    ]
+    assert [call["thinking"] for call in opened["calls"]] == [
+        True,
+        True,
+        True,
+        False,
+        False,
+    ]
+    reply = opened["calls"][-2]
     assert reply["model"]
     assert reply["tokens_in"] > 0
     assert reply["tokens_out"] > 0
@@ -117,7 +129,7 @@ def test_a_plain_users_message_makes_a_trace_with_no_content(
     assert all(call["content"] is None for call in opened["calls"])
     assert "lighthouse" not in str(opened)
     stored = stored_model_calls(engine)
-    assert len(stored) == 4
+    assert len(stored) == 5
     assert not any("lighthouse" in row for row in stored)
 
 
@@ -138,7 +150,7 @@ def test_an_admins_own_message_keeps_full_content_with_tool_calls(
 
     [trace] = list_traces(client, admin)
     assert trace["has_content"] is True
-    reply = open_trace(client, admin, trace["trace_id"])["calls"][-1]
+    reply = open_trace(client, admin, trace["trace_id"])["calls"][-2]
     content = reply["content"]
     assert content["instructions"]
     assert content["history"][-1] == {"role": "user", "text": SECRET_WORDS}
@@ -370,6 +382,7 @@ def test_texts_sent_in_a_row_make_one_trace_for_their_message(
         "understanding",
         "reply_plan",
         "reply",
+        "settings_claim_check",
     ]
 
 

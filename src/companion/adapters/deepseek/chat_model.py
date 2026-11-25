@@ -14,8 +14,10 @@ from pydantic import SecretStr
 from companion.adapters.chat_tools import (
     MAX_TOOL_ROUNDS,
     broken_arguments_message,
+    holds_tool_call_markup,
     to_tool_schema,
     unknown_tool_message,
+    without_tool_call_markup,
 )
 from companion.core.models import (
     ChatLine,
@@ -162,6 +164,22 @@ def to_model_answer(
     )
 
 
+def wrote_tool_call_as_text(response: AIMessage) -> bool:
+    """Say whether the model wrote a tool call into its reply instead of calling it.
+
+    Args:
+        response: The model's message.
+
+    Returns:
+        True if it calls no tool and its text holds tool-call markup.
+    """
+    return (
+        not response.tool_calls
+        and not response.invalid_tool_calls
+        and holds_tool_call_markup(response.text)
+    )
+
+
 def answer_with_tools(
     ask: AskModel,
     ask_without_tools: AskModel,
@@ -172,7 +190,10 @@ def answer_with_tools(
 
     A call whose arguments are not valid JSON is sent back as an error so
     the model can try again. After `MAX_TOOL_ROUNDS` rounds of tool calls
-    the model must reply without calling any more.
+    the model must reply without calling any more. A model that writes a
+    tool call into its reply as text is asked again, once per answer;
+    markup still in the reply after that is taken out, so it never reaches
+    a User.
 
     Args:
         ask: Asks the model, with the tools bound, for its next message.
@@ -187,11 +208,19 @@ def answer_with_tools(
     tools_by_name = {tool.name: tool for tool in tools}
     responses: list[AIMessage] = []
     tool_calls: list[ToolCallRecord] = []
+    asked_again = False
     for _ in range(MAX_TOOL_ROUNDS):
         response = ask(messages)
         responses.append(response)
+        if not asked_again and wrote_tool_call_as_text(response):
+            logger.warning("A model wrote a tool call as text; asking it again")
+            asked_again = True
+            response = ask(messages)
+            responses.append(response)
         if not response.tool_calls and not response.invalid_tool_calls:
-            return to_model_answer(response.text, responses, tool_calls)
+            return to_model_answer(
+                without_tool_call_markup(response.text), responses, tool_calls
+            )
         messages.append(response)
         for broken_call in response.invalid_tool_calls:
             name = broken_call["name"] or ""
@@ -213,7 +242,9 @@ def answer_with_tools(
             )
     final_response = ask_without_tools(messages)
     return to_model_answer(
-        final_response.text, [*responses, final_response], tool_calls
+        without_tool_call_markup(final_response.text),
+        [*responses, final_response],
+        tool_calls,
     )
 
 

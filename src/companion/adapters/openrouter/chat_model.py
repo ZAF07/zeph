@@ -8,8 +8,10 @@ import httpx
 from companion.adapters.chat_tools import (
     MAX_TOOL_ROUNDS,
     broken_arguments_message,
+    holds_tool_call_markup,
     to_tool_schema,
     unknown_tool_message,
+    without_tool_call_markup,
 )
 from companion.core.models import (
     INSTRUCTIONS_SEPARATOR,
@@ -150,7 +152,9 @@ def reply_message(body: dict[str, Any]) -> dict[str, Any]:
 
 
 def to_model_answer(
-    bodies: Sequence[dict[str, Any]], tool_calls: Sequence[ToolCallRecord] = ()
+    bodies: Sequence[dict[str, Any]],
+    tool_calls: Sequence[ToolCallRecord] = (),
+    tools_offered: bool = False,
 ) -> ModelAnswer:
     """Put the last reply's text together with the tokens, tool calls and reasoning.
 
@@ -158,6 +162,8 @@ def to_model_answer(
         bodies: Every reply body on the way to the answer, the last one holding
             the reply text.
         tool_calls: The tool calls made on the way, with their results.
+        tools_offered: Whether the model was offered tools; then a tool call
+            it wrote into the text is taken out.
 
     Returns:
         The answer; missing usage counts as no tokens, and the reasoning is
@@ -171,8 +177,9 @@ def to_model_answer(
     reasonings = [
         str(message["reasoning"]) for message in messages if message.get("reasoning")
     ]
+    text = str(messages[-1].get("content") or "")
     return ModelAnswer(
-        text=str(messages[-1].get("content") or ""),
+        text=without_tool_call_markup(text) if tools_offered else text,
         tokens_in=sum(int(usage.get("prompt_tokens") or 0) for usage in usages),
         tokens_out=sum(int(usage.get("completion_tokens") or 0) for usage in usages),
         tool_calls=tuple(tool_calls),
@@ -274,20 +281,36 @@ def build_request(
     return request
 
 
+def wrote_tool_call_as_text(message: dict[str, Any]) -> bool:
+    """Say whether the model wrote a tool call into its reply instead of calling it.
+
+    Args:
+        message: The model's message.
+
+    Returns:
+        True if it calls no tool and its text holds tool-call markup.
+    """
+    return not message.get("tool_calls") and holds_tool_call_markup(
+        str(message.get("content") or "")
+    )
+
+
 def answer_with_tools(
     ask: AskOpenRouter, messages: list[dict[str, Any]], tools: Sequence[ChatTool]
 ) -> ModelAnswer:
     """Let the model call tools, sending back each result, until it replies.
 
     After `MAX_TOOL_ROUNDS` rounds of tool calls the model must reply
-    without calling any more.
+    without calling any more. A model offered tools that writes a tool call
+    into its reply as text is asked again, once per answer; markup still
+    in the reply after that is taken out, so it never reaches a User.
 
     Args:
         ask: Sends the messages to the model, saying whether it may call
             tools, and returns the reply body.
         messages: The messages so far; tool calls and results are added.
         tools: The tools the model may call; with none, the first reply is
-            the answer.
+            the answer, as written.
 
     Returns:
         The reply text, the tokens every round took, every tool call made
@@ -299,12 +322,17 @@ def answer_with_tools(
     tools_by_name = {tool.name: tool for tool in tools}
     bodies: list[dict[str, Any]] = []
     tool_calls: list[ToolCallRecord] = []
+    asked_again = False
     for _ in range(MAX_TOOL_ROUNDS):
-        body = ask(messages, True)
-        bodies.append(body)
-        message = reply_message(body)
+        bodies.append(ask(messages, True))
+        message = reply_message(bodies[-1])
+        if tools and not asked_again and wrote_tool_call_as_text(message):
+            logger.warning("A model wrote a tool call as text; asking it again")
+            asked_again = True
+            bodies.append(ask(messages, True))
+            message = reply_message(bodies[-1])
         if not message.get("tool_calls"):
-            return to_model_answer(bodies, tool_calls)
+            return to_model_answer(bodies, tool_calls, tools_offered=bool(tools))
         messages.append(to_assistant_message(message))
         for tool_call in message["tool_calls"]:
             record = run_tool_call(tool_call, tools_by_name)
@@ -317,7 +345,7 @@ def answer_with_tools(
                 }
             )
     bodies.append(ask(messages, False))
-    return to_model_answer(bodies, tool_calls)
+    return to_model_answer(bodies, tool_calls, tools_offered=bool(tools))
 
 
 def new_http_client() -> httpx.Client:

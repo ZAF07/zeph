@@ -23,6 +23,8 @@ export const modelSteps: { id: ModelStep; label: string }[] = [
   { id: "pattern_other_side", label: "Other side" },
   { id: "pattern_shared_check", label: "Pattern shared check" },
   { id: "prediction_given_check", label: "Prediction given check" },
+  { id: "curiosity_asked_check", label: "Curiosity asked check" },
+  { id: "settings_claim_check", label: "Settings claim check" },
   { id: "pattern_matching", label: "Pattern matching" },
   { id: "patterns", label: "Pattern keeping" },
   { id: "portrait", label: "User Portrait" },

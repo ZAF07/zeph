@@ -1,3 +1,6 @@
+import logging
+from collections.abc import Sequence
+from dataclasses import replace
 from datetime import time
 from typing import Any
 from uuid import UUID
@@ -7,12 +10,15 @@ from companion.core.features import FeatureNotAvailableError
 from companion.core.memory_retrieval import format_day
 from companion.core.models import (
     ChangedBy,
+    ChatLine,
+    ChatRole,
     CheckInChanges,
     CheckInFrequency,
     Directness,
     Feature,
     LifeThread,
     MemoryItem,
+    ModelStep,
     PauseLength,
     PlatformSettings,
     PreferenceChanges,
@@ -20,20 +26,48 @@ from companion.core.models import (
     UserSnapshot,
 )
 from companion.core.platform_settings import (
+    CHECK_IN_MODEL,
     CONFIRMATION_WORD_PLACEHOLDER,
     DATA_DELETION_STARTED_NOTE,
     MEMORY_OFF_CHAT_LINE,
     REPLY_DELETE_DATA_INSTRUCTIONS,
     REPLY_SETTINGS_INSTRUCTIONS,
+    thinking_for_model,
 )
 from companion.core.ports import ChatTool, Repositories
 from companion.core.reply_tools import ReplyContext, ReplyOffer
+from companion.core.usage import UsageRecordingChatModel
 from companion.core.user_data import ChatDataDeletion
 from companion.core.user_memory import MemoryNotFoundError, UserMemoryService
 from companion.core.users import InvalidProfileError, UserService
 
+logger = logging.getLogger(__name__)
+
+LIST_MEMORIES_TOOL = "list_memories"
 DELETE_DATA_TOOL = "start_deleting_my_data"
 CONTESTED_GATHERING_TOOL = "turn_noting_on_disagreed_patterns_on_or_off"
+CLAIM_CHECK_PROMPT = (
+    "You check whether a reply tells someone that one of their settings was "
+    "changed. You are given the settings the reply's tools can change and the "
+    "reply as it will be sent. Answer yes if the reply says, in any words, "
+    "that one of those changes was made or is now in place, or promises to "
+    'act that changed way from now on (e.g. "done, you\'re on gentle now", '
+    '"I\'ve paused your check-ins", "okay, I\'ll stop remembering new '
+    'things", "sure, I\'ll be blunter with you from here on"). Answer no if '
+    "it only asks whether or what to change, says where they can change it "
+    "themselves, says it can't change it, or isn't about any of these "
+    "settings; being kind or careful in this one reply is not a change. "
+    "Answer with only yes or no."
+)
+UNBACKED_CLAIM_NOTE = (
+    "Your last draft of this reply said or promised a change to one of their "
+    "settings, but you called no tool, so nothing was changed and the reply "
+    "would not be true. Write the reply again. If they asked for that change, "
+    "call its settings tool now, before you write anything, and then say what "
+    "you changed. Only if they asked for no change, write the reply without "
+    "saying, promising or hinting that anything was or will be changed. Your "
+    "last draft was:"
+)
 TELL_THEM = "Tell them plainly what you changed."
 NOTHING_CHANGED = "Nothing changed."
 FREQUENCY_WORDS = {
@@ -152,6 +186,61 @@ def describe_listed_memory(memory: MemoryItem | LifeThread) -> str:
     if isinstance(memory, LifeThread):
         return f"A story in their life: {memory.title}. {memory.story}"
     return memory.content
+
+
+def recording_calls(tool: ChatTool, called: list[str]) -> ChatTool:
+    """Make a tool that notes its name each time the model calls it.
+
+    Args:
+        tool: The tool.
+        called: Where the name is added on every call.
+
+    Returns:
+        The same tool, noting its calls.
+    """
+
+    def run(arguments: dict[str, Any]) -> str:
+        """Note the call, then run the tool.
+
+        Args:
+            arguments: The model's arguments.
+
+        Returns:
+            What the tool tells the model back.
+        """
+        called.append(tool.name)
+        return tool.run(arguments)
+
+    return replace(tool, run=run)
+
+
+def describe_reply_for_claim_check(tools: Sequence[ChatTool], reply: str) -> str:
+    """Write what the claim check is given: the settings and the reply.
+
+    Args:
+        tools: The settings tools the reply was offered.
+        reply: The reply as written.
+
+    Returns:
+        One line per tool, with what it changes, then the reply.
+    """
+    tool_lines = "\n".join(f"- {tool.name}: {tool.description}" for tool in tools)
+    return (
+        f"The settings the reply's tools can change:\n{tool_lines}\n\n"
+        f"The reply:\n{reply}"
+    )
+
+
+def read_claim_answer(answer: str) -> bool:
+    """Read the claim check's yes or no.
+
+    Args:
+        answer: The model's answer.
+
+    Returns:
+        True only for an answer that starts with "yes", in any case.
+    """
+    return answer.strip().lower().startswith("yes")
 
 
 class ReplySettingsTools:
@@ -277,7 +366,7 @@ class ReplySettingsTools:
                 run=self._turn_contested_gathering_on_or_off,
             ),
             ChatTool(
-                name="list_memories",
+                name=LIST_MEMORIES_TOOL,
                 description=(
                     "List what you remember about the person and the stories "
                     "in their life you follow, by number, to find the one "
@@ -635,6 +724,11 @@ class SettingsTools:
 
     When Settings in Chat doesn't work for the User, only the tool to delete
     their data is offered: deleting their data never depends on a Feature.
+
+    A reply that calls none of these tools is read by a small model call
+    before it is sent. If it tells the User a setting was changed, the
+    reply is written again, so "it's done" is never sent when nothing was
+    done.
     """
 
     def __init__(
@@ -644,6 +738,7 @@ class SettingsTools:
         check_ins: CheckInService,
         user_memory: UserMemoryService,
         data_deletion: ChatDataDeletion,
+        chat_model: UsageRecordingChatModel,
     ) -> None:
         """Set up the settings tools.
 
@@ -653,12 +748,14 @@ class SettingsTools:
             check_ins: Changes Check-in settings.
             user_memory: Lists and forgets Memory Items and Life Threads.
             data_deletion: Asks to delete the User's data.
+            chat_model: Makes the claim check and records the tokens used.
         """
         self._repositories = repositories
         self._users = users
         self._check_ins = check_ins
         self._user_memory = user_memory
         self._data_deletion = data_deletion
+        self._chat_model = chat_model
 
     def offer(self, snapshot: UserSnapshot, context: ReplyContext) -> ReplyOffer:
         """Pick the settings tools for a reply to a User.
@@ -675,8 +772,9 @@ class SettingsTools:
         Returns:
             The tools and their reply instructions; only the tool to delete
             their data, with its own instructions, when Settings in Chat
-            doesn't work for them.
+            doesn't work for them. Its correction is the claim check.
         """
+        called: list[str] = []
         offer = ReplyOffer()
         reply_tools = ReplySettingsTools(
             snapshot.user.id,
@@ -689,7 +787,7 @@ class SettingsTools:
             offer,
         )
         if snapshot.works(Feature.SETTINGS_IN_CHAT):
-            offer.tools = [
+            tools = [
                 tool
                 for tool in reply_tools.tools
                 if tool.name != CONTESTED_GATHERING_TOOL
@@ -697,9 +795,62 @@ class SettingsTools:
             ]
             instructions = REPLY_SETTINGS_INSTRUCTIONS
         else:
-            offer.tools = [
+            tools = [
                 tool for tool in reply_tools.tools if tool.name == DELETE_DATA_TOOL
             ]
             instructions = REPLY_DELETE_DATA_INSTRUCTIONS
+        offer.tools = [recording_calls(tool, called) for tool in tools]
         offer.instructions = snapshot.settings.get(instructions)
+        offer.correction = lambda reply: self._correction(
+            snapshot, offer.tools, called, reply
+        )
         return offer
+
+    def _correction(
+        self,
+        snapshot: UserSnapshot,
+        tools: Sequence[ChatTool],
+        called: Sequence[str],
+        reply: str,
+    ) -> str:
+        """Say what to tell the model when a reply claims a change it never made.
+
+        A reply that called a settings tool is not read, unless it only
+        listed memories, which changes nothing. Any other is read
+        by one small model call, on the Check-in model, without thinking
+        unless that model always thinks. It never raises: a failed check
+        lets the reply go.
+
+        Args:
+            snapshot: The User being replied to.
+            tools: The settings tools the reply was offered.
+            called: The settings tools the reply called so far.
+            reply: The reply as written.
+
+        Returns:
+            `UNBACKED_CLAIM_NOTE` with the reply under it, if the reply
+            called no settings tool that changes something and says a
+            setting was changed; "" otherwise.
+        """
+        changed = [name for name in called if name != LIST_MEMORIES_TOOL]
+        if changed or not reply.strip():
+            return ""
+        model = snapshot.settings.get(CHECK_IN_MODEL)
+        try:
+            answer = self._chat_model.generate(
+                snapshot=snapshot,
+                step=ModelStep.SETTINGS_CLAIM_CHECK,
+                model=model,
+                thinking=thinking_for_model(snapshot.settings, model, wanted=False),
+                instructions=CLAIM_CHECK_PROMPT,
+                history=[
+                    ChatLine(
+                        role=ChatRole.USER,
+                        text=describe_reply_for_claim_check(tools, reply),
+                    )
+                ],
+            )
+        except Exception:
+            logger.exception("The settings claim check failed; the reply goes")
+            return ""
+        return f"{UNBACKED_CLAIM_NOTE}\n{reply}" if read_claim_answer(answer) else ""

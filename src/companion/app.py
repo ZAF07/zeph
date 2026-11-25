@@ -324,7 +324,9 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             clock=dependencies.clock,
         ),
         curiosity_raiser=CuriosityRaiser(
-            repositories=dependencies.repositories, clock=dependencies.clock
+            repositories=dependencies.repositories,
+            chat_model=chat_model,
+            clock=dependencies.clock,
         ),
         agenda=AgendaReader(
             dependencies.repositories, pattern_catalog_service, dependencies.clock
@@ -371,6 +373,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                     check_ins=check_in_service,
                     user_memory=user_memory_service,
                     data_deletion=chat_data_deletion,
+                    chat_model=chat_model,
                 ),
                 StickerTools(dependencies.repositories),
                 sticker_adding,

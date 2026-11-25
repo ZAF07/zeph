@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import date, datetime
@@ -43,6 +44,7 @@ from companion.core.models import (
     UserSnapshot,
 )
 from companion.core.platform_settings import (
+    CHECK_IN_MODEL,
     CURIOSITIES_PER_CONVERSATION,
     CURIOSITIES_PER_REPLY,
     CURIOSITIES_WAITING_LIMIT,
@@ -53,6 +55,7 @@ from companion.core.platform_settings import (
     CURIOSITY_KEEPING_THINKING,
     CURIOSITY_REPLIES_BETWEEN,
     STARTER_THOUGHT_EXPERIMENT_DAYS,
+    thinking_for_model,
     thinking_to_use,
 )
 from companion.core.ports import Clock, Embedder, Repositories
@@ -100,6 +103,22 @@ ASK_WHY_FIRST_NOTE = (
     "This reply also asks why they feel as they do. Ask that first, then this "
     "after it, so the two read as one easy turn, not a list of questions."
 )
+DROPPED_TOPICS_HEADER = (
+    "They asked you to drop these. Never ask about them or bring them up, not "
+    "in a question of your own or a Move that asks one either, unless they "
+    "bring one up themselves in their latest message:"
+)
+DROPPED_TOPICS_FOR_REPLY = (
+    "They asked you to drop these topics. Don't ask about them or bring them "
+    "up unless they do:"
+)
+ASKED_CHECK_PROMPT = (
+    "You check whether a reply asked what it was meant to ask. You are given "
+    "what the reply was meant to ask and the reply as it was sent. Answer yes "
+    "if the reply asks it, or asks about the same thing in other words, even "
+    "briefly. Answer no if the reply leaves it out, or only mentions the "
+    "topic without asking about it. Answer with only yes or no."
+)
 MORE_THAN_ONE_QUESTION_NOTE = (
     "This reply asks more than one question, which is fine this time, even if "
     "you usually ask at most one. Keep each short."
@@ -131,6 +150,8 @@ class DueCuriosities:
         per_reply: The most one reply may ask.
         awaiting_reaction: The newest Curiosity raised in this Conversation
             while how the User took it isn't known yet; None if there is none.
+        asked_to_drop: Every Curiosity the User asked Zeph to drop, however
+            long ago, newest raised first.
     """
 
     offered: tuple[NumberedCuriosity, ...]
@@ -138,6 +159,7 @@ class DueCuriosities:
     per_conversation: int
     per_reply: int
     awaiting_reaction: Curiosity | None = None
+    asked_to_drop: tuple[Curiosity, ...] = ()
 
     @property
     def left(self) -> int:
@@ -272,6 +294,77 @@ def describe_due_curiosities(due: DueCuriosities, time_zone: str | None) -> str:
     )
 
 
+def list_dropped_topics(asked_to_drop: Sequence[Curiosity]) -> str:
+    """List the topics a User asked Zeph to drop, one per line.
+
+    Args:
+        asked_to_drop: The Curiosities they asked Zeph to drop.
+
+    Returns:
+        E.g. "- How did the big presentation go?"; "" if there are none.
+    """
+    return "\n".join(f"- {curiosity.question}" for curiosity in asked_to_drop)
+
+
+def describe_dropped_topics(due: DueCuriosities) -> str:
+    """Write the topics the User asked to drop as the Reply Plan model reads them.
+
+    Args:
+        due: The Curiosities read for this reply, with those they asked to
+            drop.
+
+    Returns:
+        The rule and the topics, after a blank line; "" if they dropped none.
+    """
+    if not due.asked_to_drop:
+        return ""
+    return f"\n\n{DROPPED_TOPICS_HEADER}\n{list_dropped_topics(due.asked_to_drop)}"
+
+
+def format_dropped_topics_for_reply(due: DueCuriosities) -> str:
+    """Write the reply's section on the topics the User asked to drop.
+
+    Args:
+        due: The Curiosities read for this reply, with those they asked to
+            drop.
+
+    Returns:
+        The section, one of the User's boundaries; "" if they dropped none.
+    """
+    if not due.asked_to_drop:
+        return ""
+    return f"{DROPPED_TOPICS_FOR_REPLY}\n{list_dropped_topics(due.asked_to_drop)}"
+
+
+def describe_reply_for_asked_check(question: str, reply_parts: Sequence[str]) -> str:
+    """Write what the asked check is given: the question and the reply.
+
+    Args:
+        question: What the reply was meant to ask.
+        reply_parts: The reply's texts, in order.
+
+    Returns:
+        The question, then the reply.
+    """
+    reply = "\n".join(reply_parts)
+    return f"What the reply was meant to ask: {question}\n\nThe reply:\n{reply}"
+
+
+def read_asked_answer(answer: str) -> bool:
+    """Read the asked check's yes or no.
+
+    Args:
+        answer: The model's answer.
+
+    Returns:
+        False only for an answer whose first word is "no", in any case; any
+        other answer counts as asked, like a failed check, so a User is
+        never asked the same thing twice because an answer couldn't be read.
+    """
+    words = re.findall(r"[a-z]+", answer.lower())
+    return not words or words[0] != "no"
+
+
 def describe_curiosity_treatments(needs: Sequence[Need]) -> str:
     """Write how each Need treats Curiosities, as the Reply Plan model reads it.
 
@@ -375,22 +468,30 @@ def format_curiosities_for_reply(
 class CuriosityRaiser:
     """Offers the Reply Plan the Curiosities whose day has come.
 
-    No model call: it lists the User's waiting Curiosities whose "not
-    before" day has come in their time zone, until the Conversation has
-    raised as many as Admins allow, never while they are struggling or
-    before the pace allows one, and marks raised the ones a reply brought
-    up. It also saves how the User took the last one, as the Reply Plan read
-    it.
+    It lists the User's waiting Curiosities whose "not before" day has come
+    in their time zone, until the Conversation has raised as many as Admins
+    allow, never while they are struggling or before the pace allows one,
+    with every topic they asked Zeph to drop. Once a reply is sent, a small
+    model call checks whether it really asked each Curiosity the Reply Plan
+    picked, and only those are marked raised. It also saves how the User
+    took the last one, as the Reply Plan read it.
     """
 
-    def __init__(self, repositories: Repositories, clock: Clock) -> None:
+    def __init__(
+        self,
+        repositories: Repositories,
+        chat_model: UsageRecordingChatModel,
+        clock: Clock,
+    ) -> None:
         """Set up the raiser.
 
         Args:
             repositories: Where Curiosities are stored.
+            chat_model: Makes the asked check and records the tokens used.
             clock: Tells the current time.
         """
         self._repositories = repositories
+        self._chat_model = chat_model
         self._clock = clock
 
     def due(
@@ -406,11 +507,13 @@ class CuriosityRaiser:
         Returns:
             The due Curiosities, oldest first; none when Curiosities doesn't
             work for the User, they are struggling, the Conversation raised
-            as many as it may, or the pace doesn't allow one yet.
+            as many as it may, or the pace doesn't allow one yet. The
+            topics they asked to drop are always there.
         """
-        if not snapshot.works(Feature.CURIOSITIES):
-            return NO_DUE_CURIOSITIES
         store = self._repositories.curiosities
+        asked_to_drop = tuple(store.list_asked_to_drop(snapshot.user.id))
+        if not snapshot.works(Feature.CURIOSITIES):
+            return replace(NO_DUE_CURIOSITIES, asked_to_drop=asked_to_drop)
         per_conversation = snapshot.settings.get(CURIOSITIES_PER_CONVERSATION)
         raised_here = store.list_raised_in(conversation_id)
         newest_here = raised_here[-1] if raised_here else None
@@ -424,6 +527,7 @@ class CuriosityRaiser:
                 if newest_here is not None and newest_here.reaction is None
                 else None
             ),
+            asked_to_drop=asked_to_drop,
         )
         if (
             struggling
@@ -496,18 +600,74 @@ class CuriosityRaiser:
             )
         )
 
-    def mark_raised(
-        self, conversation_id: UUID, raised: Sequence[CuriosityToRaise]
-    ) -> None:
-        """Note that the reply just sent brought up some Curiosities.
+    def mark_asked(
+        self,
+        snapshot: UserSnapshot,
+        conversation_id: UUID,
+        picked: Sequence[CuriosityToRaise],
+        reply_parts: Sequence[str],
+    ) -> list[CuriosityToRaise]:
+        """Mark raised the picked Curiosities the reply just sent really asked.
+
+        One the reply left out stays waiting, so it can be offered again
+        and is never read as brushed off.
 
         Args:
+            snapshot: The User the reply went to.
             conversation_id: The Conversation the reply was sent in.
-            raised: The Curiosities the Reply Plan chose to bring up.
+            picked: The Curiosities the Reply Plan chose to bring up.
+            reply_parts: The reply's texts, in order.
+
+        Returns:
+            The Curiosities the reply asked.
         """
+        asked = [
+            item
+            for item in picked
+            if self._was_asked(snapshot, item.question, reply_parts)
+        ]
         self._repositories.curiosities.mark_raised(
-            [item.curiosity_id for item in raised], conversation_id, self._clock.now()
+            [item.curiosity_id for item in asked], conversation_id, self._clock.now()
         )
+        return asked
+
+    def _was_asked(
+        self, snapshot: UserSnapshot, question: str, reply_parts: Sequence[str]
+    ) -> bool:
+        """Ask a small model call whether the reply asked a picked Curiosity.
+
+        It uses the Check-in model, without thinking unless that model
+        always thinks. It never raises: a failed call, or an answer that
+        can't be read, counts as asked, so a User is never asked the same
+        thing twice because a check failed.
+
+        Args:
+            snapshot: The User the reply went to.
+            question: What the reply was meant to ask.
+            reply_parts: The reply's texts, in order.
+
+        Returns:
+            True if the reply asked it.
+        """
+        model = snapshot.settings.get(CHECK_IN_MODEL)
+        try:
+            answer = self._chat_model.generate(
+                snapshot=snapshot,
+                step=ModelStep.CURIOSITY_ASKED_CHECK,
+                model=model,
+                thinking=thinking_for_model(snapshot.settings, model, wanted=False),
+                instructions=ASKED_CHECK_PROMPT,
+                history=[
+                    ChatLine(
+                        role=ChatRole.USER,
+                        text=describe_reply_for_asked_check(question, reply_parts),
+                    )
+                ],
+            )
+        except Exception:
+            logger.exception("The asked check failed; counting the Curiosity as asked")
+            return True
+        return read_asked_answer(answer)
 
 
 @dataclass(frozen=True)

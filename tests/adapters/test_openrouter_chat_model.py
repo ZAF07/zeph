@@ -670,3 +670,79 @@ def test_reasoning_from_every_round_is_returned() -> None:
     answer = generate_with_tools(chat_model)
 
     assert answer.reasoning == "I should search.\n\nNow I can answer."
+
+
+MARKUP_REPLY = (
+    "<tool call>\n\n<function=web_search>\n"
+    "<parameter=query>seneca</parameter>\n</function>\n</tool_call>"
+)
+
+
+def test_a_tool_call_written_as_text_is_asked_again_once() -> None:
+    requests: list[httpx.Request] = []
+    queries: list[str] = []
+    chat_model = scripted_openrouter(
+        [
+            openrouter_reply(MARKUP_REPLY),
+            tool_call_reply('{"query": "seneca"}'),
+            openrouter_reply("Found it."),
+        ],
+        requests,
+    )
+
+    answer = chat_model.generate(
+        model="deepseek/deepseek-v4.1-flash-1017",
+        thinking=False,
+        instructions="Be Zeph.",
+        history=HISTORY,
+        tools=[search_tool(queries)],
+    )
+
+    assert answer.text == "Found it."
+    assert queries == ["seneca"]
+    first_messages = json.loads(requests[0].content)["messages"]
+    assert json.loads(requests[1].content)["messages"] == first_messages
+    assert answer.tokens_in == 42 + 10 + 42
+
+
+def test_tool_call_markup_still_there_after_asking_again_is_never_returned() -> None:
+    requests: list[httpx.Request] = []
+    chat_model = scripted_openrouter(
+        [
+            openrouter_reply(MARKUP_REPLY),
+            openrouter_reply(f"Straight talk it is.\n\n{MARKUP_REPLY}"),
+        ],
+        requests,
+    )
+
+    answer = generate_with_tools(chat_model)
+
+    assert answer.text == "Straight talk it is."
+    assert len(requests) == 2
+
+
+def test_tool_call_markup_is_asked_again_only_once_per_reply() -> None:
+    requests: list[httpx.Request] = []
+    chat_model = scripted_openrouter(
+        [
+            openrouter_reply(MARKUP_REPLY),
+            tool_call_reply('{"query": "seneca"}'),
+            openrouter_reply(MARKUP_REPLY),
+        ],
+        requests,
+    )
+
+    answer = generate_with_tools(chat_model)
+
+    assert answer.text == ""
+    assert len(requests) == 3
+
+
+def test_a_reply_with_no_tools_offered_is_returned_as_written() -> None:
+    requests: list[httpx.Request] = []
+    chat_model = scripted_openrouter([openrouter_reply("<tool_call>")], requests)
+
+    answer = generate(chat_model)
+
+    assert answer.text == "<tool_call>"
+    assert len(requests) == 1

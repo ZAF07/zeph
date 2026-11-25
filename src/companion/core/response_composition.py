@@ -1,6 +1,7 @@
+import logging
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from uuid import UUID
 
 from companion.core.features import FeatureService
@@ -23,7 +24,7 @@ from companion.core.platform_settings import (
     RESPONSE_THINKING,
     thinking_to_use,
 )
-from companion.core.ports import Repositories
+from companion.core.ports import ChatTool, Repositories
 from companion.core.recent_messages import (
     RecentMessages,
     describe_stand_ins,
@@ -39,6 +40,8 @@ from companion.core.reply_tools import (
 )
 from companion.core.transcripts import readable_content
 from companion.core.usage import UsageRecordingChatModel
+
+logger = logging.getLogger(__name__)
 
 BLANK_LINE = re.compile(r"\n\s*\n")
 REPLY_TO_TEXT_MARKER = re.compile(r"^\[\s*re\s*(\d+)\s*\]\s*", re.IGNORECASE)
@@ -89,6 +92,27 @@ class ReplyInstructions:
 
 class EmptyReplyError(Exception):
     """Raised when the chat model's reply has no text, sticker or photo."""
+
+
+class UnbackedClaimError(Exception):
+    """Raised when a reply written twice still says it did what it never did."""
+
+
+def corrections_for(offers: Sequence[ReplyOffer], reply: str) -> list[str]:
+    """Ask each offer whether the reply as written needs writing again.
+
+    Args:
+        offers: The offers the reply was given.
+        reply: The reply as written.
+
+    Returns:
+        What to tell the model before it writes the reply again; empty when
+        the reply may go as it is.
+    """
+    corrections = [
+        offer.correction(reply) for offer in offers if offer.correction is not None
+    ]
+    return [correction for correction in corrections if correction]
 
 
 @dataclass(frozen=True)
@@ -336,6 +360,11 @@ class ResponseComposer:
         part the model starts with "[re 2]" is sent as a reply to that text
         (see `link_to_texts`).
 
+        A reply an offer finds untrue as written (it says a setting was
+        changed, but no settings tool was called) is written once more,
+        told so, and a sticker, photo or closing text the first one picked
+        is dropped; if the second one is no better, nothing of it is sent.
+
         Args:
             recent: The Recent Messages: the Conversation to reply in and every
                 message from the last hours, across Conversations.
@@ -356,6 +385,8 @@ class ResponseComposer:
 
         Raises:
             EmptyReplyError: If the reply has no text, sticker or photo.
+            UnbackedClaimError: If the reply, written twice, still says it
+                did what it never did.
         """
         settings = snapshot.settings
         context = ReplyContext(
@@ -397,16 +428,23 @@ class ResponseComposer:
             history.append(
                 numbered_message_line(message_texts, snapshot.user.time_zone)
             )
-        reply = self._chat_model.generate(
-            snapshot=snapshot,
-            step=ModelStep.REPLY,
-            model=settings.get(RESPONSE_MODEL),
-            thinking=thinking_to_use(settings, RESPONSE_MODEL, RESPONSE_THINKING),
-            instructions=instructions.fixed,
-            history=history,
-            tools=[tool for offer in offers for tool in offer.tools],
-            message_instructions=instructions.for_this_message,
-        )
+        tools = [tool for offer in offers for tool in offer.tools]
+        reply = self._write(snapshot, instructions, history, tools)
+        corrections = corrections_for(offers, reply)
+        if corrections:
+            logger.warning("A reply said it did what it never did; writing it again")
+            corrected = replace(
+                instructions,
+                for_this_message="\n\n".join(
+                    [instructions.for_this_message, *corrections]
+                ),
+            )
+            for offer in offers:
+                offer.picked = None
+                offer.closing_text = ""
+            reply = self._write(snapshot, corrected, history, tools)
+            if corrections_for(offers, reply):
+                raise UnbackedClaimError
         reply_parts = link_to_texts(split_into_messages(reply), message_texts)
         reply_parts += [
             ReplyPart(offer.closing_text) for offer in offers if offer.closing_text
@@ -422,4 +460,34 @@ class ResponseComposer:
             raise EmptyReplyError
         return ComposedReply(
             parts=reply_parts, sticker=sticker, shared_photo=shared_photo
+        )
+
+    def _write(
+        self,
+        snapshot: UserSnapshot,
+        instructions: ReplyInstructions,
+        history: list[ChatLine],
+        tools: Sequence[ChatTool],
+    ) -> str:
+        """Ask the reply model to write the reply once.
+
+        Args:
+            snapshot: The User being replied to.
+            instructions: The reply's instructions, in their two parts.
+            history: The Recent Messages as chat turns.
+            tools: The tools the reply may call.
+
+        Returns:
+            The reply text.
+        """
+        settings = snapshot.settings
+        return self._chat_model.generate(
+            snapshot=snapshot,
+            step=ModelStep.REPLY,
+            model=settings.get(RESPONSE_MODEL),
+            thinking=thinking_to_use(settings, RESPONSE_MODEL, RESPONSE_THINKING),
+            instructions=instructions.fixed,
+            history=history,
+            tools=tools,
+            message_instructions=instructions.for_this_message,
         )

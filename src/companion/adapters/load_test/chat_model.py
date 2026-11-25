@@ -5,6 +5,8 @@ import time
 from collections.abc import Callable, Sequence
 from enum import StrEnum
 
+from companion.core.chat_settings import CLAIM_CHECK_PROMPT
+from companion.core.curiosities import ASKED_CHECK_PROMPT
 from companion.core.models import ChatLine, ModelAnswer, PhotoImage, PlatformSettings
 from companion.core.platform_settings import (
     CHECK_IN_PROMPT,
@@ -47,6 +49,8 @@ class CallShape(StrEnum):
     REPLY = "reply"
     CHECK_IN = "check-in"
     BROUGHT_UP_CHECK = "brought-up check"
+    SETTINGS_CLAIM_CHECK = "settings claim check"
+    CURIOSITY_ASKED_CHECK = "curiosity asked check"
     CONVERSATION_END = "conversation end"
     LIFE_THREADS = "life threads"
     PATTERN_TAGGING = "pattern tagging"
@@ -96,6 +100,8 @@ def shape_of(instructions: str, settings: PlatformSettings) -> CallShape:
             CallShape.KNOWLEDGE_WHEN_IT_HELPS
         ),
         BROUGHT_UP_CHECK_PROMPT: CallShape.BROUGHT_UP_CHECK,
+        CLAIM_CHECK_PROMPT: CallShape.SETTINGS_CLAIM_CHECK,
+        ASKED_CHECK_PROMPT: CallShape.CURIOSITY_ASKED_CHECK,
     }
     if instructions in whole_prompts:
         return whole_prompts[instructions]
@@ -259,8 +265,10 @@ class LoadTestChatModel:
                 return reply_plan_answer(self._first_need())
             case CallShape.CHECK_IN:
                 return self._check_in_answer(history)
-            case CallShape.BROUGHT_UP_CHECK:
+            case CallShape.BROUGHT_UP_CHECK | CallShape.SETTINGS_CLAIM_CHECK:
                 return "no"
+            case CallShape.CURIOSITY_ASKED_CHECK:
+                return "yes"
             case CallShape.CONVERSATION_END:
                 return conversation_end_answer()
             case CallShape.LIFE_THREADS:

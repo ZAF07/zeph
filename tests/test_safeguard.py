@@ -68,10 +68,12 @@ def test_safeguard_checks_every_message_before_the_reply_is_written(
         "understanding",
         "reply_plan",
         "reply",
+        "claim_check",
         "safeguard",
         "understanding",
         "reply_plan",
         "reply",
+        "claim_check",
     ]
     first, second = chat_model.safeguard_calls
     assert first.model == seeded_settings["safeguard_model"]
