@@ -203,6 +203,20 @@ should. This says nothing yet about the 70% target: the look-alike cases
 (`goes-quiet-and-says-fine`, `cannot-stand-waiting`, `never-arrives`) have
 not been run, and no case has had a Pattern shared.
 
+## First Agenda results (25 Nov 2026)
+
+The twelve cases were run once with the real model: 9 passed, 3 failed,
+about 108,000 tokens in and 22,000 out, S$0.075. The Reply Plan picked the
+aimed Curiosity for each open need and for the Thought Experiment, and left
+the story alone in all four must-not-ask cases. All three Tagging cases
+passed: the plain answer settled the story, and the other two left it
+unclear. What failed: one reply said the User's own words back when it
+asked ("You said yes the moment she asked"); with two Explorations the
+Reply Plan asked neither; and the first struggling Message was taken by the
+Safeguard as a crisis, so that case was rewritten (it then passed). One run
+proves little: use Repeats. The findings are in
+`.scratch/pattern-pipeline/issues/20-findings-for-the-owner.md`, section 25.
+
 ## How to run the Whole-pipeline Eval
 
 It costs far more than the other Evals: every text is a full reply (the
