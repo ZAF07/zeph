@@ -3964,6 +3964,7 @@ class PostgresPatternRepository:
                     for narrowing in row.narrowings
                 ),
                 other_side_asked_at=row.other_side_asked_at,
+                other_side_found_better=row.other_side_found_better,
             )
             for row in rows
         ]
@@ -4019,6 +4020,9 @@ class PostgresPatternRepository:
                         blocked_by=bindparam("new_blocked_by"),
                         narrowings=bindparam("new_narrowings", type_=JSONB),
                         other_side_asked_at=bindparam("new_other_side_asked_at"),
+                        other_side_found_better=bindparam(
+                            "new_other_side_found_better"
+                        ),
                     ),
                     [
                         {
@@ -4035,6 +4039,9 @@ class PostgresPatternRepository:
                                 for narrowing in pattern.narrowings
                             ],
                             "new_other_side_asked_at": pattern.other_side_asked_at,
+                            "new_other_side_found_better": (
+                                pattern.other_side_found_better
+                            ),
                         }
                         for pattern in changed
                     ],

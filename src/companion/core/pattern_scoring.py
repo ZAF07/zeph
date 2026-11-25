@@ -12,6 +12,7 @@ from companion.core.models import (
     PatternMoveCause,
     PatternState,
     PlatformSettings,
+    ReadyCheck,
     SignStrength,
     User,
 )
@@ -328,6 +329,7 @@ def logged_move(
     cause: PatternMoveCause,
     conversation_id: UUID | None,
     now: datetime,
+    blocked_by: ReadyCheck | None = None,
 ) -> PatternMove:
     """Write one move of a Pattern as its log keeps it.
 
@@ -339,6 +341,7 @@ def logged_move(
         cause: What made it be scored again.
         conversation_id: The Conversation tagged, when that is the cause.
         now: When it moved.
+        blocked_by: The ready check to record, for a move to or from ready.
 
     Returns:
         The move.
@@ -355,6 +358,7 @@ def logged_move(
         points=score.points,
         situations=score.situations,
         moved_at=now,
+        blocked_by=blocked_by,
     )
 
 

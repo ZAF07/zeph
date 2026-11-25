@@ -17,6 +17,7 @@ from companion.core.models import (
     Observation,
     ObservationDirection,
     Pattern,
+    PatternMove,
     PatternMoveCause,
     PatternNarrowing,
     PatternReaction,
@@ -39,6 +40,7 @@ from companion.core.pattern_catalog import PatternCatalogService
 from companion.core.pattern_scoring import (
     PatternScore,
     ScoringNumbers,
+    StateBars,
     logged_move,
     observation_points,
     score_observations,
@@ -146,6 +148,7 @@ class GateFacts:
             didn't raise.
         rejected: Whether the User rejected it.
         pattern_type_approved: Whether its Pattern Type is approved.
+        narrowings: Where counter-tests showed it doesn't happen.
         unchecked_quotes: How many of its quotes are not word for word in
             the User's texts still kept; None while not looked at, which
             blocks.
@@ -165,6 +168,7 @@ class GateFacts:
     ruled_out_topic: bool
     rejected: bool
     pattern_type_approved: bool
+    narrowings: tuple[PatternNarrowing, ...] = ()
     unchecked_quotes: int | None = None
     better_explanation: bool | None = None
 
@@ -189,7 +193,7 @@ class UserSafety:
     rejected_pattern_type_ids: frozenset[str]
 
 
-def passes(score: PatternScore, bars: ReadyBars) -> bool:
+def meets_bars(score: PatternScore, bars: ReadyBars) -> bool:
     """Say whether a score is in enough situations and past the score bar.
 
     Args:
@@ -227,9 +231,9 @@ def ready_check(facts: GateFacts, bars: ReadyBars) -> ReadyCheck | None:
         return ReadyCheck.COUNTER_TEST
     if facts.score.points < bars.points:
         return ReadyCheck.SCORE
-    if not passes(facts.clear_score, bars):
+    if not meets_bars(facts.clear_score, bars):
         return ReadyCheck.CLEAR
-    if not passes(facts.score_without_situational, bars):
+    if not meets_bars(facts.score_without_situational, bars):
         return ReadyCheck.SITUATIONAL
     if facts.exclusion_applies or facts.recent_safeguard_event or facts.ruled_out_topic:
         return ReadyCheck.SAFE
@@ -388,6 +392,7 @@ def gate_facts(
         ),
         rejected=pattern_type.id in safety.rejected_pattern_type_ids,
         pattern_type_approved=pattern_type.status == PatternTypeStatus.APPROVED,
+        narrowings=narrowings,
     )
 
 
@@ -545,7 +550,7 @@ def rejected_before_the_catalog(patterns: Sequence[Pattern]) -> frozenset[str]:
 
 
 @dataclass(frozen=True)
-class Judged:
+class JudgedPattern:
     """One Pattern as the gate judged it from what is stored.
 
     Attributes:
@@ -554,7 +559,6 @@ class Judged:
         observations: Its Observations.
         facts: What code found out about it.
         bars: The bars it must pass.
-        narrowings: Where it was shown not to happen.
         scored: Its score as scoring counts it, for the log.
     """
 
@@ -563,12 +567,32 @@ class Judged:
     observations: list[Observation]
     facts: GateFacts
     bars: ReadyBars
-    narrowings: tuple[PatternNarrowing, ...]
     scored: PatternScore
 
 
-def has_new_evidence(judged: Judged) -> bool:
-    """Say whether the other side should be argued for a Pattern now.
+@dataclass(frozen=True)
+class LastChecks:
+    """What the gate's last two checks found for one Pattern.
+
+    Attributes:
+        pattern_id: The Pattern.
+        observation_ids: The Observations that were looked at.
+        unchecked_quotes: How many of their quotes failed the check.
+        better_explanation: What the other side found; None when it wasn't
+            asked or the call failed.
+        asked_now: Whether a model was asked just now, and not its earlier
+            answer on the same evidence used.
+    """
+
+    pattern_id: UUID
+    observation_ids: frozenset[UUID]
+    unchecked_quotes: int
+    better_explanation: bool | None
+    asked_now: bool
+
+
+def has_new_evidence(judged: JudgedPattern) -> bool:
+    """Say whether a Pattern has evidence the other side hasn't argued yet.
 
     Args:
         judged: The Pattern.
@@ -581,6 +605,37 @@ def has_new_evidence(judged: Judged) -> bool:
     return asked_at is None or any(
         observation.tagged_at > asked_at for observation in judged.observations
     )
+
+
+def taken_back(
+    pattern: CatalogPattern,
+    blocked_by: ReadyCheck,
+    scored: PatternScore,
+    bars: StateBars,
+    cause: PatternMoveCause,
+    conversation_id: UUID | None,
+    now: datetime,
+) -> tuple[CatalogPattern, PatternMove]:
+    """Move a ready Pattern that fails a check back to where its score puts it.
+
+    Args:
+        pattern: The ready Pattern.
+        blocked_by: The check it now fails.
+        scored: Its score as scoring counts it.
+        bars: The Admin-set state bars.
+        cause: What made the gate look.
+        conversation_id: The Conversation tagged, when that is the cause.
+        now: When it is moved.
+
+    Returns:
+        The Pattern, suspected, noticed or closed, and the move for the log
+        with the check it failed.
+    """
+    state = state_for(PatternState.SUSPECTED, scored, bars)
+    move = logged_move(
+        pattern, pattern.state, state, scored, cause, conversation_id, now, blocked_by
+    )
+    return replace(pattern, state=state, updated_at=now, blocked_by=blocked_by), move
 
 
 class ReadyKeeper:
@@ -616,12 +671,13 @@ class ReadyKeeper:
         settings: PlatformSettings,
         cause: PatternMoveCause,
         conversation_id: UUID | None = None,
-    ) -> list[Judged]:
+    ) -> list[JudgedPattern]:
         """Judge the User's suspected and ready Patterns from what is stored.
 
-        The User is locked, like scoring. A ready Pattern failing a check is
-        moved back to where its score puts it. A suspected one's blocking
-        check and narrowings are saved.
+        The User is locked, like scoring. A ready Pattern that fails a
+        check, or whose Pattern Type left the catalog, is moved back to
+        where its score puts it. Each Pattern's blocking check and
+        narrowings are saved.
 
         Args:
             user: The User.
@@ -631,65 +687,65 @@ class ReadyKeeper:
 
         Returns:
             The suspected Patterns only the last two checks still block,
-            with new evidence since the other side was last argued.
+            left out when the other side already found a better
+            explanation of the same evidence.
         """
         with self._repositories.transaction() as transaction:
             transaction.lock_user(user.id)
             repositories = transaction.repositories
-            judged = self._judge(repositories, user, settings)
+            patterns = self._patterns_to_judge(repositories, user)
+            all_judged = self._judge(repositories, user, settings, patterns)
             now = self._clock.now()
-            changed, moves, waiting = [], [], []
-            for one in judged:
-                pattern = one.pattern
+            bars = state_bars(settings)
+            judged_ids = {judged.pattern.id for judged in all_judged}
+            taken = [
+                taken_back(
+                    pattern,
+                    ReadyCheck.ALLOWED,
+                    PatternScore(points=0.0, situations=0),
+                    bars,
+                    cause,
+                    conversation_id,
+                    now,
+                )
+                for pattern in patterns
+                if pattern.id not in judged_ids and pattern.state == PatternState.READY
+            ]
+            changed = [pattern for pattern, _ in taken]
+            moves = [move for _, move in taken]
+            waiting = []
+            for judged in all_judged:
+                pattern = replace(judged.pattern, narrowings=judged.facts.narrowings)
                 if pattern.state == PatternState.READY:
                     blocked = ready_check(
                         replace(
-                            one.facts, unchecked_quotes=0, better_explanation=False
+                            judged.facts, unchecked_quotes=0, better_explanation=False
                         ),
-                        one.bars,
+                        judged.bars,
                     )
-                    if blocked is None:
-                        continue
-                    state = state_for(
-                        PatternState.SUSPECTED, one.scored, state_bars(settings)
-                    )
-                    moves.append(
-                        replace(
-                            logged_move(
-                                pattern,
-                                pattern.state,
-                                state,
-                                one.scored,
-                                cause,
-                                conversation_id,
-                                now,
-                            ),
-                            blocked_by=blocked,
-                        )
-                    )
-                    changed.append(
-                        replace(
+                    if blocked is not None:
+                        pattern, move = taken_back(
                             pattern,
-                            state=state,
-                            updated_at=now,
-                            blocked_by=blocked,
-                            narrowings=one.narrowings,
+                            blocked,
+                            judged.scored,
+                            bars,
+                            cause,
+                            conversation_id,
+                            now,
                         )
-                    )
-                    continue
-                blocked = ready_check(one.facts, one.bars)
-                if blocked == ReadyCheck.QUOTES:
-                    if has_new_evidence(one):
-                        waiting.append(one)
-                        continue
-                    blocked = ReadyCheck.OTHER_SIDE
-                if (blocked, one.narrowings) != (
-                    pattern.blocked_by,
-                    pattern.narrowings,
-                ):
-                    changed.append(
-                        replace(pattern, blocked_by=blocked, narrowings=one.narrowings)
-                    )
+                        moves.append(move)
+                else:
+                    blocked = ready_check(judged.facts, judged.bars)
+                    if blocked == ReadyCheck.QUOTES:
+                        if has_new_evidence(judged) or not (
+                            pattern.other_side_found_better
+                        ):
+                            waiting.append(judged)
+                            continue
+                        blocked = ReadyCheck.OTHER_SIDE
+                    pattern = replace(pattern, blocked_by=blocked)
+                if pattern != judged.pattern:
+                    changed.append(pattern)
             repositories.patterns.save_moves([], changed, [], moves)
             return waiting
 
@@ -697,75 +753,69 @@ class ReadyKeeper:
         self,
         user: User,
         settings: PlatformSettings,
-        pattern_id: UUID,
-        unchecked_quotes: int,
-        better_explanation: bool | None,
-        cause: PatternMoveCause,
         conversation_id: UUID,
+        last_checks: LastChecks,
     ) -> None:
         """Judge one Pattern again with the last two checks, and move it.
 
         The User is locked and everything read again, so evidence deleted
-        while the model was asked is never counted.
+        while the model was asked is never counted. If its Observations are
+        no longer the ones looked at, the last two checks count as not
+        made, and it waits for the next Conversation end.
 
         Args:
             user: The User.
             settings: The platform settings.
-            pattern_id: The Pattern.
-            unchecked_quotes: How many of its quotes failed the check.
-            better_explanation: What the other side found; None when it
-                wasn't asked or the call failed.
-            cause: What made the gate run.
             conversation_id: The ended Conversation.
+            last_checks: What the last two checks found.
         """
         with self._repositories.transaction() as transaction:
             transaction.lock_user(user.id)
             repositories = transaction.repositories
-            judged = self._judge(repositories, user, settings)
-            one = next(
-                (
-                    one
-                    for one in judged
-                    if one.pattern.id == pattern_id
-                    and one.pattern.state == PatternState.SUSPECTED
-                ),
-                None,
-            )
-            if one is None:
+            patterns = [
+                pattern
+                for pattern in self._patterns_to_judge(repositories, user)
+                if pattern.id == last_checks.pattern_id
+                and pattern.state == PatternState.SUSPECTED
+            ]
+            all_judged = self._judge(repositories, user, settings, patterns)
+            if not all_judged:
                 return
+            [judged] = all_judged
+            same_evidence = last_checks.observation_ids == frozenset(
+                observation.id for observation in judged.observations
+            )
+            better = last_checks.better_explanation if same_evidence else None
             now = self._clock.now()
             blocked = ready_check(
                 replace(
-                    one.facts,
-                    unchecked_quotes=unchecked_quotes,
-                    better_explanation=better_explanation,
+                    judged.facts,
+                    unchecked_quotes=(
+                        last_checks.unchecked_quotes if same_evidence else None
+                    ),
+                    better_explanation=better,
                 ),
-                one.bars,
+                judged.bars,
             )
             pattern = replace(
-                one.pattern,
-                blocked_by=blocked,
-                narrowings=one.narrowings,
-                other_side_asked_at=(
-                    now
-                    if better_explanation is not None
-                    else one.pattern.other_side_asked_at
-                ),
+                judged.pattern, blocked_by=blocked, narrowings=judged.facts.narrowings
             )
+            if last_checks.asked_now and better is not None:
+                pattern = replace(
+                    pattern, other_side_asked_at=now, other_side_found_better=better
+                )
             if blocked is not None:
                 repositories.patterns.save_moves([], [pattern], [], [])
                 return
-            move = replace(
-                logged_move(
-                    pattern,
-                    pattern.state,
-                    PatternState.READY,
-                    one.scored,
-                    cause,
-                    conversation_id,
-                    now,
-                ),
-                blocked_by=one.pattern.blocked_by,
+            move = logged_move(
+                pattern,
+                pattern.state,
+                PatternState.READY,
+                judged.scored,
+                PatternMoveCause.CONVERSATION_TAGGED,
+                conversation_id,
+                now,
+                judged.pattern.blocked_by,
             )
             repositories.patterns.save_moves(
                 [],
@@ -774,25 +824,43 @@ class ReadyKeeper:
                 [move],
             )
 
+    def _patterns_to_judge(
+        self, repositories: Repositories, user: User
+    ) -> list[CatalogPattern]:
+        """List the User's Patterns the gate looks at.
+
+        Args:
+            repositories: The repositories, inside the locking transaction.
+            user: The User.
+
+        Returns:
+            Their suspected and ready Patterns of Pattern Types.
+        """
+        return [
+            pattern
+            for pattern in repositories.patterns.list_of_pattern_types(user.id)
+            if pattern.state in STATES_THE_GATE_LOOKS_AT
+        ]
+
     def _judge(
-        self, repositories: Repositories, user: User, settings: PlatformSettings
-    ) -> list[Judged]:
-        """Find out the facts about each suspected or ready Pattern of a User.
+        self,
+        repositories: Repositories,
+        user: User,
+        settings: PlatformSettings,
+        patterns: Sequence[CatalogPattern],
+    ) -> list[JudgedPattern]:
+        """Find out the facts about some of a User's Patterns.
 
         Args:
             repositories: The repositories, inside the locking transaction.
             user: The User.
             settings: The platform settings.
+            patterns: Their Patterns to judge.
 
         Returns:
-            Each of those Patterns whose Pattern Type is in the catalog now,
-            judged; none when they have none, which reads nothing more.
+            Each of those whose Pattern Type is in the catalog now, judged;
+            with no Patterns, nothing more is read.
         """
-        patterns = [
-            pattern
-            for pattern in repositories.patterns.list_of_pattern_types(user.id)
-            if pattern.state in STATES_THE_GATE_LOOKS_AT
-        ]
         if not patterns:
             return []
         catalog = self._pattern_catalog.catalog()
@@ -828,7 +896,7 @@ class ReadyKeeper:
             exploration.pattern_id: exploration.id
             for exploration in repositories.explorations.list_for_user(user.id)
         }
-        judged = []
+        all_judged = []
         for pattern in patterns:
             pattern_type = pattern_types.get(pattern.pattern_type_id)
             if pattern_type is None:
@@ -839,8 +907,8 @@ class ReadyKeeper:
                 for attempt in tries
                 if attempt.exploration_id == exploration_ids.get(pattern.id)
             ]
-            judged.append(
-                Judged(
+            all_judged.append(
+                JudgedPattern(
                     pattern=pattern,
                     pattern_type=pattern_type,
                     observations=its_observations,
@@ -848,11 +916,10 @@ class ReadyKeeper:
                         pattern_type, its_observations, its_tries, safety, weighing
                     ),
                     bars=ready_bars(settings, pattern_type),
-                    narrowings=narrowings_of(its_observations),
                     scored=weighing.score(its_observations),
                 )
             )
-        return judged
+        return all_judged
 
 
 class ReadyGate:
@@ -890,7 +957,9 @@ class ReadyGate:
         A ready Pattern that now fails a check goes back. A suspected one
         that passes every stored check has its quotes read again and the
         other side argued, outside the lock, and is then judged once more
-        under it before it becomes ready.
+        under it before it becomes ready. The other side is asked only
+        about evidence it hasn't argued yet; its earlier answer stands for
+        the same evidence.
 
         Args:
             snapshot: The User whose Conversation it was.
@@ -900,15 +969,25 @@ class ReadyGate:
         cause = PatternMoveCause.CONVERSATION_TAGGED
         for judged in self._ready_keeper.look(user, settings, cause, conversation_id):
             unchecked = self._count_unchecked_quotes(judged.observations)
-            better = None if unchecked else self._argue_other_side(snapshot, judged)
+            ask_now = not unchecked and has_new_evidence(judged)
+            better = (
+                self._argue_other_side(snapshot, judged)
+                if ask_now
+                else judged.pattern.other_side_found_better
+            )
             self._ready_keeper.settle(
                 user,
                 settings,
-                judged.pattern.id,
-                unchecked,
-                better,
-                cause,
                 conversation_id,
+                LastChecks(
+                    pattern_id=judged.pattern.id,
+                    observation_ids=frozenset(
+                        observation.id for observation in judged.observations
+                    ),
+                    unchecked_quotes=unchecked,
+                    better_explanation=None if unchecked else better,
+                    asked_now=ask_now,
+                ),
             )
 
     def _count_unchecked_quotes(self, observations: Sequence[Observation]) -> int:
@@ -931,7 +1010,9 @@ class ReadyGate:
         }
         return count_unchecked_quotes(observations, kept_texts)
 
-    def _argue_other_side(self, snapshot: UserSnapshot, judged: Judged) -> bool | None:
+    def _argue_other_side(
+        self, snapshot: UserSnapshot, judged: JudgedPattern
+    ) -> bool | None:
         """Ask a model for a better explanation of a Pattern's evidence.
 
         An unreadable answer is asked once more. A failed call is logged
@@ -949,7 +1030,7 @@ class ReadyGate:
         description = describe_pattern_to_argue(
             judged.pattern_type,
             judged.observations,
-            judged.narrowings,
+            judged.facts.narrowings,
             snapshot.user.time_zone,
             self._clock.now(),
         )

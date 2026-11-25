@@ -3294,8 +3294,10 @@ class CatalogPattern:
         blocked_by: The ready check that last stopped it being ready; None
             if the ready gate never looked at it or nothing stops it.
         narrowings: Where counter-tests showed it doesn't happen.
-        other_side_asked_at: When a model last argued the other side; None
-            if never.
+        other_side_asked_at: When a model last argued the other side and
+            gave a readable answer; None if never.
+        other_side_found_better: Whether it then found a better
+            explanation; None if never asked.
     """
 
     id: UUID
@@ -3307,6 +3309,7 @@ class CatalogPattern:
     blocked_by: ReadyCheck | None = None
     narrowings: tuple[PatternNarrowing, ...] = ()
     other_side_asked_at: datetime | None = None
+    other_side_found_better: bool | None = None
 
 
 @dataclass(frozen=True)

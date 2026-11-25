@@ -22,6 +22,7 @@ from companion.core.models import (
     SafeguardEvent,
 )
 from companion.core.pattern_catalog import PatternCatalogService
+from companion.core.ready_gate import LastChecks, ReadyKeeper
 from tests.conftest import PATTERN_CATALOG_DIR
 from tests.fakes import (
     FakeAuthVerifier,
@@ -33,6 +34,8 @@ from tests.fakes import (
 from tests.telegram_helpers import auth_headers, connect_telegram, owner_headers
 from tests.test_life_threads import end_conversation
 from tests.test_moves_migration import downgrade_to
+from tests.test_pattern_catalog import load_catalog
+from tests.test_pattern_catalog_reader import VALID
 from tests.test_pattern_states import (
     BELONG,
     MEI_STORY,
@@ -825,3 +828,124 @@ def test_the_migration_keeps_user_data_and_reloads_the_tagging_prompt(
             )
         ).scalar_one()
     assert stored == 0
+
+
+def add_safeguard_event(engine: Engine, user_id: str, clock: FakeClock) -> None:
+    """Record a Safeguard Event for the User, now."""
+    build_postgres_repositories(engine).safeguard_events.add(
+        SafeguardEvent(
+            id=uuid4(),
+            user_id=UUID(user_id),
+            risk_type=RiskType.SUICIDE_OR_SELF_HARM,
+            created_at=clock.now(),
+            helplines_country=None,
+        )
+    )
+
+
+def test_a_pattern_taken_back_for_safety_is_ready_again_without_asking_the_model(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    user_id = turn_noticing_on(client, auth_verifier)
+    make_belonging_ready(client, chat_model, clock, scheduler, seeded_settings)
+    add_safeguard_event(client.engine, user_id, clock)
+
+    end_tagged(client, chat_model, clock, scheduler, seeded_settings, [], "hello again")
+
+    pattern = belonging(client.engine, user_id)
+    assert (pattern.state, pattern.blocked_by) == (
+        PatternState.SUSPECTED,
+        ReadyCheck.SAFE,
+    )
+    assert pattern.narrowings != ()
+
+    change_settings(client, auth_verifier, {"pattern_safeguard_quiet_days": 0})
+    end_tagged(client, chat_model, clock, scheduler, seeded_settings, [], "and again")
+
+    assert belonging(client.engine, user_id).state == PatternState.READY
+    assert moves_of(client.engine, user_id)[-1].blocked_by == ReadyCheck.SAFE
+    assert len(chat_model.other_side_calls) == 1
+
+
+def test_a_ready_pattern_whose_pattern_type_left_the_catalog_goes_back(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    user_id = turn_noticing_on(client, auth_verifier)
+    make_belonging_ready(client, chat_model, clock, scheduler, seeded_settings)
+    load_catalog(client.engine, tmp_path / "catalog", VALID)
+
+    end_tagged(client, chat_model, clock, scheduler, seeded_settings, [], "hello again")
+
+    pattern = belonging(client.engine, user_id)
+    assert pattern.state != PatternState.READY
+    assert pattern.blocked_by == ReadyCheck.ALLOWED
+    assert moves_of(client.engine, user_id)[-1].blocked_by == ReadyCheck.ALLOWED
+
+
+def test_checks_made_on_other_evidence_than_is_stored_now_never_make_it_ready(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    user_id = turn_noticing_on(client, auth_verifier)
+    chat_model.script_other_side(RuntimeError("model down"))
+    make_belonging_ready(client, chat_model, clock, scheduler, seeded_settings)
+    repositories = build_postgres_repositories(client.engine)
+    keeper = ReadyKeeper(
+        repositories, PatternCatalogService(repositories.pattern_catalog), clock
+    )
+    user = repositories.users.get(UUID(user_id))
+    assert user is not None
+    settings = repositories.platform_settings.load()
+    pattern = belonging(client.engine, user_id)
+    observations = observations_of(client.engine, user_id)
+    seen_before_one_was_tagged = frozenset(
+        observation.id for observation in observations[:-1]
+    )
+
+    keeper.settle(
+        user,
+        settings,
+        observations[0].conversation_id,
+        LastChecks(pattern.id, seen_before_one_was_tagged, 0, False, True),
+    )
+
+    after = belonging(client.engine, user_id)
+    assert after.state == PatternState.SUSPECTED
+    assert after.blocked_by == ReadyCheck.QUOTES
+    assert after.other_side_asked_at is None
+
+    keeper.settle(
+        user,
+        settings,
+        observations[0].conversation_id,
+        LastChecks(
+            pattern.id,
+            frozenset(observation.id for observation in observations),
+            0,
+            False,
+            True,
+        ),
+    )
+
+    assert belonging(client.engine, user_id).state == PatternState.READY

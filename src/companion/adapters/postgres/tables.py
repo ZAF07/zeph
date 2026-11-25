@@ -565,6 +565,7 @@ patterns = Table(
     Column("blocked_by", Text),
     Column("narrowings", JSONB, nullable=False, server_default="[]"),
     Column("other_side_asked_at", DateTime(timezone=True)),
+    Column("other_side_found_better", Boolean),
     UniqueConstraint(
         "user_id", "pattern_type_id", name="uq_patterns_user_id_pattern_type_id"
     ),

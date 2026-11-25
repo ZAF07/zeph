@@ -2,10 +2,11 @@
 
 Adds what the gate keeps on a Pattern (`patterns.blocked_by`, the ready
 check that last stopped it; `narrowings`, where a counter-test showed it
-doesn't happen; `other_side_asked_at`), the check on each logged move to or
-from ready (`pattern_moves.blocked_by`), what the tagging step now notes on
-an Observation (`excluded`, `ruled_out_topic`, `raised_by_user`) and the
-exclusions that apply to a User now (`pattern_exclusion_flags`).
+doesn't happen; `other_side_asked_at` and `other_side_found_better`), the
+check on each logged move to or from ready (`pattern_moves.blocked_by`),
+what the tagging step now notes on an Observation (`excluded`,
+`ruled_out_topic`, `raised_by_user`) and the exclusions that apply to a
+User now (`pattern_exclusion_flags`).
 `pattern_tagging_prompt` reloads from the seed on next start, even where an
 Admin edited it, since the tagging step now flags exclusions and ruled-out
 topics. The bars, the ruled-out topics and the other-side prompt come from
@@ -40,6 +41,7 @@ def upgrade() -> None:
     op.add_column(
         "patterns", sa.Column("other_side_asked_at", sa.DateTime(timezone=True))
     )
+    op.add_column("patterns", sa.Column("other_side_found_better", sa.Boolean))
     op.add_column("pattern_moves", sa.Column("blocked_by", sa.Text))
     op.add_column(
         "observations",
@@ -79,6 +81,7 @@ def downgrade() -> None:
     op.drop_column("observations", "ruled_out_topic")
     op.drop_column("observations", "excluded")
     op.drop_column("pattern_moves", "blocked_by")
+    op.drop_column("patterns", "other_side_found_better")
     op.drop_column("patterns", "other_side_asked_at")
     op.drop_column("patterns", "narrowings")
     op.drop_column("patterns", "blocked_by")
