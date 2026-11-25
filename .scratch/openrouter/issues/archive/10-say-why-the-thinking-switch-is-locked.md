@@ -42,4 +42,4 @@ In Prompts and models, the thinking switch is locked for a model that can't thin
 ## Completion
 
 - Completed: 2026-11-25
-- Commit: <to be filled in after the merge>
+- Commit: 422ede3 (merge of openrouter-10-why-thinking-is-locked; work in 1a0f3bf 6961146)
