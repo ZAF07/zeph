@@ -53,4 +53,4 @@ Design files: `web/design/reference/AdminPatternCatalog.html` and its baseline w
 ## Completion
 
 - Completed: 2026-11-25
-- Commit: MERGE_COMMIT
+- Commit: efe99ea5 ("Merge pattern-30-owner-decisions-before-sharing: the owner's decisions before Pattern sharing is on", the merge of pattern-30-owner-decisions-before-sharing into main; work commits b4fdc35d, 351f74c8, ec11f7a8, e21f096b, f9225f60, 7522ee99, 45d716a0, cc0fd499, ff840919, 875f3175, 88bc0a4a)
