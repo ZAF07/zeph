@@ -3141,6 +3141,30 @@ def test_a_whole_pipeline_case_shows_a_conversation_end_step_that_failed(
     ]
 
 
+def test_a_whole_pipeline_case_whose_conversation_end_fails_names_what_failed(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, BELONGING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.WHOLE_PIPELINE)
+    chat_model.script("Mm.")
+    chat_model.script_processing(RuntimeError("the model is down"))
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "error"
+    assert result["error"] == (
+        "The Conversation-end steps didn't finish; "
+        "Could not process an ended Conversation: "
+        "RuntimeError('the model is down')"
+    )
+
+
 def test_a_variant_s_override_changes_what_becomes_ready_in_a_whole_pipeline_case(
     client: TestClient,
     engine: Engine,

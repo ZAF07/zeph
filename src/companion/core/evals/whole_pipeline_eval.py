@@ -28,7 +28,7 @@ MESSAGE_GAP = timedelta(minutes=1)
 STATES_THAT_COUNT = frozenset({PatternState.READY, PatternState.SHARED})
 NOTHING_READY = "nothing ready"
 TRUE_PATTERNS_FOUND = "true Patterns found"
-CONVERSATION_END_STEP = "Conversation-end step failed"
+CONVERSATION_END_STEP_FAILED = "Conversation-end step failed"
 TARGET_PERCENT_OF_READY_TRUE = 70
 
 
@@ -131,22 +131,17 @@ def pipeline_facts(
     }
 
 
-def check_ready_patterns(
-    facts: Mapping[str, Any], failed_steps: Sequence[str] = ()
-) -> list[Check]:
-    """Check the ready Patterns are true ones, a true one was found and no step failed.
+def check_ready_patterns(facts: Mapping[str, Any]) -> list[Check]:
+    """Check the ready Patterns are true ones and a true one was found.
 
     Args:
         facts: What `pipeline_facts` wrote.
-        failed_steps: Each Conversation-end step that failed and was
-            skipped, one line each.
 
     Returns:
         One check per ready or shared Pattern, passed when it is true of
         the User. When the User has true Patterns, one "true Patterns
         found" check, failed when none of them became ready. With neither,
-        one passed "nothing ready" check. Then one failed check per failed
-        step.
+        one passed "nothing ready" check.
     """
     checks = [
         Check(
@@ -171,9 +166,21 @@ def check_ready_patterns(
         checks.append(
             Check(NOTHING_READY, True, "no Pattern became ready, and none is true")
         )
+    return checks
+
+
+def check_failed_steps(failed_steps: Sequence[str]) -> list[Check]:
+    """Fail the case for each Conversation-end step that failed and was skipped.
+
+    Args:
+        failed_steps: What failed, one line each, e.g. "after Conversation
+            2: Could not score Patterns: ValueError('no bar')".
+
+    Returns:
+        One failed check per line; none when every step ran.
+    """
     return [
-        *checks,
-        *(Check(CONVERSATION_END_STEP, False, failure) for failure in failed_steps),
+        Check(CONVERSATION_END_STEP_FAILED, False, failure) for failure in failed_steps
     ]
 
 
@@ -252,17 +259,22 @@ def check_whole_pipeline_case(
             transcript.append(transcript_line(True, text))
             transcript += [transcript_line(False, reply) for reply in replies.texts]
             companion.move_clock(MESSAGE_GAP)
-        failed_steps += [
-            f"after Conversation {number}: {failure}"
-            for failure in companion.end_conversation()
-        ]
+        failures = companion.end_conversation()
         if not any(
             call.step == ModelStep.PATTERN_TAGGING
             for call in calls_in_new_traces(repositories, user_id, seen_trace_ids)
         ):
             raise EvalSetupError(
-                f"The tagging step didn't run after Conversation {number}"
+                "; ".join(
+                    [
+                        f"The tagging step didn't run after Conversation {number}",
+                        *failures,
+                    ]
+                )
             )
+        failed_steps += [
+            f"after Conversation {number}: {failure}" for failure in failures
+        ]
 
     facts = pipeline_facts(
         case.true_pattern_types,
@@ -271,7 +283,7 @@ def check_whole_pipeline_case(
         names,
         len(case.conversations),
     )
-    checks = check_ready_patterns(facts, failed_steps)
+    checks = [*check_ready_patterns(facts), *check_failed_steps(failed_steps)]
     passed = all(check.passed for check in checks)
     return CaseCheckResult(
         outcome=CaseOutcome.PASS if passed else CaseOutcome.FAIL,

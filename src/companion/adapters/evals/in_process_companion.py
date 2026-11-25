@@ -753,7 +753,8 @@ class InProcessCompanion:
 
         Raises:
             EvalSetupError: If no User is connected, they have no
-                Conversation, or it wasn't ended and processed.
+                Conversation, or it wasn't ended and processed; it then
+                names the failures logged.
         """
         if self._user_id is None:
             raise EvalSetupError("Connect the made-up User first")
@@ -769,7 +770,9 @@ class InProcessCompanion:
             unprocessed.id == conversation.id
             for unprocessed in conversations.list_ended_unprocessed()
         ):
-            raise EvalSetupError("The Conversation-end steps didn't finish")
+            raise EvalSetupError(
+                "; ".join(["The Conversation-end steps didn't finish", *failures])
+            )
         return failures
 
     def tag_observations(

@@ -345,9 +345,9 @@ class EvalCompanion(Protocol):
         the Eval database's Platform Settings.
 
         Returns:
-            Each failure the app logged during that work, such as a
-            Conversation-end step that failed and was skipped, e.g. "Could
-            not score Patterns: ValueError('no settings')".
+            What failed and was skipped during that work, one line each,
+            such as a Conversation-end step: "Could not score Patterns:
+            ValueError('no settings')".
 
         Raises:
             EvalSetupError: If no User is connected, they have no

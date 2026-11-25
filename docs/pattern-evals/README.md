@@ -145,7 +145,7 @@ then asks Zeph what it has noticed, so the Pattern can be shared.
     the tagger hears it. Here the player is Claude, who drafted every text
     with the Pattern Catalog open. So this layer catches breakage, not
     whether Patterns are true or new to real people.
-  - That 70% means anything for real Users. Five scripted Users give a
+  - That 70% means anything for real Users. Six scripted Users give a
     handful of ready Patterns, so one more or one fewer moves the share a
     lot. Read each case, not only the share.
   - Every missed Pattern as a failure. A case fails when none of its true
@@ -235,10 +235,14 @@ Each case was run alone, once, on the live settings:
 | `never-arrives` | Pass. ACH.GOAL.MOVE ready, then shared in chat; the single look-alike story didn't become ready | 338,000 / 147,000 | S$0.36 |
 | `cannot-stand-waiting`, as first drafted | Fail. CTRL.UNCERT.PLAN suspected, stopped by score | 307,000 / 112,000 | S$0.29 |
 | `cannot-stand-waiting`, script corrected | Pass. CTRL.UNCERT.PLAN ready, then shared in chat | 300,000 / 143,000 | S$0.33 |
-| `asks-what-zeph-noticed` (new), third script | Pass. CONF.AVOID.BELONG ready after 5 Conversations, shared in chat in the 6th, when asked | 388,000 / 188,000 | S$0.44 |
+| `asks-what-zeph-noticed` (new), first script | Fail. CONF.AVOID.BELONG suspected, stopped by counter-test | 406,000 / 173,000 | S$0.42 |
+| `asks-what-zeph-noticed`, second script | Fail. Suspected, stopped by situations | 380,000 / 149,000 | S$0.37 |
+| `asks-what-zeph-noticed`, third script | Pass. CONF.AVOID.BELONG ready after 5 Conversations, shared in chat in the 6th, when asked | 388,000 / 188,000 | S$0.44 |
 
-Across the five seeded cases with a true Pattern, as last run: 5 of 5 ready
-Patterns were true, and 5 of 6 true Patterns were found. No look-alike
+Seven case runs, S$2.63 in all. Across the five seeded cases with a true
+Pattern, each as last run (these four and `folds-with-sister-and-friends`
+from the first results): 5 of 5 ready Patterns were true, and 5 of 6 true
+Patterns were found. No look-alike
 became ready. Three Patterns were shared in real runs. Each case was run
 once, so this is not a steady figure: use Repeats.
 

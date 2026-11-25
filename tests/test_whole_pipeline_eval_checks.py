@@ -7,6 +7,7 @@ from companion.core.evals.case_shapes import CASE_SHAPES, find_problems
 from companion.core.evals.cases import WholePipelineCase, read_whole_pipeline_case
 from companion.core.evals.models import CaseOutcome, Check, EvalName
 from companion.core.evals.whole_pipeline_eval import (
+    check_failed_steps,
     check_ready_patterns,
     missed_line,
     pipeline_facts,
@@ -184,13 +185,12 @@ def test_a_case_that_finds_none_of_its_true_patterns_fails() -> None:
 
 
 def test_a_failed_conversation_end_step_is_a_failed_check_of_its_own() -> None:
-    none_true = pipeline_facts([], [], [], NAMES, conversations=4)
     step = "after Conversation 2: Could not score Patterns: ValueError('no bar')"
 
-    assert check_ready_patterns(none_true, [step]) == [
-        Check("nothing ready", True, "no Pattern became ready, and none is true"),
-        Check("Conversation-end step failed", False, step),
+    assert check_failed_steps([step]) == [
+        Check("Conversation-end step failed", False, step)
     ]
+    assert check_failed_steps([]) == []
 
 
 def test_a_case_reads_its_conversations_and_each_true_pattern_type_once() -> None:
@@ -329,7 +329,7 @@ def test_the_report_says_none_ready_when_no_pattern_became_ready() -> None:
         [
             case_result(
                 EvalName.WHOLE_PIPELINE,
-                "ordinary",
+                "keeps-moving-the-goal",
                 CaseOutcome.FAIL,
                 check_ready_patterns(nothing),
                 {"whole_pipeline": nothing},
