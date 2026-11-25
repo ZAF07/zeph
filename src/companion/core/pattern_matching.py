@@ -31,6 +31,7 @@ from companion.core.platform_settings import (
     PATTERN_MATCHING_MODEL,
     PATTERN_MATCHING_PROMPT,
     PATTERN_MATCHING_THINKING,
+    thinking_to_use,
 )
 from companion.core.ports import Repositories
 from companion.core.timing import day_span
@@ -482,7 +483,9 @@ class PatternMatcher:
                 snapshot=snapshot,
                 step=ModelStep.PATTERN_MATCHING,
                 model=settings.get(PATTERN_MATCHING_MODEL),
-                thinking=settings.get(PATTERN_MATCHING_THINKING),
+                thinking=thinking_to_use(
+                    settings, PATTERN_MATCHING_MODEL, PATTERN_MATCHING_THINKING
+                ),
                 instructions=settings.get(PATTERN_MATCHING_PROMPT),
                 history=[ChatLine(role=ChatRole.USER, text=description)],
             )

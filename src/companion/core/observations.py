@@ -42,6 +42,7 @@ from companion.core.platform_settings import (
     PATTERN_TAGGING_MODEL,
     PATTERN_TAGGING_PROMPT,
     PATTERN_TAGGING_THINKING,
+    thinking_to_use,
 )
 from companion.core.ports import Clock, Repositories
 from companion.core.timing import users_today
@@ -1037,7 +1038,9 @@ class PatternTagger:
                 snapshot=snapshot,
                 step=ModelStep.PATTERN_TAGGING,
                 model=settings.get(PATTERN_TAGGING_MODEL),
-                thinking=settings.get(PATTERN_TAGGING_THINKING),
+                thinking=thinking_to_use(
+                    settings, PATTERN_TAGGING_MODEL, PATTERN_TAGGING_THINKING
+                ),
                 instructions=settings.get(PATTERN_TAGGING_PROMPT),
                 history=[ChatLine(role=ChatRole.USER, text=description)],
             )

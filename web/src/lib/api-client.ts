@@ -325,10 +325,14 @@ export type CoreService = {
   limits: ServiceLimit[];
 };
 
-/** The core services and the models Admins can pick for them. */
+/**
+ * The core services, the models Admins can pick for them and which of those
+ * models can't think.
+ */
 export type CoreServices = {
   services: CoreService[];
   model_choices: string[];
+  models_that_cannot_think: string[];
 };
 
 /** A crisis support contact; the international fallback has no country. */

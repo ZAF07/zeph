@@ -65,6 +65,7 @@ from companion.core.platform_settings import (
     CURIOSITY_CHECK_INS_PER_WEEK,
     PERSONA,
     RECENT_CONVERSATION_SUMMARIES,
+    thinking_to_use,
 )
 from companion.core.ports import (
     ChatBlockedError,
@@ -1328,7 +1329,7 @@ class CheckInService:
             snapshot=snapshot,
             step=ModelStep.CHECK_IN,
             model=settings.get(CHECK_IN_MODEL),
-            thinking=settings.get(CHECK_IN_THINKING),
+            thinking=thinking_to_use(settings, CHECK_IN_MODEL, CHECK_IN_THINKING),
             instructions=f"{settings.get(PERSONA)}\n\n{settings.get(CHECK_IN_PROMPT)}",
             history=[ChatLine(role=ChatRole.USER, text=description)],
         )

@@ -40,6 +40,7 @@ from companion.core.platform_settings import (
     PATTERN_KEEPING_THINKING,
     PATTERN_KEEPING_THREADS,
     PATTERN_PUSHED_BACK_WAIT,
+    thinking_to_use,
 )
 from companion.core.ports import Clock, Embedder, Repositories
 from companion.core.timing import day_span, users_today
@@ -846,7 +847,9 @@ class PatternKeeper:
                 snapshot=snapshot,
                 step=ModelStep.PATTERNS,
                 model=settings.get(PATTERN_KEEPING_MODEL),
-                thinking=settings.get(PATTERN_KEEPING_THINKING),
+                thinking=thinking_to_use(
+                    settings, PATTERN_KEEPING_MODEL, PATTERN_KEEPING_THINKING
+                ),
                 instructions=settings.get(PATTERN_KEEPING_PROMPT),
                 history=[ChatLine(role=ChatRole.USER, text=description)],
             )

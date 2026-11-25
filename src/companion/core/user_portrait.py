@@ -29,6 +29,7 @@ from companion.core.platform_settings import (
     PORTRAIT_MODEL,
     PORTRAIT_PROMPT,
     PORTRAIT_THINKING,
+    thinking_to_use,
 )
 from companion.core.ports import Clock, Repositories
 from companion.core.usage import UsageRecordingChatModel
@@ -195,7 +196,7 @@ class PortraitWriter:
             snapshot=snapshot,
             step=ModelStep.PORTRAIT,
             model=settings.get(PORTRAIT_MODEL),
-            thinking=settings.get(PORTRAIT_THINKING),
+            thinking=thinking_to_use(settings, PORTRAIT_MODEL, PORTRAIT_THINKING),
             instructions=settings.get(PORTRAIT_PROMPT),
             history=[ChatLine(role=ChatRole.USER, text=description)],
         ).strip()

@@ -23,6 +23,7 @@ from companion.core.platform_settings import (
     SAFEGUARD_MODEL,
     SAFEGUARD_PROMPT,
     SAFEGUARD_THINKING,
+    thinking_to_use,
 )
 from companion.core.ports import Clock, Repositories
 from companion.core.response_composition import to_chat_history
@@ -184,7 +185,7 @@ class Safeguard:
                 snapshot=snapshot,
                 step=ModelStep.SAFEGUARD,
                 model=settings.get(SAFEGUARD_MODEL),
-                thinking=settings.get(SAFEGUARD_THINKING),
+                thinking=thinking_to_use(settings, SAFEGUARD_MODEL, SAFEGUARD_THINKING),
                 instructions=settings.get(SAFEGUARD_PROMPT),
                 history=transcript,
             )

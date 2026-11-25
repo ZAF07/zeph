@@ -46,7 +46,11 @@ export function PromptsAndModels() {
     return <CardListLoading label="Loading services" />;
   }
 
-  const { services, model_choices: modelChoices } = coreServices;
+  const {
+    services,
+    model_choices: modelChoices,
+    models_that_cannot_think: modelsThatCannotThink,
+  } = coreServices;
   if (services.length === 0) {
     return (
       <EmptyState
@@ -71,6 +75,7 @@ export function PromptsAndModels() {
             key={id}
             service={service}
             modelChoices={modelChoices}
+            modelsThatCannotThink={modelsThatCannotThink}
             settings={settings}
             isOpen={folding.isOpen}
             onToggle={folding.onToggle}

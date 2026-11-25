@@ -23,6 +23,7 @@ from companion.core.platform_settings import (
     PERSONAL_STICKER_KEEPING_PROMPT,
     PERSONAL_STICKER_KEEPING_THINKING,
     PERSONAL_STICKERS_LIMIT,
+    thinking_to_use,
 )
 from companion.core.ports import ChatChannel, Clock, Repositories
 from companion.core.transcripts import to_transcript_lines
@@ -278,7 +279,11 @@ class PersonalStickerKeeper:
             snapshot=snapshot,
             step=ModelStep.PERSONAL_STICKERS,
             model=settings.get(PERSONAL_STICKER_KEEPING_MODEL),
-            thinking=settings.get(PERSONAL_STICKER_KEEPING_THINKING),
+            thinking=thinking_to_use(
+                settings,
+                PERSONAL_STICKER_KEEPING_MODEL,
+                PERSONAL_STICKER_KEEPING_THINKING,
+            ),
             instructions=settings.get(PERSONAL_STICKER_KEEPING_PROMPT),
             history=[
                 ChatLine(

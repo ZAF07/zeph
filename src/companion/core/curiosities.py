@@ -53,6 +53,7 @@ from companion.core.platform_settings import (
     CURIOSITY_KEEPING_THINKING,
     CURIOSITY_REPLIES_BETWEEN,
     STARTER_THOUGHT_EXPERIMENT_DAYS,
+    thinking_to_use,
 )
 from companion.core.ports import Clock, Embedder, Repositories
 from companion.core.starter_thought_experiments import starters_offered
@@ -1037,7 +1038,9 @@ class CuriosityKeeper:
                 snapshot=snapshot,
                 step=ModelStep.CURIOSITIES,
                 model=settings.get(CURIOSITY_KEEPING_MODEL),
-                thinking=settings.get(CURIOSITY_KEEPING_THINKING),
+                thinking=thinking_to_use(
+                    settings, CURIOSITY_KEEPING_MODEL, CURIOSITY_KEEPING_THINKING
+                ),
                 instructions=settings.get(CURIOSITY_KEEPING_PROMPT),
                 history=[ChatLine(role=ChatRole.USER, text=description)],
             )
