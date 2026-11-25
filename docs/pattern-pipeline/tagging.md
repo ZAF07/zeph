@@ -74,9 +74,11 @@ If the answer can't be read (no `observations` list), it is asked once more. If 
 |---|---|
 | Not an Observation | It isn't a JSON object |
 | Unknown Pattern Type | A Pattern Type it names isn't in the catalog |
+| Never again | It names a Pattern Type the User marked "never again", by deleting a Pattern they disagreed with or that didn't hold up |
 | Not gathered | It names a Pattern the User disagreed with, while they have "Keep noticing after I disagree" off |
 | Unknown sign | Its sign isn't in the first Pattern Type's signs for (or against, if it's against) |
 | Quote not word for word | The quote isn't in one of the User's own texts |
+| Deleted by the User | The quote is one the User deleted from this Conversation before (matched by a hash; the words aren't kept) |
 | Tag off its list | A tag or the kind of evidence isn't from its list |
 | Missing details | No context line, or no one it is about |
 | Repeat | Same Pattern Type, sign and quote as one already kept from this answer |
@@ -113,6 +115,7 @@ The quote is stored on the Observation with no link to its message, so Message R
 The differences from a normal tagging:
 - It uses only the messages still kept, since Message Retention may have deleted some.
 - It skips any Observation already kept from that Conversation.
+- A quote the User deleted is never kept again, and nothing is kept for a Pattern Type they marked "never again" (the same checks as any tagging).
 - It doesn't touch exclusions, reactions, Predictions or settling.
 - New Observations are scored at once (cause `evidence_tagged_again`).
 
@@ -127,4 +130,4 @@ The differences from a normal tagging:
 - Only some Pattern Types have `anyone_would_when` matches. Where "anyone would" can't be put as tags (high stakes, a real crisis), nothing is ever situational.
 - A topic added to the ruled-out list doesn't reach Observations tagged before.
 - An exclusion flag stays until the User's next tagged Conversation.
-- One story can count twice: as a Prediction outcome and as an Observation from the same words.
+- A story that settles a Prediction is still tagged as an Observation, but it counts nothing for that shared Pattern (the outcome keeps its Conversation in `predictions.outcome_conversation_id`).
