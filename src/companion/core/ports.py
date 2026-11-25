@@ -1383,6 +1383,18 @@ class ObservationRepository(Protocol):
         """
         ...
 
+    def delete_of_pattern_type(self, user_id: UUID, pattern_type_id: str) -> None:
+        """Delete a User's Observations whose first Pattern Type is the one given.
+
+        An unclear Observation that names it second is kept: it belongs
+        first to another Pattern.
+
+        Args:
+            user_id: The User's ID.
+            pattern_type_id: The Pattern Type's ID.
+        """
+        ...
+
     def delete_for_user(self, user_id: UUID) -> None:
         """Delete all of a User's Observations and exclusion flags.
 
@@ -1431,17 +1443,6 @@ class PatternRepository(Protocol):
 
         Returns:
             The Patterns, each with its evidence oldest first.
-        """
-        ...
-
-    def list_confirmed(self, user_id: UUID) -> list[Pattern]:
-        """List the Patterns with no Pattern Type a User agreed with, newest first.
-
-        Args:
-            user_id: The User's ID.
-
-        Returns:
-            The confirmed Patterns, each with its evidence oldest first.
         """
         ...
 
@@ -1651,19 +1652,6 @@ class PatternRepository(Protocol):
 
         Returns:
             The reactions.
-        """
-        ...
-
-    def delete_confirmed(self, user_id: UUID, pattern_id: UUID) -> bool:
-        """Delete one of a User's confirmed Patterns, with its evidence.
-
-        Args:
-            user_id: The User's ID.
-            pattern_id: The Pattern's ID.
-
-        Returns:
-            True if it was deleted; False if the User has no such confirmed
-            Pattern.
         """
         ...
 

@@ -496,22 +496,60 @@ export type MoveOutcome = {
   made_at: string;
 };
 
-/** One time a Pattern showed up: the day, its Life Thread and what happened. */
-export type PatternEvidence = {
+/** Who a Pattern shows with and who it was shown not to happen with. */
+export type WhereItShows = {
+  shows_with: string[];
+  not_with: string[];
+};
+
+/** One of the User's quotes behind a Pattern, and the day (`YYYY-MM-DD`). */
+export type PatternQuote = {
+  quote: string;
   day: string;
-  thread: string;
-  line: string;
 };
 
 /**
- * A Pattern the User agreed with: what keeps showing up across their life,
- * when they agreed and what it is based on, newest day first.
+ * A Pattern's quotes from one part of the User's life: the Life Thread's
+ * title, or null for quotes in no Thread, and the quotes newest first.
+ */
+export type PatternQuoteGroup = {
+  life_thread: string | null;
+  quotes: PatternQuote[];
+};
+
+/** How a Prediction went, once the User said or Zeph stopped waiting. */
+export type PredictionOutcome =
+  "came_true" | "did_not" | "not_come_up" | "not_followed_up";
+
+/**
+ * The one thing Zeph asked the User to notice for a Pattern, when, and how
+ * it went; `outcome` is null until Zeph has asked.
+ */
+export type PatternPrediction = {
+  wording: string;
+  made_at: string;
+  outcome: PredictionOutcome | null;
+};
+
+/**
+ * Where a Pattern Zeph told the User about stands: shared is still being
+ * tested, contested is one they disagreed with and closed didn't hold up.
+ */
+export type ToldPatternState = "shared" | "confirmed" | "contested" | "closed";
+
+/**
+ * A Pattern Zeph told the User about: its wording, where it shows, when
+ * Zeph told them, their quotes by part of life and what they were asked
+ * to notice, newest first. It never carries a score.
  */
 export type Pattern = {
   id: string;
+  state: ToldPatternState;
   pattern: string;
-  agreed_at: string;
-  evidence: PatternEvidence[];
+  where_it_shows: WhereItShows[];
+  told_at: string;
+  quote_groups: PatternQuoteGroup[];
+  predictions: PatternPrediction[];
 };
 
 /**

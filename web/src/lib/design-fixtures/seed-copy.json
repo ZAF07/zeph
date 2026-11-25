@@ -1933,30 +1933,110 @@
         "text": "Patterns"
       },
       {
-        "key": "memories.patterns.lead",
+        "key": "memories.patterns.intro",
         "name": "Patterns tab: line under the heading",
         "max_length": 300,
-        "text": "Things Zeph has noticed across different parts of your life, that you agreed with when it said them. Each one shows the days it is based on. Delete one and Zeph stops using it."
+        "text": "Things Zeph has noticed across different parts of your life and told you about. Each one shows your own words behind it and what Zeph asked you to notice. Delete one and Zeph forgets it, along with the quotes it rests on."
       },
       {
-        "key": "memories.patterns.agreed",
-        "name": "Patterns tab: when you agreed",
+        "key": "memories.patterns.section.shared",
+        "name": "Patterns tab: heading above Patterns still being tested",
+        "max_length": 40,
+        "text": "Being tested"
+      },
+      {
+        "key": "memories.patterns.section.confirmed",
+        "name": "Patterns tab: heading above confirmed Patterns",
+        "max_length": 40,
+        "text": "Confirmed"
+      },
+      {
+        "key": "memories.patterns.section.contested",
+        "name": "Patterns tab: heading above Patterns you disagreed with",
+        "max_length": 40,
+        "text": "You disagreed"
+      },
+      {
+        "key": "memories.patterns.section.closed",
+        "name": "Patterns tab: heading above Patterns that turned out wrong",
+        "max_length": 40,
+        "text": "Didn't hold up"
+      },
+      {
+        "key": "memories.patterns.told_on",
+        "name": "Patterns tab: when Zeph told you",
         "max_length": 60,
         "placeholders": ["day"],
-        "text": "You agreed with this on {day}"
+        "text": "Zeph told you this on {day}"
       },
       {
-        "key": "memories.patterns.based_on",
-        "name": "Patterns tab: label above the evidence",
-        "max_length": 40,
-        "text": "What it is based on"
+        "key": "memories.patterns.where_it_shows",
+        "name": "Patterns tab: who it shows with and who it doesn't",
+        "max_length": 80,
+        "placeholders": ["shows_with", "not_with"],
+        "text": "It shows with {shows_with}; not with {not_with}."
       },
       {
-        "key": "memories.patterns.evidence_when",
-        "name": "Patterns tab: day and Thread of each piece of evidence",
+        "key": "memories.patterns.quotes_label",
+        "name": "Patterns tab: label above your quotes",
         "max_length": 40,
-        "placeholders": ["day", "thread"],
-        "text": "{day} · {thread}"
+        "text": "In your own words"
+      },
+      {
+        "key": "memories.patterns.no_thread",
+        "name": "Patterns tab: name for quotes that belong to no part of your life Zeph follows",
+        "max_length": 40,
+        "text": "Other moments"
+      },
+      {
+        "key": "memories.patterns.quote",
+        "name": "Patterns tab: one of your quotes",
+        "max_length": 20,
+        "placeholders": ["quote"],
+        "text": "“{quote}”"
+      },
+      {
+        "key": "memories.patterns.predictions_label",
+        "name": "Patterns tab: label above what Zeph asked you to notice",
+        "max_length": 40,
+        "text": "What Zeph asked you to notice"
+      },
+      {
+        "key": "memories.patterns.asked_on",
+        "name": "Patterns tab: when Zeph asked you to notice something",
+        "max_length": 40,
+        "placeholders": ["day"],
+        "text": "Asked on {day}"
+      },
+      {
+        "key": "memories.patterns.outcome.waiting",
+        "name": "Patterns tab: how it went, not asked yet",
+        "max_length": 80,
+        "text": "Zeph hasn't asked how it went yet."
+      },
+      {
+        "key": "memories.patterns.outcome.came_true",
+        "name": "Patterns tab: how it went, it happened",
+        "max_length": 80,
+        "text": "How it went: it happened as Zeph thought."
+      },
+      {
+        "key": "memories.patterns.outcome.did_not",
+        "name": "Patterns tab: how it went, it didn't happen",
+        "max_length": 80,
+        "text": "How it went: it didn't happen as Zeph thought."
+      },
+      {
+        "key": "memories.patterns.outcome.not_come_up",
+        "name": "Patterns tab: how it went, it hasn't come up",
+        "max_length": 80,
+        "text": "How it went: it hasn't come up yet."
+      },
+      {
+        "key": "memories.patterns.outcome.not_followed_up",
+        "name": "Patterns tab: how it went, Zeph never asked",
+        "max_length": 80,
+        "text": "Zeph didn't get to ask how it went."
       },
       {
         "key": "memories.patterns.delete",
@@ -1972,10 +2052,10 @@
         "text": "No patterns yet"
       },
       {
-        "key": "memories.patterns.empty_body",
+        "key": "memories.patterns.empty_message",
         "name": "Patterns tab: nothing yet, message",
         "max_length": 200,
-        "text": "When Zeph notices the same thing across different parts of your life, and you agree with it, it appears here with what it is based on."
+        "text": "When Zeph tells you about something it has noticed across different parts of your life, it appears here with your own words behind it."
       },
       {
         "key": "memories.helps.heading",

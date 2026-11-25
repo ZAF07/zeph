@@ -336,6 +336,7 @@ def build_settings_tools(repositories: Repositories) -> SettingsTools:
     user_memory = UserMemoryService(
         repositories,
         features,
+        pattern_catalog,
         PatternScorer(repositories, pattern_catalog, clock),
         ready_keeper,
         clock,

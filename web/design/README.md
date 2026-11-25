@@ -255,6 +255,14 @@ The design changed for the issues in `.scratch/message-pipeline/issues`. Build e
 
 **Baselines.** After any change to `reference/`, Zaf runs `node design/shoot.cjs` on his own machine to rebuild `baseline/`. Baselines made on another machine render type differently and will not pass.
 
+## Pattern-pipeline additions (25 Nov 2026)
+
+| Issue | What changed in the design | Reference files |
+|---|---|---|
+| 18 | The Patterns tab shows the Patterns Zeph told the User under four headings (Being tested, Confirmed, You disagreed, Didn't hold up). Each card has the wording, where it shows, the day Zeph told them, their quotes by part of life, and what Zeph asked them to notice with how it went. Under "You disagreed" is the "Keep noticing after I disagree" card from `Account`. Built from the old Patterns card's parts and the Memories group heading. | `Memories--tab-patterns`, `M-Memories--tab-patterns`, `States` (empty state) |
+
+**Fixtures.** Alex has the four Patterns drawn, one under each heading.
+
 ## Build order (the redesign, finished)
 
 Kept as a record of how the redesign was built. New work follows "Building new UI" above.

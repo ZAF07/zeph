@@ -33,16 +33,17 @@ import { useApiClient } from "@/lib/use-api-client";
 
 /**
  * The Memories page: what Zeph remembers, by Memory Category, its User
- * Portrait of the User, the Life Threads it follows, the Patterns they
- * agreed with, what helps them (Move Outcomes), the Day Summaries, the
+ * Portrait of the User, the Life Threads it follows, the Patterns it
+ * told them about, what helps them (Move Outcomes), the Day Summaries, the
  * Shared Photos and the quotes Zeph keeps as evidence, each deletable, with
  * the User Memory switch and, until they press Got it, the notice saying
  * Zeph now keeps some of their words. One tab shows at a time; the
  * address's `?tab=` picks it, and choosing a tab updates `?tab=` without
  * loading the page again. Every word is the Memories tab's Copy.
  *
- * @param props - `copy` holds the Memories page's Copy slots and the
- *   Shared Memory-off notes.
+ * @param props - `copy` holds the Memories page's Copy slots, the Shared
+ *   Memory-off notes and the Account page's slots for the switch under
+ *   the Patterns they disagreed with.
  * @returns The page, a loading panel, or an error with Try again.
  */
 export function Memories({ copy }: { copy: Copy }) {
@@ -231,8 +232,13 @@ export function Memories({ copy }: { copy: Copy }) {
               timeZone={timeZone}
             />
           ) : null}
-          {patterns && tab === "patterns" ? (
-            <PatternsList patterns={patterns} copy={copy} timeZone={timeZone} />
+          {patterns && me && tab === "patterns" ? (
+            <PatternsList
+              patterns={patterns}
+              me={me}
+              copy={copy}
+              timeZone={timeZone}
+            />
           ) : null}
           {outcomes && tab === "helps" ? (
             <MoveOutcomesList

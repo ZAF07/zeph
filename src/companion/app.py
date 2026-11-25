@@ -208,6 +208,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     user_memory_service = UserMemoryService(
         dependencies.repositories,
         feature_service,
+        pattern_catalog_service,
         pattern_scorer,
         ready_keeper,
         dependencies.clock,

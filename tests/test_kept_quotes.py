@@ -243,6 +243,7 @@ def test_a_quote_deleted_while_a_conversation_end_scores_does_not_come_back(
     user_memory = UserMemoryService(
         repositories,
         FeatureService(repositories, clock, "http://dashboard"),
+        PatternCatalogService(repositories.pattern_catalog),
         PatternScorer(
             repositories, PatternCatalogService(repositories.pattern_catalog), clock
         ),

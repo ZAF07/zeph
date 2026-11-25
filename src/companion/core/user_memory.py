@@ -13,11 +13,11 @@ from companion.core.models import (
     MemorySource,
     MoveOutcome,
     Observation,
-    Pattern,
     PatternMoveCause,
     User,
     UserPortrait,
 )
+from companion.core.pattern_catalog import PatternCatalogService
 from companion.core.pattern_scoring import PatternScorer
 from companion.core.platform_settings import (
     ONBOARDING_NAME_MEMORY_CATEGORY,
@@ -25,6 +25,7 @@ from companion.core.platform_settings import (
 )
 from companion.core.ports import Clock, Repositories
 from companion.core.ready_gate import ReadyKeeper
+from companion.core.told_patterns import ToldPattern, told_patterns, was_told
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ class MoveOutcomeNotFoundError(MemoryNotFoundError):
 
 
 class PatternNotFoundError(MemoryNotFoundError):
-    """Raised when a User has no confirmed Pattern with that ID."""
+    """Raised when a User has no Pattern they were told with that ID."""
 
     shown_message = "Pattern not found"
 
@@ -99,6 +100,7 @@ class UserMemoryService:
         self,
         repositories: Repositories,
         features: FeatureService,
+        pattern_catalog: PatternCatalogService,
         pattern_scorer: PatternScorer,
         ready_keeper: ReadyKeeper,
         clock: Clock,
@@ -109,6 +111,7 @@ class UserMemoryService:
             repositories: Where User Memory, Memory Categories and settings
                 are stored.
             features: Says whether User Memory works for the User.
+            pattern_catalog: Reads the words a Pattern is told in.
             pattern_scorer: Scores the User's Patterns again once
                 Observations are deleted.
             ready_keeper: Takes back a ready Pattern that no longer passes
@@ -117,6 +120,7 @@ class UserMemoryService:
         """
         self._repositories = repositories
         self._features = features
+        self._pattern_catalog = pattern_catalog
         self._pattern_scorer = pattern_scorer
         self._ready_keeper = ready_keeper
         self._clock = clock
@@ -225,31 +229,65 @@ class UserMemoryService:
         self._score_patterns_again(user_id)
         self._rewrite_portrait(user_id)
 
-    def list_confirmed_patterns(self, user_id: UUID) -> list[Pattern]:
-        """List the Patterns a User agreed with, newest agreed first.
+    def list_told_patterns(self, user_id: UUID) -> list[ToldPattern]:
+        """List the Patterns Zeph has told a User about, as they see them.
 
-        Unmatched Patterns are never shown to the User.
+        Patterns Zeph hasn't told them, and unmatched ones, are never shown.
 
         Args:
             user_id: The User's ID.
 
         Returns:
-            The confirmed Patterns, each with its evidence oldest first.
+            The Patterns being tested, then confirmed, disagreed with and
+            closed after being told, each with its quotes by Life Thread
+            and its Predictions.
         """
-        return self._repositories.patterns.list_confirmed(user_id)
+        patterns = self._repositories.patterns.list_of_pattern_types(user_id)
+        if not any(was_told(pattern) for pattern in patterns):
+            return []
+        return told_patterns(
+            patterns,
+            {
+                entry.pattern_type.id: entry.pattern_type
+                for entry in self._pattern_catalog.catalog()
+            },
+            self._repositories.observations.list_for_user(user_id),
+            self._repositories.patterns.list_predictions(user_id),
+            self._repositories.life_threads.list_for_user(user_id),
+        )
 
     def delete_pattern(self, user_id: UUID, pattern_id: UUID) -> None:
-        """Delete one of a User's confirmed Patterns, so it is never used again.
+        """Delete a Pattern Zeph told a User about, so it is gone at once.
+
+        The Observations whose first Pattern Type is its own go with it,
+        so the quotes it showed never bring it back; its Predictions and
+        the User's reactions to it go too. The
+        User is locked while it is deleted, as scoring locks them, and
+        their other Patterns are scored again at once.
 
         Args:
             user_id: The User's ID.
             pattern_id: The Pattern's ID.
 
         Raises:
-            PatternNotFoundError: If the User has no such confirmed Pattern.
+            PatternNotFoundError: If the User has no such Pattern they were
+                told.
         """
-        if not self._repositories.patterns.delete_confirmed(user_id, pattern_id):
-            raise PatternNotFoundError
+        with self._repositories.transaction() as transaction:
+            transaction.lock_user(user_id)
+            in_transaction = transaction.repositories
+            told = [
+                pattern
+                for pattern in in_transaction.patterns.list_of_pattern_types(user_id)
+                if pattern.id == pattern_id and was_told(pattern)
+            ]
+            if not told:
+                raise PatternNotFoundError
+            in_transaction.observations.delete_of_pattern_type(
+                user_id, told[0].pattern_type_id
+            )
+            in_transaction.patterns.save_moves([], [], [pattern_id], [])
+        self._score_patterns_again(user_id)
         self._rewrite_portrait(user_id)
 
     def list_kept_quotes(self, user_id: UUID) -> list[Observation]:

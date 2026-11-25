@@ -37,6 +37,10 @@ export default async function MemoriesPage() {
         "memories.",
         "shared.memory_off.",
         "shared.pattern_noticing.",
+        "account.contested_gathering.",
+        "account.not_available",
+        "account.changed_in_chat",
+        "account.switch_save_failed",
       ])}
     />
   );
