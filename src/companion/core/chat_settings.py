@@ -43,6 +43,7 @@ from companion.core.users import InvalidProfileError, UserService
 
 logger = logging.getLogger(__name__)
 
+LIST_MEMORIES_TOOL = "list_memories"
 DELETE_DATA_TOOL = "start_deleting_my_data"
 CONTESTED_GATHERING_TOOL = "turn_noting_on_disagreed_patterns_on_or_off"
 CLAIM_CHECK_PROMPT = (
@@ -365,7 +366,7 @@ class ReplySettingsTools:
                 run=self._turn_contested_gathering_on_or_off,
             ),
             ChatTool(
-                name="list_memories",
+                name=LIST_MEMORIES_TOOL,
                 description=(
                     "List what you remember about the person and the stories "
                     "in their life you follow, by number, to find the one "
@@ -814,7 +815,8 @@ class SettingsTools:
     ) -> str:
         """Say what to tell the model when a reply claims a change it never made.
 
-        A reply that called a settings tool is not read. Any other is read
+        A reply that called a settings tool is not read, unless it only
+        listed memories, which changes nothing. Any other is read
         by one small model call, on the Check-in model, without thinking
         unless that model always thinks. It never raises: a failed check
         lets the reply go.
@@ -827,10 +829,11 @@ class SettingsTools:
 
         Returns:
             `UNBACKED_CLAIM_NOTE` with the reply under it, if the reply
-            called no settings tool and says a setting was changed; ""
-            otherwise.
+            called no settings tool that changes something and says a
+            setting was changed; "" otherwise.
         """
-        if called or not reply.strip():
+        changed = [name for name in called if name != LIST_MEMORIES_TOOL]
+        if changed or not reply.strip():
             return ""
         model = snapshot.settings.get(CHECK_IN_MODEL)
         try:

@@ -1,10 +1,11 @@
 from datetime import timedelta
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 
-from companion.core.curiosities import ASKED_CHECK_PROMPT
+from companion.core.curiosities import ASKED_CHECK_PROMPT, read_asked_answer
 from companion.core.models import CuriosityState
 from tests.fakes import (
     FakeAuthVerifier,
@@ -249,3 +250,15 @@ def test_a_prediction_follow_up_picked_but_not_asked_is_still_waiting(
     assert still_waiting.raised_at is None
     assert FOLLOW_UP in offered_again
     assert waiting(client.engine, user_id) == []
+
+
+@pytest.mark.parametrize("answer", ["no", "No.", " NO, it never asks it", "**no**"])
+def test_only_an_answer_that_says_no_counts_as_not_asked(answer: str) -> None:
+    assert not read_asked_answer(answer)
+
+
+@pytest.mark.parametrize(
+    "answer", ["yes", "**Yes**", "", "not sure", "Yes, at the end"]
+)
+def test_any_other_answer_counts_as_asked(answer: str) -> None:
+    assert read_asked_answer(answer)

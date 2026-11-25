@@ -6,7 +6,7 @@ from companion.core.ports import ChatTool
 MAX_TOOL_ROUNDS = 4
 
 TOOL_CALL_OPENING_TAG = (
-    r"<(?:tool[ _]calls?|function_calls?|function=[^>]*|invoke\b[^>]*"
+    r"<(?:tool[ _]calls?|function_calls?|function(?:=[^>]*)?|invoke\b[^>]*"
     r"|｜tool▁calls?▁begin｜)>"
 )
 TOOL_CALL_CLOSING_TAG = (

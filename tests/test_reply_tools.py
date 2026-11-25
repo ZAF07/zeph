@@ -279,6 +279,35 @@ def test_what_a_providers_tool_picks_is_sent_as_the_sticker_or_shared_photo(
     assert reply.shared_photo == shared_photo
 
 
+def test_a_reply_written_again_sends_nothing_its_first_draft_picked(
+    repositories: Repositories,
+) -> None:
+    user = add_user(repositories)
+    chat_model = ScriptedChatModel()
+    chat_model.script(ToolCall("pick_sticker", {}), "All done!", "Want me to?")
+    drafts: list[str] = []
+
+    def correct_first_draft(reply: str) -> str:
+        drafts.append(reply)
+        return "Nothing was done." if len(drafts) == 1 else ""
+
+    composer = build_composer(
+        repositories,
+        chat_model,
+        [
+            FakeProvider(picking_offer("pick_sticker", a_sticker())),
+            FakeProvider(ReplyOffer(correction=correct_first_draft)),
+        ],
+    )
+
+    reply = composer.compose(RecentMessages(uuid4(), []), snapshot_for(user))
+
+    assert drafts == ["All done!", "Want me to?"]
+    assert reply.texts == ["Want me to?"]
+    assert reply.sticker is None
+    assert chat_model.calls[1].instructions.endswith("Nothing was done.")
+
+
 def test_a_reply_with_only_a_pick_is_sent_but_one_with_nothing_is_empty(
     repositories: Repositories,
 ) -> None:

@@ -360,6 +360,11 @@ class ResponseComposer:
         part the model starts with "[re 2]" is sent as a reply to that text
         (see `link_to_texts`).
 
+        A reply an offer finds untrue as written (it says a setting was
+        changed, but no settings tool was called) is written once more,
+        told so, and a sticker, photo or closing text the first one picked
+        is dropped; if the second one is no better, nothing of it is sent.
+
         Args:
             recent: The Recent Messages: the Conversation to reply in and every
                 message from the last hours, across Conversations.
@@ -373,10 +378,6 @@ class ResponseComposer:
             guidance: What the Understanding adds, by priority.
             optional_offers: Optional extras with their own tools, such as a
                 Woven-in Check-in, whose instructions go last.
-
-        A reply an offer finds untrue as written (it says a setting was
-        changed, but no settings tool was called) is written once more,
-        told so; if the second one is no better, nothing of it is sent.
 
         Returns:
             The reply as short messages, an optional sticker and an optional
@@ -438,6 +439,9 @@ class ResponseComposer:
                     [instructions.for_this_message, *corrections]
                 ),
             )
+            for offer in offers:
+                offer.picked = None
+                offer.closing_text = ""
             reply = self._write(snapshot, corrected, history, tools)
             if corrections_for(offers, reply):
                 raise UnbackedClaimError

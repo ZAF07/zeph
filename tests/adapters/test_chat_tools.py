@@ -74,3 +74,9 @@ def test_a_closing_tag_left_on_its_own_is_taken_out() -> None:
 
 def test_ordinary_text_is_left_as_it_is() -> None:
     assert without_tool_call_markup("a < b, and <3 to you") == "a < b, and <3 to you"
+
+
+def test_a_bare_function_tag_goes_with_what_is_inside_it() -> None:
+    text = 'One sec.\n<function>{"name": "change_directness"}</function>'
+
+    assert without_tool_call_markup(text) == "One sec."

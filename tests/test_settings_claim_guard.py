@@ -179,3 +179,16 @@ def test_with_settings_in_chat_off_a_claim_to_have_deleted_data_is_still_checked
     [check] = chat_model.claim_check_calls
     assert "- start_deleting_my_data: " in check.history[0].text
     assert "change_directness" not in check.history[0].text
+
+
+def test_a_reply_that_only_listed_memories_is_still_checked(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+) -> None:
+    set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+
+    send(client, chat_model, ToolCall("list_memories", {}), "done, forgotten")
+
+    assert len(chat_model.claim_check_calls) == 1

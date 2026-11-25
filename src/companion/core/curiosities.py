@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import date, datetime
@@ -356,9 +357,12 @@ def read_asked_answer(answer: str) -> bool:
         answer: The model's answer.
 
     Returns:
-        True only for an answer that starts with "yes", in any case.
+        False only for an answer whose first word is "no", in any case; any
+        other answer counts as asked, like a failed check, so a User is
+        never asked the same thing twice because an answer couldn't be read.
     """
-    return answer.strip().lower().startswith("yes")
+    words = re.findall(r"[a-z]+", answer.lower())
+    return not words or words[0] != "no"
 
 
 def describe_curiosity_treatments(needs: Sequence[Need]) -> str:
@@ -633,8 +637,9 @@ class CuriosityRaiser:
         """Ask a small model call whether the reply asked a picked Curiosity.
 
         It uses the Check-in model, without thinking unless that model
-        always thinks. It never raises: a failed call counts as asked, so a
-        User is never asked the same thing twice because a check failed.
+        always thinks. It never raises: a failed call, or an answer that
+        can't be read, counts as asked, so a User is never asked the same
+        thing twice because a check failed.
 
         Args:
             snapshot: The User the reply went to.
