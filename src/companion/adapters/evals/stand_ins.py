@@ -377,7 +377,12 @@ class CountingChatModel:
         """
         recorded_tools = [self._recording(tool) for tool in tools]
         answer = self._chat_model.generate(
-            model, thinking, instructions, history, recorded_tools, message_instructions
+            model=model,
+            thinking=thinking,
+            instructions=instructions,
+            history=history,
+            tools=recorded_tools,
+            message_instructions=message_instructions,
         )
         self._counter.add(model, answer)
         return answer

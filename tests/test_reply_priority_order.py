@@ -45,7 +45,14 @@ def positions(instructions: str, *pieces: str) -> list[int]:
 
 
 def whole(instructions: ReplyInstructions) -> str:
-    """Join the two parts into the one text the model reads."""
+    """Join the two parts into the one text the model reads.
+
+    Args:
+        instructions: The reply's instructions.
+
+    Returns:
+        The fixed part, then the part for this message.
+    """
     return join_instructions(instructions.fixed, instructions.for_this_message)
 
 
