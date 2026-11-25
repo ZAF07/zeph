@@ -50,6 +50,7 @@ export function PromptsAndModels() {
     services,
     model_choices: modelChoices,
     models_that_cannot_think: modelsThatCannotThink,
+    models_that_always_think: modelsThatAlwaysThink,
   } = coreServices;
   if (services.length === 0) {
     return (
@@ -76,6 +77,7 @@ export function PromptsAndModels() {
             service={service}
             modelChoices={modelChoices}
             modelsThatCannotThink={modelsThatCannotThink}
+            modelsThatAlwaysThink={modelsThatAlwaysThink}
             settings={settings}
             isOpen={folding.isOpen}
             onToggle={folding.onToggle}

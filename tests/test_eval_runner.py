@@ -629,6 +629,33 @@ def test_a_photo_case_sends_the_image_uploaded_for_it(
     assert photo_viewer.calls[-1].photo.media_type == "image/png"
 
 
+def test_a_judge_on_a_model_that_always_thinks_is_never_told_thinking_is_off(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, PERSONA_CASE)
+    admin = owner_headers(client, auth_verifier)
+    saved_judge = PostgresJudgeSettingsRepository(engine).load()
+    judge = {**saved_judge, "model": "anthropic/claude-opus-5.5", "thinking": False}
+    client.put("/api/admin/eval-judge", json={"values": judge}, headers=admin)
+    start_run(client, admin, EvalName.PERSONA)
+    chat_model.script(
+        "Pretty good!",
+        '{"verdicts": [{"rule": "no_lists", "passed": true, "reason": "Fine."}]}',
+    )
+
+    runner.work_next_run()
+
+    _, judge_call = chat_model.calls
+    assert (judge_call.model, judge_call.thinking) == (
+        "anthropic/claude-opus-5.5",
+        True,
+    )
+
+
 def test_a_missing_judge_setting_makes_each_case_an_error_and_the_run_finishes(
     client: TestClient,
     engine: Engine,
