@@ -65,4 +65,4 @@ The pixel test was not run: no component layout or design reference changed (one
 
 - Completed: 2026-11-25
 - Checks: pytest 2221 passed; Dashboard 972 tests passed; ruff, format, mypy, lint and typecheck clean
-- Commit: <merge commit, filled in after the merge>
+- Commit: d9a744e (merge into main), b250667 (the change)
