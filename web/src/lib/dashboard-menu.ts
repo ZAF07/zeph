@@ -63,6 +63,7 @@ export const adminMenuItems: AdminMenuItem[] = [
   { label: "Moves", href: "/admin/moves" },
   { label: "Pattern Catalog", href: "/admin/pattern-catalog" },
   { label: "Thought Experiments", href: "/admin/thought-experiments" },
+  { label: "Unmatched Patterns", href: "/admin/unmatched-patterns" },
   { label: "Check-in Kinds", href: "/admin/check-in-kinds" },
   { label: "Check-in log", href: "/admin/check-in-log" },
   { label: "Check-in Schedule", href: "/admin/check-in-schedule" },

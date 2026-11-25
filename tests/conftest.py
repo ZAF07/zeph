@@ -193,7 +193,7 @@ def engine(database_url: str) -> Iterator[Engine]:
                 "daily_usage, stickers, check_in_kinds, check_ins, "
                 "feature_switches, user_feature_switches, shared_photos, "
                 "personal_stickers, pending_auth_account_deletions, needs, moves, "
-                "thought_experiments, "
+                "thought_experiments, unmatched_entries, "
                 "eval_cases, eval_runs, eval_images, eval_judge_settings CASCADE"
             )
         )

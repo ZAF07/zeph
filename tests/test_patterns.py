@@ -180,7 +180,10 @@ def test_keeping_is_given_the_touched_and_closest_threads_however_old_and_the_pa
         in seen
     )
     assert "[3]" not in seen
-    assert f"Patterns kept so far:\n[1] (unmatched) {GOES_QUIET} Evidence:" in seen
+    assert (
+        "Patterns kept so far:\n[1] (needs a general description) (unmatched) "
+        f"{GOES_QUIET} Evidence:" in seen
+    )
     assert "Pattern Types Zeph already looks for:\nNone.\n" in seen
 
 

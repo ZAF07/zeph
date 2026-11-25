@@ -110,6 +110,13 @@ on the Dashboard's Platform settings page.
 
 ## How to add a Pattern Type
 
+What to add comes from the Dashboard (Admin → Unmatched Patterns): what Zeph
+keeps noticing that fits no Pattern Type, as general descriptions with how
+many Users each appears for. Mark an entry "New Pattern Type" when you decide
+to write one for it, "Folded" (naming the Pattern Type) when an existing one
+should cover it, or "Dropped". A mark is only a note for Admins: nothing
+changes until the file below is written and deployed.
+
 Copy a file in the same area and change everything. Pick an ID in the same
 shape (`AREA.DRIVER.BEHAVIOUR`), set `version: 0.1.0` and `status: draft`. Add
 it as a look-alike to every Pattern Type it can be mistaken for, with new

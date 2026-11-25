@@ -21,6 +21,9 @@ from companion.adapters.http.pattern_catalog_api import (
 from companion.adapters.http.thought_experiment_api import (
     build_thought_experiment_api_router,
 )
+from companion.adapters.http.unmatched_review_api import (
+    build_unmatched_review_api_router,
+)
 from companion.adapters.telegram.webhook import build_telegram_webhook_router
 from companion.core.admin_users import AdminUserService
 from companion.core.agenda import AgendaKeeper, AgendaReader
@@ -101,6 +104,7 @@ from companion.core.telegram_connection import TelegramConnectionService
 from companion.core.thought_experiments import ThoughtExperimentService
 from companion.core.typing_keeper import TypingKeeper
 from companion.core.understanding import UnderstandingService
+from companion.core.unmatched_review import UnmatchedGrouper, UnmatchedReviewService
 from companion.core.usage import UsageLimiter, UsageRecordingChatModel
 from companion.core.user_data import ChatDataDeletion, UserDataService
 from companion.core.user_memory import UserMemoryService
@@ -407,6 +411,11 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             pattern_keeper=PatternKeeper(
                 repositories=dependencies.repositories,
                 pattern_catalog=pattern_catalog_service,
+                unmatched_grouper=UnmatchedGrouper(
+                    dependencies.repositories,
+                    dependencies.embedder,
+                    dependencies.clock,
+                ),
                 chat_model=chat_model,
                 embedder=dependencies.embedder,
                 clock=dependencies.clock,
@@ -495,6 +504,15 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         build_thought_experiment_api_router(
             current_admin=current_admin,
             thought_experiment_service=ThoughtExperimentService(
+                dependencies.repositories, pattern_catalog_service, dependencies.clock
+            ),
+            pattern_catalog_service=pattern_catalog_service,
+        )
+    )
+    app.include_router(
+        build_unmatched_review_api_router(
+            current_admin=current_admin,
+            unmatched_review_service=UnmatchedReviewService(
                 dependencies.repositories, pattern_catalog_service, dependencies.clock
             ),
             pattern_catalog_service=pattern_catalog_service,

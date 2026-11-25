@@ -46,6 +46,7 @@ describe("SidebarNav", () => {
       "Moves",
       "Pattern Catalog",
       "Thought Experiments",
+      "Unmatched Patterns",
       "Check-in Kinds",
       "Check-in log",
       "Check-in Schedule",

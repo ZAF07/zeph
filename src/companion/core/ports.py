@@ -23,6 +23,7 @@ from companion.core.models import (
     ConversationMessage,
     CopySeedSlot,
     CopySlot,
+    CountedUnmatchedEntry,
     Curiosity,
     CuriosityChanges,
     DailyUsage,
@@ -85,6 +86,7 @@ from companion.core.models import (
     ThoughtExperimentDetails,
     Understanding,
     UnderstandingShape,
+    UnmatchedEntry,
     User,
     UserOverview,
     UserPage,
@@ -1738,6 +1740,73 @@ class ExplorationRepository(Protocol):
         ...
 
 
+class UnmatchedEntryRepository(Protocol):
+    """Stores what keeps turning up that fits no Pattern Type, for Admins.
+
+    An entry holds a general description and an Admin's mark, and no User.
+    Unmatched Patterns are grouped under it by `patterns.unmatched_entry_id`.
+    """
+
+    def join_or_add(
+        self,
+        new_entry: UnmatchedEntry,
+        embedding: list[float],
+        min_closeness: float,
+        created_at: datetime,
+    ) -> UUID:
+        """Find the entry a general description belongs under, or add one.
+
+        Done one at a time across the whole platform, so two Conversations
+        ending at the same moment never add two entries for the same thing.
+
+        Args:
+            new_entry: The entry to add when none is close enough, holding
+                the general description.
+            embedding: The general description embedded.
+            min_closeness: How close in meaning an entry must be to be
+                joined, from 0 to 1.
+            created_at: When the new entry is added.
+
+        Returns:
+            The ID of the closest entry at least that close, the oldest
+            first when two are as close; the new entry's ID if it was added.
+        """
+        ...
+
+    def list_counted(self) -> list[CountedUnmatchedEntry]:
+        """List the entries that appear for at least one User.
+
+        A User counts once for an entry, however many of their unmatched
+        Patterns are grouped under it; a Pattern the matching command
+        linked to a Pattern Type doesn't count.
+
+        Returns:
+            The entries, most Users first, then oldest first.
+        """
+        ...
+
+    def get_counted(self, entry_id: UUID) -> CountedUnmatchedEntry | None:
+        """Get one entry with how many Users it appears for now.
+
+        Args:
+            entry_id: The entry's ID.
+
+        Returns:
+            The entry, also when it appears for no User; None if there is
+            no such entry.
+        """
+        ...
+
+    def save_mark(self, entry: UnmatchedEntry) -> None:
+        """Save an entry's mark.
+
+        Args:
+            entry: The entry with its new mark, the Pattern Type it is
+                folded into, the Users it appeared for and when.
+        """
+        ...
+
+
 class ThoughtExperimentRepository(Protocol):
     """Stores the Thought Experiments Admins manage. None is ever deleted."""
 
@@ -3283,6 +3352,7 @@ class Repositories:
     curiosities: CuriosityRepository
     explorations: ExplorationRepository
     thought_experiments: ThoughtExperimentRepository
+    unmatched_entries: UnmatchedEntryRepository
     move_outcomes: MoveOutcomeRepository
     user_portraits: UserPortraitRepository
     knowledge_documents: KnowledgeDocumentRepository

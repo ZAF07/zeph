@@ -351,6 +351,9 @@ STARTER_THOUGHT_EXPERIMENT_DAYS = Setting("starter_thought_experiment_days", rea
 STARTER_THOUGHT_EXPERIMENTS_PER_CONVERSATION = Setting(
     "starter_thought_experiments_per_conversation", read_whole_number
 )
+UNMATCHED_GROUPING_CLOSENESS_PERCENT = Setting(
+    "unmatched_grouping_closeness_percent", read_whole_number
+)
 PATTERN_PUSHED_BACK_WAIT = Setting("pattern_pushed_back_wait_days", read_days)
 PATTERN_CLOSENESS_PERCENT = Setting("pattern_closeness_percent", read_whole_number)
 PORTRAIT_MODEL = Setting("portrait_model", read_text)
@@ -1591,6 +1594,19 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
             "The most starter Thought Experiments in one Conversation (0 asks "
             "none); the next is written when a Conversation ends. The Curiosity "
             "limits still apply."
+        ),
+    ),
+    EditableSetting(
+        UNMATCHED_GROUPING_CLOSENESS_PERCENT.key,
+        "Unmatched grouping bar",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=100,
+        hint=(
+            "How close in meaning two general descriptions must be to count as "
+            "one entry on the Unmatched Patterns page, for Patterns kept from "
+            "now on. The same way in other words scores about 74–88; a "
+            "different way up to about 78."
         ),
     ),
     EditableSetting(
