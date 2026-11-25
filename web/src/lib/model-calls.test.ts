@@ -253,6 +253,10 @@ describe("taggingShapeFacts", () => {
     expect(modelStepLabel("prediction_given_check")).toBe(
       "Prediction given check",
     );
+    expect(modelStepLabel("curiosity_asked_check")).toBe(
+      "Curiosity asked check",
+    );
+    expect(modelStepLabel("settings_claim_check")).toBe("Settings claim check");
     expect(taggingShapeFacts({ tagged: 3, dropped: 1 })).toEqual([
       { label: "Observations tagged", value: "3" },
       { label: "Dropped by code", value: "1" },

@@ -763,6 +763,8 @@ export type ModelStep =
   | "pattern_other_side"
   | "pattern_shared_check"
   | "prediction_given_check"
+  | "curiosity_asked_check"
+  | "settings_claim_check"
   | "pattern_matching"
   | "patterns"
   | "portrait"

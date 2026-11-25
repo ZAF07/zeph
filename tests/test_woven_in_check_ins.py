@@ -102,10 +102,11 @@ def test_a_check_in_due_mid_conversation_is_woven_into_the_reply_and_logged(
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
         "ha, love that. how did the board presentation go?"
     ]
-    assert chat_model.call_order[-4:] == [
+    assert chat_model.call_order[-5:] == [
         "understanding",
         "reply_plan",
         "reply",
+        "claim_check",
         "brought_up_check",
     ]
     [check_call] = chat_model.brought_up_check_calls
@@ -248,7 +249,7 @@ def test_the_reply_plan_is_given_the_due_check_in_kinds_and_no_check_in_model_ru
     assert "Something I've been wondering" not in line.text
     assert "now making a big salad" in line.text
     assert chat_model.brought_up_check_calls == []
-    assert chat_model.call_order[-1] == "reply"
+    assert chat_model.call_order[-2:] == ["reply", "claim_check"]
 
 
 def assert_no_check_in_offered(

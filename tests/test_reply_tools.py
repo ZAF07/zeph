@@ -367,6 +367,7 @@ def build_settings_tools(repositories: Repositories) -> SettingsTools:
         check_ins,
         user_memory,
         ChatDataDeletion(repositories, chat_channel, clock),
+        chat_model,
     )
 
 

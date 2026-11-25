@@ -310,3 +310,44 @@ def test_a_model_direct_deepseek_cant_call_fails_clearly(model: str) -> None:
 
     assert model in str(error.value)
     assert "Pick a DeepSeek model" in str(error.value)
+
+
+MARKUP_REPLY = (
+    "<tool call>\n\n<function=web_search>\n"
+    "<parameter=query>seneca</parameter>\n</function>\n</tool_call>"
+)
+
+
+def test_a_tool_call_written_as_text_is_asked_again_once() -> None:
+    chat = ScriptedLangChainModel(
+        AIMessage(MARKUP_REPLY),
+        asks_for_search("seneca", "call_1"),
+        AIMessage("Seneca was a Stoic."),
+    )
+
+    reply = answer_with_tools(
+        chat.invoke,
+        ScriptedLangChainModel().invoke,
+        [SystemMessage("x")],
+        [search_tool()],
+    )
+
+    assert reply.text == "Seneca was a Stoic."
+    assert chat.received[1] == chat.received[0]
+    assert [call.name for call in reply.tool_calls] == ["web_search"]
+
+
+def test_tool_call_markup_still_there_after_asking_again_is_never_returned() -> None:
+    chat = ScriptedLangChainModel(
+        AIMessage(MARKUP_REPLY), AIMessage(f"Straight talk it is.\n\n{MARKUP_REPLY}")
+    )
+
+    reply = answer_with_tools(
+        chat.invoke,
+        ScriptedLangChainModel().invoke,
+        [SystemMessage("x")],
+        [search_tool()],
+    )
+
+    assert reply.text == "Straight talk it is."
+    assert len(chat.received) == 2

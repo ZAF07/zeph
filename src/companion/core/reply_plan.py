@@ -14,8 +14,10 @@ from companion.core.curiosities import (
     DueCuriosities,
     NumberedCuriosity,
     describe_curiosity_treatments,
+    describe_dropped_topics,
     describe_due_curiosities,
     format_curiosities_for_reply,
+    format_dropped_topics_for_reply,
     offered_under,
     why_none_asked,
 )
@@ -430,10 +432,10 @@ def describe_message_for_reply_plan(
         Memory Categories, recent Conversations, reminded Life Threads, the
         Patterns in mind, the ready Pattern it may share and those the User
         disagreed with, due Curiosities and how each Need treats them, the
-        Agenda with its earlier tries, Knowledge documents, the due
-        Check-in's Kinds when one is due, where the previous Conversation
-        was, earlier Reply Plans, earlier messages across Conversations and
-        latest message.
+        topics they asked to drop, the Agenda with its earlier tries,
+        Knowledge documents, the due Check-in's Kinds when one is due,
+        where the previous Conversation was, earlier Reply Plans, earlier
+        messages across Conversations and latest message.
     """
     fallback = fallback_need(needs)
     need_lines = "\n".join(f"- {need.name}: {need.when_it_fits}" for need in needs)
@@ -504,6 +506,7 @@ def describe_message_for_reply_plan(
         f"\n\nThings you've been wondering about them, whose time has come "
         f"{describe_due_curiosities(due, snapshot.user.time_zone)}"
         f"{awaiting_line}"
+        f"{describe_dropped_topics(due)}"
         f"{describe_agenda(agenda, snapshot.user.time_zone)}"
         f"\n\nHow each Need treats them:\n{describe_curiosity_treatments(needs)}"
         f"\n\nKnowledge documents, with when each helps:\n"
@@ -1220,6 +1223,7 @@ def format_reply_guidance(
     past_days: Sequence[str] = (),
     open_needs_line: str = "",
     pattern_section: str = "",
+    dropped_topics_section: str = "",
 ) -> ReplyGuidance:
     """Write what the Reply Plan adds to the reply's instructions.
 
@@ -1239,9 +1243,12 @@ def format_reply_guidance(
             lead or supporting Move asks a question; "" otherwise.
         pattern_section: The ready Pattern to tell them, or the Pattern
             they disagreed with and raised themselves; "" for neither.
+        dropped_topics_section: The topics they asked Zeph to drop; "" if
+            none.
 
     Returns:
-        The Threads to leave alone as a boundary; the Need and how to reply,
+        The Threads to leave alone and the topics they asked to drop as
+        boundaries; the Need and how to reply,
         the Read when the plan says to give it now with the Pattern it
         offers, if any, the lead and supporting
         Moves and how to make them, the guidance, the mood, the note, the
@@ -1287,8 +1294,9 @@ def format_reply_guidance(
         if past_days
         else ""
     )
+    boundaries = [left_alone_section, dropped_topics_section]
     return ReplyGuidance(
-        boundaries=left_alone_section,
+        boundaries="\n\n".join(section for section in boundaries if section),
         plan=reply_plan,
         past_days=past_days_section,
     )
@@ -1597,6 +1605,7 @@ class ReplyPlanService:
                 past_days,
                 describe_open_needs_for_reply(agenda),
                 format_pattern_for_reply(form, pattern_to_share, contested),
+                format_dropped_topics_for_reply(due),
             ),
             asks_a_question=asks_another_question or picked.asks_a_question,
             may_send_photo=may_send_photo(understanding.form, form),

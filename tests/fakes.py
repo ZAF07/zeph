@@ -10,6 +10,8 @@ from typing import Any
 
 from companion.adapters.evals.stand_ins import InlineUserWorkQueue
 from companion.adapters.postgres.tables import EMBEDDING_SIZE
+from companion.core.chat_settings import CLAIM_CHECK_PROMPT
+from companion.core.curiosities import ASKED_CHECK_PROMPT
 from companion.core.incoming_messages import MESSAGE_WAIT_PREFIX
 from companion.core.models import (
     AccountIdentity,
@@ -659,7 +661,9 @@ class ScriptedChatModel:
     `reply_plan_answer()`, Life Thread, Pattern, Curiosity and Move Outcome
     keeping to none kept, arguing the other side to no better
     explanation, Portrait writing to an empty answer (no
-    Portrait), the brought-up check to "no", the check that a Pattern was
+    Portrait), the brought-up check to "no", the check that a reply asked
+    its Curiosity to "yes", the check that a reply says a setting changed
+    to "no", the check that a Pattern was
     shared to not shared and drafting to
     `DEFAULT_WHEN_IT_HELPS`, so tests about replies don't have to script
     them too. Set
@@ -736,6 +740,8 @@ class ScriptedChatModel:
         self._other_side_answers: list[str | Exception] = []
         self._shared_check_answers: list[str | Exception] = []
         self._given_check_answers: list[str | Exception] = []
+        self._asked_check_answers: list[str | Exception] = []
+        self._claim_check_answers: list[str | Exception] = []
         self.safeguard_prompt = safeguard_prompt
         self.memory_processing_prompt = memory_processing_prompt
         self.understanding_prompt = understanding_prompt
@@ -768,6 +774,8 @@ class ScriptedChatModel:
         self.other_side_calls: list[ChatModelCall] = []
         self.shared_check_calls: list[ChatModelCall] = []
         self.given_check_calls: list[ChatModelCall] = []
+        self.asked_check_calls: list[ChatModelCall] = []
+        self.claim_check_calls: list[ChatModelCall] = []
         self.call_order: list[str] = []
         self.delay_seconds = 0.0
         self.before_next_reply: Callable[[], None] | None = None
@@ -913,6 +921,24 @@ class ScriptedChatModel:
                 returned, to act like a failing model.
         """
         self._given_check_answers.extend(answers)
+
+    def script_asked_check(self, *answers: str | Exception) -> None:
+        """Queue answers to whether a reply asked its Curiosity, one per call.
+
+        Args:
+            answers: "yes" or "no"; an exception is raised instead of
+                returned, to act like a failing model.
+        """
+        self._asked_check_answers.extend(answers)
+
+    def script_claim_check(self, *answers: str | Exception) -> None:
+        """Queue answers to whether a reply says a setting changed, one per call.
+
+        Args:
+            answers: "yes" or "no"; an exception is raised instead of
+                returned, to act like a failing model.
+        """
+        self._claim_check_answers.extend(answers)
 
     def script_brought_up_check(self, *answers: str | Exception) -> None:
         """Queue answers to whether a reply brought up its Check-in, one per call.
@@ -1133,6 +1159,18 @@ class ScriptedChatModel:
                 self._given_check_answers.pop(0)
                 if self._given_check_answers
                 else json.dumps({"given": False, "prediction": ""})
+            )
+        elif instructions == ASKED_CHECK_PROMPT:
+            self.asked_check_calls.append(call)
+            self.call_order.append("asked_check")
+            answer = (
+                self._asked_check_answers.pop(0) if self._asked_check_answers else "yes"
+            )
+        elif instructions == CLAIM_CHECK_PROMPT:
+            self.claim_check_calls.append(call)
+            self.call_order.append("claim_check")
+            answer = (
+                self._claim_check_answers.pop(0) if self._claim_check_answers else "no"
             )
         elif instructions == BROUGHT_UP_CHECK_PROMPT:
             self.brought_up_check_calls.append(call)

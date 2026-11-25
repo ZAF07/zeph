@@ -2539,6 +2539,8 @@ class ModelStep(StrEnum):
     PATTERN_OTHER_SIDE = "pattern_other_side"
     PATTERN_SHARED_CHECK = "pattern_shared_check"
     PREDICTION_GIVEN_CHECK = "prediction_given_check"
+    CURIOSITY_ASKED_CHECK = "curiosity_asked_check"
+    SETTINGS_CLAIM_CHECK = "settings_claim_check"
     PATTERNS = "patterns"
     PORTRAIT = "portrait"
     PERSONAL_STICKERS = "personal_stickers"
@@ -2645,7 +2647,8 @@ class ReplyPlanShape:
         curiosities_offered: How many Curiosities it could ask; 0 when the
             Need it picked never asks one. None on a shape saved before
             this was recorded.
-        curiosity_asked: Whether the reply was to ask a Curiosity; None on
+        curiosity_asked: Whether the reply was to ask a Curiosity and, once
+            it is sent, whether the asked check found it did; None on
             a shape saved before this was recorded.
         pattern_to_share_offered: Whether code offered it a ready Pattern
             to share; None on a shape saved before this was recorded.

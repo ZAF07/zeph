@@ -14,8 +14,10 @@ from companion.adapters.load_test.chat_model import (
     shape_of,
 )
 from companion.adapters.postgres.repositories import build_postgres_repositories
+from companion.core.chat_settings import CLAIM_CHECK_PROMPT
 from companion.core.check_ins import read_check_in_decision
 from companion.core.curiosities import (
+    ASKED_CHECK_PROMPT,
     NO_DUE_CURIOSITIES,
     read_curiosity_keeping_answer,
 )
@@ -132,6 +134,8 @@ def test_every_call_shape_is_told_apart_by_its_instructions(engine: Engine) -> N
         == CallShape.KNOWLEDGE_WHEN_IT_HELPS
     )
     assert shape_of(BROUGHT_UP_CHECK_PROMPT, settings) == CallShape.BROUGHT_UP_CHECK
+    assert shape_of(CLAIM_CHECK_PROMPT, settings) == CallShape.SETTINGS_CLAIM_CHECK
+    assert shape_of(ASKED_CHECK_PROMPT, settings) == CallShape.CURIOSITY_ASKED_CHECK
     assert shape_of(f"{persona}\n\nReply in Zeph's voice.", settings) == (
         CallShape.REPLY
     )
@@ -173,6 +177,8 @@ def test_each_canned_answer_is_read_by_the_app_as_a_real_answer(
     assert keeping(PORTRAIT_PROMPT).strip()
     assert keeping(KNOWLEDGE_WHEN_IT_HELPS_PROMPT).strip()
     assert ask(chat_model, BROUGHT_UP_CHECK_PROMPT) == "no"
+    assert ask(chat_model, CLAIM_CHECK_PROMPT) == "no"
+    assert ask(chat_model, ASKED_CHECK_PROMPT) == "yes"
     assert ask(chat_model, f"{persona}\n\nReply in Zeph's voice.") == CANNED_REPLY
 
 
