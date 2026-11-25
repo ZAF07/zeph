@@ -43,3 +43,22 @@ What the Admin does about a kept edit is in `docs/PROMPT_EDITS_AND_DEPLOYS_GUIDE
 A stored prompt that already differs from the previous seed for any reason (an Admin's edit, or an older seed text that was never reloaded) counts as edited and is kept.
 
 Migrations 0073, 0078, 0080, 0081, 0086, 0100 and 0101 removed prompts without this check. They have already run on production and stay as they are.
+
+## Changing a seed Eval Case
+
+A case in `src/companion/seed/evals/cases/` loads only where its key isn't stored yet. So when you change a seed case, a migration has to remove the stored one for the new case to load.
+
+**A new migration must use the helper `reload_eval_case_unless_edited` for this. Never delete from `eval_cases` yourself.**
+
+```python
+from alembic import op
+
+from companion.adapters.postgres.eval_case_reload import reload_eval_case_unless_edited
+
+
+def upgrade() -> None:
+    """Reload the case where no Admin changed it."""
+    reload_eval_case_unless_edited(op.get_bind(), "guess-checked-gently")
+```
+
+The helper removes the stored case only when no Admin edited or archived it. Otherwise the case stays and a warning naming it goes to the backend log (`docker compose logs backend | grep "Kept the stored Eval Case"`), so the owner can change it by hand on the Dashboard. Past Case Results keep the case as it was when they ran. A reloaded case moves to the end of its Eval's list.

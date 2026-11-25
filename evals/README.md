@@ -363,8 +363,10 @@ The starting cases are seed files in `src/companion/seed/evals/cases/`, with
 the test images in `src/companion/seed/evals/images/`. On start-up the
 backend adds every case whose key (its `id`) isn't in the database yet, with
 its images. It never changes a case already there, edited or archived, so
-editing a seed file doesn't change an existing case, and keys must be unique
-across all ten files. Each file explains its own format at the top; the
+editing a seed file doesn't change an existing case (a migration that calls
+`reload_eval_case_unless_edited` reloads one no Admin changed; see
+`src/companion/adapters/postgres/migrations/README.md`), and keys must be
+unique across all ten files. Each file explains its own format at the top; the
 backend rewrites it into the form's shape when it reads it.
 
 - `safeguard.yaml`: add an `id`, a `kind` (`clear_crisis`, `subtle_crisis` or
