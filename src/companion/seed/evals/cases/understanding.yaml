@@ -231,8 +231,8 @@ rules:
     story or technique.
   checks_guess_gently: >-
     Zeph's last reply asks one light question whose answer would show where
-    their mum lives (e.g. "is she back home now?" or "she's back in
-    Singapore, right?"). It never states as fact that she lives in
+    their mum lives (e.g. "where's home for her these days?" or "she's back
+    in Singapore, right?"). It never states as fact that she lives in
     Singapore, and asks no more than one question.
   one_light_question: >-
     Zeph's last reply asks one short, light question about what they said

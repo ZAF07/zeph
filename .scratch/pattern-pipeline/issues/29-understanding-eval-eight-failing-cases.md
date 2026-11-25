@@ -47,7 +47,7 @@ Use a worktree for the old commit; don't switch branches in the main folder.
 
 ### 25 Nov 2026: run, sorted and fixed
 
-**Answer: no case got worse because of issues 01 and 02.** No regression in how Zeph picks Needs and Moves or weaves in Check-ins was found. One case (`guess-checked-gently`) could not pass after issue 01 because the case was out of date; it is fixed here. Six cases fail often for reasons that were already there before issue 01; they are in the new issue `33-understanding-eval-cases-that-fail-for-old-reasons.md`.
+**Answer: no regression in Zeph's behaviour was found.** Nothing in these runs shows Zeph picking Needs and Moves or weaving in Check-ins worse than before issue 01. That rests on two tries a side (six for the Check-in case), so it is "none found", not proof. One case (`guess-checked-gently`) did get worse as a case: after issue 01 it could not pass at all, because the case was out of date, not because Zeph went wrong. It is fixed here. Six cases fail often for reasons that were already there before issue 01; they are in the new issue `33-understanding-eval-cases-that-fail-for-old-reasons.md`.
 
 **How it was run**
 
@@ -55,7 +55,7 @@ Use a worktree for the old commit; don't switch branches in the main folder.
 - The 8 cases' seed text is the same in both commits.
 - One difference that could not be avoided: the old commit has no OpenRouter, so "before" called DeepSeek directly (`deepseek-flash`) and "now" calls it through OpenRouter (`deepseek/deepseek-v4.1-flash-1017`). Same model, same prices (S$0.38 in, S$1.54 out per 1M tokens).
 
-**The owner and the estimates.** Before any run the owner was shown the stack's own estimate: about S$0.055 per run of the 8 cases, S$0.22 for the four runs, and S$0.01 for the one-case re-run. The owner said yes, with a cap of S$0.50 in total for follow-up runs of single cases without asking again. The 8 extra Check-in runs and 3 extra `guess-checked-gently` runs below were made under that cap, not shown one by one. Total spent: **S$0.33**.
+**The owner and the estimates.** Before any run the owner was shown the stack's own estimate: about S$0.055 per run of the 8 cases, S$0.22 for the four runs, and S$0.01 for the one-case re-run. The owner said yes, with a cap of S$0.50 in total for follow-up runs of single cases without asking again. The 8 extra Check-in runs and 4 extra `guess-checked-gently` runs below were made under that cap, not shown one by one. Total spent: **S$0.34**.
 
 **Eval Runs** (cost worked out from each run's tokens at the prices above)
 
@@ -77,6 +77,7 @@ Use a worktree for the old commit; don't switch branches in the main folder.
 | `8c5f7632-24aa-4620-9f6d-45e0458a4a7f` | now | `guess-checked-gently`, final | pass | 10,150 / 1,660 | S$0.006 |
 | `e43ddd11-0591-4b5c-b619-3fb2d85e4487` | now | `guess-checked-gently`, final | fail | 10,187 / 1,658 | S$0.006 |
 | `da21b1bb-3911-4a14-a7ca-72cb7556c695` | now | `guess-checked-gently`, final | pass | 10,187 / 1,429 | S$0.006 |
+| `a762770f-cb54-406f-ac96-10e0bcf60c51` | now | `guess-checked-gently`, final, rule example reworded after review | pass | 10,109 / 1,839 | S$0.007 |
 
 The runs live in the two worktree databases, which are deleted at teardown. The reports were read in full before that; what matters from them is below.
 
@@ -84,21 +85,22 @@ The runs live in the two worktree databases, which are deleted at teardown. The 
 
 | Case | B1 | B2 | N1 | N2 | Sorted as | Why |
 | --- | --- | --- | --- | --- | --- | --- |
-| `strong-mood-unknown-cause` | F | F | P | F | always failed (a case fault) | The Reply Plan leads with Get curious instead of setting "ask why". The reply asks what is behind the mood either way; the judge passed it 4 of 4. |
+| `strong-mood-unknown-cause` | F | F | P | F | flaky, mostly fails (a case fault, there before) | In the three fails the Reply Plan leads with Get curious instead of setting "ask why". The reply asks what is behind the mood either way; the judge passed it 4 of 4. |
 | `knowledge-for-a-reflective-question` | P | F | P | P | flaky | Once before, the Need was Advice, not Think it through. Passes now. |
-| `no-knowledge-for-a-vent` | F | F | P | F | always failed (an old fault) | The Need and "no Knowledge" are right every time. The reply gives a breathing tip, which fails the judge's "no fixing" rule. |
+| `no-knowledge-for-a-vent` | F | F | P | F | flaky, mostly fails (an old fault) | The Need and "no Knowledge" are right every time. In the three fails the reply gives a breathing tip, which fails the judge's "no fixing" rule. |
 | `check-in-not-now-while-asking-for-help` | P | P | P | F | flaky (an old fault) | Looked worse, so it was run 4 more times on each side: 3 of 6 before, 2 of 6 now. The Reply Plan weaves in the follow-up Check-in about half the time on both. The Check-in part of the prompt is the same in both commits. |
 | `internal-testing-finish-line` | P | F | F | P | flaky | Now and then it picks another Need or Move (Be heard and Get curious before, Suggest now). |
-| `small-talk-makes-no-move` | F | F | F | F | always failed (a case or prompt fault) | The case wants no Move. The Reply Plan always makes one: Suggest before, Get curious now. |
+| `small-talk-makes-no-move` | F | F | F | F | always failed (a case or prompt fault) | The case wants no Move. The Reply Plan always makes one. Which one did change: Suggest before (a keyboard tip), Get curious now (asks about the cat, with the tip as support). Both fail the case the same way; whether asking is better or worse than a tip in small talk is the owner's call in issue 33. |
 | `next-move-held-then-made` | F | F | F | F | always failed (a case fault) | The case wants Research held for the next reply. The Reply Plan leads with Research at once, every time. |
-| `guess-checked-gently` | F | P | F | F | got worse: the case was out of date | Before, it failed or passed on the judge rule only. Now code drops Get curious when the reply raises the Curiosity (issue 01's one question per reply), so "lead Move Get curious" can never pass. Zeph's behaviour is as designed. |
+| `guess-checked-gently` | F | P | F | F | got worse: the case was out of date | The runs alone (1 of 2, then 0 of 2) don't prove it; the code does. Before, the lead Move check passed both times and only the judge rule varied. Now code drops Get curious when the reply raises the Curiosity (issue 01's one question per reply), so "lead Move Get curious" can never pass; it failed that check both times. Zeph's behaviour is as designed. |
 
 **`guess-checked-gently`, what changed**
 
 - It now expects `curiosity_raised: true`, not `lead_move: [Get curious]`.
 - First try (run `2a882c1d`): with only that change it failed. On "she sounded so happy" the Reply Plan asked what made her happy and left the Curiosity. Under Just chatting a Curiosity is the model's choice, so the Message has to make it fit.
 - Final case: the Curiosity's question is "Where is home for your mum these days?" (it was "Is your mum back home after her visit?", whose answer says little about the guess), the Message is "had a long call with my mum last night, she's settled back in at home after the visit", and the judge rule says the reply asks one light question whose answer would show where their mum lives and never states Singapore as fact.
-- Result: passed 2 of 3 (`8c5f7632`, `da21b1bb`). The Curiosity was raised 3 of 3. The one fail (`e43ddd11`) is the rule doing its job: the reply said "how's she doing back in Singapore" and asked two questions. That is a fault in the reply, listed in issue 33.
+- After the review, the rule's example "is she back home now?" became "where's home for her these days?", since the Message already says she is back home. The case as merged passed run `a762770f`.
+- Result: passed 3 of 4 (`8c5f7632`, `da21b1bb`, `a762770f`). The Curiosity was raised 4 of 4. The one fail (`e43ddd11`) is the rule doing its job: the reply said "how's she doing back in Singapore" and asked two questions. That is a fault in the reply, listed in issue 33.
 
 **What was built so the changed case reaches stacks that already have it**
 
@@ -114,11 +116,13 @@ A seed case loads only where its key isn't stored, so editing the seed file alon
 
 - **Each case run twice before and twice now, with IDs and costs.** The four runs of 8 in the table above.
 - **Each case sorted, with the reason.** The second table.
-- **`guess-checked-gently` can be met and passed a run.** Runs `8c5f7632` and `da21b1bb` passed, on this worktree's running stack after migration 0102 reloaded the case (the stored case went from `lead_move: [Get curious]` to `curiosity_raised: true`; `alembic_version` 0102).
+- **`guess-checked-gently` can be met and passed a run.** Runs `8c5f7632`, `da21b1bb` and `a762770f` (the case exactly as merged) passed, on this worktree's running stack after migration 0102 reloaded the case (the stored case went from `lead_move: [Get curious]` to `curiosity_raised: true`; `alembic_version` 0102).
 - **Every real regression fixed or has its own issue.** The only case that got worse is `guess-checked-gently`, fixed here. The old faults are in issue 33.
 - **The owner was shown the estimate before each run.** See "The owner and the estimates": shown before the first runs; the follow-up runs were under the S$0.50 cap the owner set, not shown one by one.
 
 **Checked in the running app.** On this worktree's stack: (1) backend rebuilt with 0102, the unedited stored case was removed and loaded again from the seed; (2) the stored case marked edited, the migration run again: the case was kept and the backend log had "Kept the stored Eval Case guess-checked-gently: an Admin edited or archived it, so the new seed case was not loaded. Change it by hand on the Dashboard."
+
+**Review.** Standards and spec reviews run. Standards: no hard violations. Fixed after the spec review: two cases sorted as "always failed" that passed once are now "flaky, mostly fails"; the answer says "none found" and why two tries a side can't prove more; the change of Move in `small-talk-makes-no-move` is noted; the rule's example; a test name. The helper and migration go past the issue's wording ("change its expectation"), because without them the changed case would not reach any stack that already has it.
 
 **Checks.** ruff clean, ruff format clean, mypy clean (278 files), pytest 2471 passed. New tests: `tests/test_eval_case_reload.py` (4). No Dashboard code changed, so the web checks were not run.
 

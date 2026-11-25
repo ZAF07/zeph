@@ -776,9 +776,7 @@ def test_a_made_up_guess_curiosity_is_read_and_saved_with_how_sure_zeph_is(
     assert (plain.guess, plain.how_sure) == (None, None)
 
 
-def test_the_understanding_cases_check_a_guess_gently_by_raising_its_curiosity() -> (
-    None
-):
+def test_the_understanding_cases_check_a_guess_by_raising_its_curiosity() -> None:
     seed_cases: list[UnderstandingCase] = seeded(EvalName.UNDERSTANDING)
     case = {case.id: case for case in seed_cases}["guess-checked-gently"]
 
