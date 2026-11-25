@@ -16,10 +16,12 @@ from companion.core.models import (
     ModelStep,
     WebSearchResult,
 )
+from companion.core.usage import UsageLimiter, UsageRecordingChatModel
 from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
     FakeClock,
+    FakePhotoViewer,
     FakeScheduler,
     FakeTimer,
     FakeWebSearch,
@@ -535,6 +537,38 @@ def record_one_call(
         ModelAnswer(text="that sounds lovely", reasoning="They seem excited."),
     )
     return log.open_trace(snapshot.trace.id)
+
+
+def test_the_log_keeps_the_two_instructions_as_the_one_text_the_model_reads(
+    engine: Engine, clock: FakeClock
+) -> None:
+    repositories = build_postgres_repositories(engine)
+    log = ModelCallLog(
+        repositories, clock, content_for_everyone=True, developer_logs=False
+    )
+    scripted = ScriptedChatModel()
+    scripted.script("hey")
+    chat_model = UsageRecordingChatModel(
+        scripted, FakePhotoViewer(), UsageLimiter(repositories, clock), log, clock
+    )
+    snapshot = snapshot_for(add_user(repositories))
+
+    chat_model.generate(
+        snapshot=snapshot,
+        step=ModelStep.REPLY,
+        model="deepseek-flash",
+        thinking=False,
+        instructions="Be kind.",
+        history=[ChatLine(ChatRole.USER, "hi")],
+        message_instructions="They just asked about work.",
+    )
+
+    [scripted_call] = scripted.calls
+    assert scripted_call.fixed_instructions == "Be kind."
+    assert scripted_call.message_instructions == "They just asked about work."
+    [call] = log.open_trace(snapshot.trace.id).calls
+    assert call.content is not None
+    assert call.content.instructions == "Be kind.\n\nThey just asked about work."
 
 
 def test_an_eval_run_keeps_full_content_for_every_user(

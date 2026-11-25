@@ -69,6 +69,24 @@ OPTIONAL_EXTRAS_HEADING = (
 )
 
 
+@dataclass(frozen=True)
+class ReplyInstructions:
+    """The reply's instructions, in the two parts the chat model is given.
+
+    They are kept apart so a provider's prompt cache can keep the fixed
+    part and read it back for the next reply.
+
+    Attributes:
+        fixed: The part that is the same for every reply: the Persona, the
+            response prompt and the priority order.
+        for_this_message: The part made for this User and Message: one
+            section per priority level that has something in it.
+    """
+
+    fixed: str
+    for_this_message: str
+
+
 class EmptyReplyError(Exception):
     """Raised when the chat model's reply has no text, sticker or photo."""
 
@@ -181,13 +199,14 @@ def write_instructions(
     guidance: str,
     memory: str,
     optional_extras: Sequence[str],
-) -> str:
+) -> ReplyInstructions:
     """Write the reply's instructions in their priority order.
 
     The voice and response prompt come first, then the priority order with
     its clash rule, then one section per level that has something in it.
     The "what they just asked" section always tells the reply to answer a
-    direct question first.
+    direct question first. Everything before the first section is the fixed
+    part; the sections are the part for this message.
 
     Args:
         voice: The Persona.
@@ -201,7 +220,7 @@ def write_instructions(
             Woven-in Check-in or Knowledge passages.
 
     Returns:
-        The instructions.
+        The instructions, in their fixed part and their part for this message.
     """
     levels = (
         (BOUNDARIES_HEADING, list(boundaries)),
@@ -210,12 +229,16 @@ def write_instructions(
         (MEMORY_HEADING, [memory]),
         (OPTIONAL_EXTRAS_HEADING, list(optional_extras)),
     )
-    parts = [voice, response_prompt, PRIORITY_ORDER]
+    fixed_parts = (voice, response_prompt, PRIORITY_ORDER)
+    filled_levels = []
     for heading, sections in levels:
         filled = [section for section in sections if section]
         if filled:
-            parts.append("\n\n".join([heading, *filled]))
-    return "\n\n".join(part for part in parts if part)
+            filled_levels.append("\n\n".join([heading, *filled]))
+    return ReplyInstructions(
+        fixed="\n\n".join(part for part in fixed_parts if part),
+        for_this_message="\n\n".join(filled_levels),
+    )
 
 
 def to_chat_history(
@@ -379,9 +402,10 @@ class ResponseComposer:
             step=ModelStep.REPLY,
             model=settings.get(RESPONSE_MODEL),
             thinking=thinking_to_use(settings, RESPONSE_MODEL, RESPONSE_THINKING),
-            instructions=instructions,
+            instructions=instructions.fixed,
             history=history,
             tools=[tool for offer in offers for tool in offer.tools],
+            message_instructions=instructions.for_this_message,
         )
         reply_parts = link_to_texts(split_into_messages(reply), message_texts)
         reply_parts += [

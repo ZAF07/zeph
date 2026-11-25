@@ -3472,3 +3472,22 @@ class AgendaChanges:
     closed_curiosity_ids: list[UUID]
     new_curiosities: list[Curiosity]
     new_tries: list[ExplorationTry]
+
+
+INSTRUCTIONS_SEPARATOR = "\n\n"
+
+
+def join_instructions(instructions: str, message_instructions: str) -> str:
+    """Join a model call's fixed instructions and the ones for this one call.
+
+    Args:
+        instructions: The instructions that stay the same from call to call.
+        message_instructions: The instructions made for this one call; "" if none.
+
+    Returns:
+        One text, the fixed instructions first, with a blank line between
+        them. An empty one is left out.
+    """
+    return INSTRUCTIONS_SEPARATOR.join(
+        part for part in (instructions, message_instructions) if part
+    )
