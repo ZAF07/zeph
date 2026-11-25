@@ -93,4 +93,4 @@ The same as issues 07 and 10 did for a model that can't think, in reverse (opera
 ## Completion
 
 - Completed: 2026-11-25
-- Commit: <to be filled in after the merge>
+- Commit: c336eab (merge of openrouter-11-always-think; work in 0858dac 5984b83 7499d72)
