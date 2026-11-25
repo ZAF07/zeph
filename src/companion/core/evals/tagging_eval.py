@@ -185,24 +185,25 @@ def unclear_story_facts(
 
     Args:
         story: The unclear story and how it must end.
-        after: Its Observation after tagging; None if it is gone.
+        after: Its Observation after tagging; None if it is gone, which
+            reads as still unclear (the tagging step deletes none).
 
     Returns:
         Its quote, its two Pattern Types, whether Zeph asked about it, the
         Pattern Type and sign it ended clear for (None while unclear), the
         Pattern Type expected (None to stay unclear) and whether they agree.
     """
-    still_unclear = after is None or after.unclear
-    ended_clear_for = None if after is None or still_unclear else after.pattern_type_id
+    settled = after is not None and not after.unclear
+    ended_clear_for = after.pattern_type_id if after and settled else None
     return {
         "quote": story.observation.quote,
         "pattern_types": story.pattern_types,
         "direction": story.observation.direction.value,
         "asked": story.asked,
         "ended_clear_for": ended_clear_for,
-        "sign": None if after is None or still_unclear else after.sign_id,
+        "sign": after.sign_id if after and settled else None,
         "expected_clear_for": story.ends_clear_for,
-        "matched": after is not None and ended_clear_for == story.ends_clear_for,
+        "matched": ended_clear_for == story.ends_clear_for,
     }
 
 
@@ -580,7 +581,7 @@ def check_tagging_case(case: TaggingCase, companion: EvalCompanion) -> CaseCheck
                 ),
                 "Dropped:",
                 *(f'"{item["quote"]}": {item["reason"]}' for item in facts["dropped"]),
-                "Unclear stories:",
+                *(["Unclear stories:"] if unclear else []),
                 *(
                     f'"{item["quote"]}": ended '
                     f"{describe_ending(item['ended_clear_for'])}"

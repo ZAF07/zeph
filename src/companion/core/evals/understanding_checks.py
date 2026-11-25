@@ -344,14 +344,15 @@ def check_aim(name: str, expected: str, aimed: Sequence[str]) -> CheckResult:
         aimed: The same of each aimed Curiosity brought up, in words.
 
     Returns:
-        The check's outcome; failed when no aimed Curiosity was brought up.
+        The check's outcome; failed when no aimed Curiosity was brought up,
+        or when any brought up differs from what is expected.
     """
     if not aimed:
         return CheckResult(name, False, f"{NO_AIMED_CURIOSITY}, expected {expected}")
-    found = " and ".join(aimed)
-    if expected in aimed:
+    found = " and ".join(dict.fromkeys(aimed))
+    if all(one == expected for one in aimed):
         return CheckResult(name, True, found)
-    return CheckResult(name, False, f"{found}, expected {expected}")
+    return CheckResult(name, False, f"{found}, expected only {expected}")
 
 
 def check_agenda(

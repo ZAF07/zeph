@@ -73,7 +73,7 @@ export function describeEnding(patternType: string | null): string {
  */
 export function describeUnclearNow(story: UnclearStory): string {
   return story.ended_clear_for
-    ? `${story.ended_clear_for} ${story.sign ?? ""} · ${story.direction}`
+    ? `${[story.ended_clear_for, story.sign].filter(Boolean).join(" ")} · ${story.direction}`
     : `${story.pattern_types.join(" or ")} · ${story.direction} · unclear`;
 }
 

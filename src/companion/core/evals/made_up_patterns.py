@@ -50,7 +50,9 @@ from companion.core.ports import Repositories
 from companion.core.timing import users_today
 
 THOUGHT_EXPERIMENTS_DAYS_AGO = 30
+THOUGHT_EXPERIMENT_GAP = timedelta(minutes=1)
 REPLY_GAP = timedelta(minutes=1)
+PACES_OF_REPLIES_AFTER_A_TRY = 2
 MADE_UP_NEED = "Just chatting"
 REACTIONS = {
     TryOutcome.USEFUL: ThreadReaction.ENGAGED,
@@ -300,8 +302,8 @@ def replace_thought_experiments(
                     starter=False,
                     on=True,
                 ),
-                created_at=added_at + REPLY_GAP * number,
-                updated_at=added_at + REPLY_GAP * number,
+                created_at=added_at + THOUGHT_EXPERIMENT_GAP * number,
+                updated_at=added_at + THOUGHT_EXPERIMENT_GAP * number,
             )
         )
 
@@ -449,7 +451,6 @@ def save_tries_made(
         pattern.pattern_type_id,
         repositories.observations.list_for_user(pattern.user_id),
     )
-    replies = repositories.platform_settings.load().get(CURIOSITY_REPLIES_BETWEEN) * 2
     curiosities: list[Curiosity] = []
     tries: list[ExplorationTry] = []
     for made_up_try in oldest_first:
@@ -466,9 +467,6 @@ def save_tries_made(
         )
         curiosities.append(curiosity)
         tries.append(attempt)
-        add_replies_after(
-            repositories, pattern.user_id, conversation_id, asked_at, replies
-        )
     repositories.explorations.save_agenda(
         AgendaChanges(
             added=[exploration],
@@ -489,8 +487,10 @@ def give_made_up_patterns(
     Pattern noticing and exploring are turned on. Each Observation is saved
     in an ended Conversation of its day, the real scoring step makes the
     Patterns, the tries already made are saved with their Explorations, and
-    the real Agenda step then runs as if the newest of those Conversations
-    just ended. It writes the Explorations and the aimed Curiosities.
+    each Conversation a try was asked in goes on for twice the replies the
+    pace between Curiosities needs. The real Agenda step then runs as if
+    the newest of those Conversations just ended. It writes the Explorations
+    and the aimed Curiosities.
 
     Args:
         companion: The app on the Eval database.
@@ -549,6 +549,21 @@ def give_made_up_patterns(
                 pattern_types[made_up.pattern_type],
                 conversations,
             )
+    replies = (
+        repositories.platform_settings.load().get(CURIOSITY_REPLIES_BETWEEN)
+        * PACES_OF_REPLIES_AFTER_A_TRY
+    )
+    days_tried = {
+        attempt.days_ago for made_up in memory.patterns for attempt in made_up.tries
+    }
+    for days_ago in days_tried:
+        add_replies_after(
+            repositories,
+            user_id,
+            conversations.on(days_ago),
+            conversations.moment(days_ago),
+            replies,
+        )
     newest = conversations.newest()
     if newest is not None:
         companion.keep_agenda(newest)
