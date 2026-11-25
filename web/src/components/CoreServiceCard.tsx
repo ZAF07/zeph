@@ -23,6 +23,35 @@ import { lastSavedNote, onOffSetting, textSetting } from "@/lib/settings";
 import { useSaveAdminSettings } from "@/lib/use-admin-settings";
 
 /**
+ * Says how a model locks the thinking switch.
+ *
+ * @param model - The chosen model.
+ * @param modelsThatCannotThink - The models that can't think.
+ * @param modelsThatAlwaysThink - The models that always think.
+ * @returns What thinking is locked to and the note saying why, or null when
+ *   the model can think or not.
+ */
+function lockedThinking(
+  model: string,
+  modelsThatCannotThink: string[],
+  modelsThatAlwaysThink: string[],
+): { thinking: boolean; note: string } | null {
+  if (modelsThatAlwaysThink.includes(model)) {
+    return {
+      thinking: true,
+      note: "This model always thinks, so thinking stays on.",
+    };
+  }
+  if (modelsThatCannotThink.includes(model)) {
+    return {
+      thinking: false,
+      note: "This model can’t think, so thinking stays off.",
+    };
+  }
+  return null;
+}
+
+/**
  * One core service as a folding card of the card list. The folded row shows
  * its name, description and when it runs. Open, it has two groups: "Model &
  * settings", the field rows for which model it uses, whether that model
@@ -35,18 +64,22 @@ import { useSaveAdminSettings } from "@/lib/use-admin-settings";
  * chosen model can't think, the thinking switch is off and can't be changed,
  * and a pop-up says why while the mouse is over it.
  * Choosing such a model switches thinking off, and it stays off until it is
- * switched on again for a model that can think.
+ * switched on again for a model that can think. A model that always thinks
+ * is the same in reverse: the switch is on and can't be changed, with its
+ * own pop-up, and thinking stays on until it is switched off for another
+ * model.
  *
  * @param props - `service` is the core service, `modelChoices` the models
  *   Admins can pick, `modelsThatCannotThink` the ones of those that can't
- *   think, `settings` the saved settings, and `isOpen` and `onToggle` open
- *   and fold the card.
+ *   think, `modelsThatAlwaysThink` the ones that always think, `settings`
+ *   the saved settings, and `isOpen` and `onToggle` open and fold the card.
  * @returns The card.
  */
 export function CoreServiceCard({
   service,
   modelChoices,
   modelsThatCannotThink,
+  modelsThatAlwaysThink,
   settings,
   isOpen,
   onToggle,
@@ -54,6 +87,7 @@ export function CoreServiceCard({
   service: CoreService;
   modelChoices: string[];
   modelsThatCannotThink: string[];
+  modelsThatAlwaysThink: string[];
   settings: AdminSettings;
   isOpen: boolean;
   onToggle: () => void;
@@ -61,12 +95,16 @@ export function CoreServiceCard({
   const saveSettings = useSaveAdminSettings();
   const savedModel = textSetting(settings, service.model_key);
   const savedThinking =
-    onOffSetting(settings, service.thinking_key) &&
-    !modelsThatCannotThink.includes(savedModel);
+    lockedThinking(savedModel, modelsThatCannotThink, modelsThatAlwaysThink)
+      ?.thinking ?? onOffSetting(settings, service.thinking_key);
   const savedPrompt = textSetting(settings, service.prompt_key);
   const [model, setModel] = useState(savedModel);
   const [thinking, setThinking] = useState(savedThinking);
-  const modelCanThink = !modelsThatCannotThink.includes(model);
+  const thinkingLock = lockedThinking(
+    model,
+    modelsThatCannotThink,
+    modelsThatAlwaysThink,
+  );
   const [prompt, setPrompt] = useState(savedPrompt);
   const allExtraPrompts = [
     ...service.extra_prompts,
@@ -183,9 +221,13 @@ export function CoreServiceCard({
               }))}
               onChange={(choice) => {
                 setModel(choice);
-                if (modelsThatCannotThink.includes(choice)) {
-                  setThinking(false);
-                }
+                setThinking(
+                  lockedThinking(
+                    choice,
+                    modelsThatCannotThink,
+                    modelsThatAlwaysThink,
+                  )?.thinking ?? thinking,
+                );
                 saveSettings.reset();
               }}
             />
@@ -196,17 +238,13 @@ export function CoreServiceCard({
           >
             <HoverNote
               noteId={thinkingLockedNoteId}
-              note={
-                modelCanThink
-                  ? null
-                  : "This model can’t think, so thinking stays off."
-              }
+              note={thinkingLock?.note ?? null}
             >
               <Switch
                 label={`Thinking for ${service.name}`}
                 checked={thinking}
-                disabled={!modelCanThink}
-                describedById={modelCanThink ? undefined : thinkingLockedNoteId}
+                disabled={thinkingLock !== null}
+                describedById={thinkingLock ? thinkingLockedNoteId : undefined}
                 onChange={(isOn) => {
                   setThinking(isOn);
                   saveSettings.reset();

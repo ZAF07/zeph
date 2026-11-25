@@ -224,6 +224,7 @@ MIN_TYPING_SECONDS = Setting("min_typing_seconds", read_number)
 MAX_TYPING_SECONDS = Setting("max_typing_seconds", read_number)
 AVAILABLE_MODELS = Setting("available_models", read_text_list)
 MODELS_THAT_CANNOT_THINK = Setting("models_that_cannot_think", read_text_list)
+MODELS_THAT_ALWAYS_THINK = Setting("models_that_always_think", read_text_list)
 RESPONSE_MODEL = Setting("response_model", read_text)
 RESPONSE_THINKING = Setting("response_thinking", read_on_off)
 PERSONA = Setting("persona", read_text)
@@ -2369,6 +2370,25 @@ def check_waits_fit_under_the_cap(
         )
 
 
+def thinking_for_model(settings: PlatformSettings, model: str, wanted: bool) -> bool:
+    """Say whether a call should ask its model to think.
+
+    Args:
+        settings: The platform settings.
+        model: The model the call uses.
+        wanted: Whether the caller wants the model to think.
+
+    Returns:
+        True for a model that always thinks, False for one that can't
+        think, and what the caller wants for any other model.
+    """
+    if model in settings.get(MODELS_THAT_ALWAYS_THINK):
+        return True
+    if model in settings.get(MODELS_THAT_CANNOT_THINK):
+        return False
+    return wanted
+
+
 def thinking_to_use(
     settings: PlatformSettings, model: Setting[str], thinking: Setting[bool]
 ) -> bool:
@@ -2380,19 +2400,20 @@ def thinking_to_use(
         thinking: The setting holding the service's thinking switch.
 
     Returns:
-        True if the switch is on and the model can think.
+        True if the model always thinks, or the switch is on and the model
+        can think.
     """
-    can_think = settings.get(model) not in settings.get(MODELS_THAT_CANNOT_THINK)
-    return can_think and settings.get(thinking)
+    return thinking_for_model(settings, settings.get(model), settings.get(thinking))
 
 
 def with_thinking_fitted_to_the_models(
     settings: PlatformSettings, values: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """Keep thinking off for each core service whose model can't think, after a change.
+    """Keep each core service's thinking as its model needs it, after a change.
 
-    Only a service whose model or thinking is being changed is looked at, so
-    other settings can always be saved.
+    Thinking stays off for a model that can't think and on for one that
+    always thinks. Only a service whose model or thinking is being changed
+    is looked at, so other settings can always be saved.
 
     Args:
         settings: The platform settings before the change.
@@ -2400,25 +2421,38 @@ def with_thinking_fitted_to_the_models(
 
     Returns:
         The values to save: the ones given, plus thinking off for each
-        service on a model that can't think whose thinking is saved as on.
+        service on a model that can't think whose thinking is saved as on,
+        and thinking on for each service on a model that always thinks
+        whose thinking is saved as off.
 
     Raises:
         InvalidSettingError: If thinking would be turned on for a model
-            that can't think.
+            that can't think, or off for a model that always thinks.
     """
     models_that_cannot_think = settings.get(MODELS_THAT_CANNOT_THINK)
+    models_that_always_think = settings.get(MODELS_THAT_ALWAYS_THINK)
     fitted_values = dict(values)
     for service in CORE_SERVICES:
         if not {service.model_key, service.thinking_key} & values.keys():
             continue
         model = values.get(service.model_key, settings.values[service.model_key])
-        if model not in models_that_cannot_think:
-            continue
-        if values.get(service.thinking_key):
-            label = EDITABLE_SETTINGS_BY_KEY[service.thinking_key].label
-            raise InvalidSettingError(f"The {label} can't be on: {model} can't think.")
-        if settings.values[service.thinking_key]:
-            fitted_values[service.thinking_key] = False
+        label = EDITABLE_SETTINGS_BY_KEY[service.thinking_key].label
+        new_thinking = values.get(service.thinking_key)
+        saved_thinking = settings.values[service.thinking_key]
+        if model in models_that_always_think:
+            if new_thinking is False:
+                raise InvalidSettingError(
+                    f"The {label} can't be off: {model} always thinks."
+                )
+            if not saved_thinking:
+                fitted_values[service.thinking_key] = True
+        elif model in models_that_cannot_think:
+            if new_thinking:
+                raise InvalidSettingError(
+                    f"The {label} can't be on: {model} can't think."
+                )
+            if saved_thinking:
+                fitted_values[service.thinking_key] = False
     return fitted_values
 
 
@@ -2476,11 +2510,20 @@ class PlatformSettingsService:
         """
         return self._settings.load().get(MODELS_THAT_CANNOT_THINK)
 
+    def models_that_always_think(self) -> list[str]:
+        """List the models whose thinking can't be turned off.
+
+        Returns:
+            The model names.
+        """
+        return self._settings.load().get(MODELS_THAT_ALWAYS_THINK)
+
     def update(self, admin: User, values: Mapping[str, Any]) -> list[StoredSetting]:
         """Check and save setting changes, all together or not at all.
 
         A core service changed to a model that can't think gets its thinking
-        saved as off.
+        saved as off, and one changed to a model that always thinks gets it
+        saved as on.
 
         Args:
             admin: The Admin making the change.
@@ -2492,8 +2535,8 @@ class PlatformSettingsService:
         Raises:
             InvalidSettingError: If a key may not be changed, a value is not
                 valid, the Message wait cap would be shorter than a wait, or
-                thinking would be on for a model that can't think; nothing
-                is saved.
+                thinking would be on for a model that can't think, or off
+                for a model that always thinks; nothing is saved.
         """
         checked_values = {
             key: self.checked_value(key, value) for key, value in values.items()

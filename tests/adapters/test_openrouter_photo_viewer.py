@@ -157,22 +157,6 @@ def test_the_thinking_switch_becomes_reasoning_enabled(thinking: bool) -> None:
     assert json.loads(requests[0].content)["reasoning"] == {"enabled": thinking}
 
 
-def test_thinking_off_is_left_unsaid_for_a_model_that_always_thinks() -> None:
-    requests: list[httpx.Request] = []
-    photo_viewer = openrouter_with(
-        httpx.Response(200, json=openrouter_reply()), requests
-    )
-
-    photo_viewer.look(
-        model="anthropic/claude-opus-5.5",
-        thinking=False,
-        instructions="Describe the photo.",
-        photo=PHOTO,
-    )
-
-    assert "reasoning" not in json.loads(requests[0].content)
-
-
 def test_the_text_tokens_and_reasoning_are_returned() -> None:
     photo_viewer = openrouter_with(
         httpx.Response(

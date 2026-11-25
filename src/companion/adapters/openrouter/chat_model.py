@@ -24,10 +24,6 @@ from companion.core.ports import ChatTool
 logger = logging.getLogger(__name__)
 
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODELS_THAT_ALWAYS_THINK = frozenset(
-    {"anthropic/claude-opus-5.5", "anthropic/claude-fable-5.2"}
-)
-
 CLAUDE_MAKER = "anthropic"
 
 AskOpenRouter = Callable[[list[dict[str, Any]], bool], dict[str, Any]]
@@ -252,8 +248,8 @@ def build_request(
     makers' keys: any other host would be paid with OpenRouter credits. A
     model its maker does not serve fails.
 
-    A model that always thinks refuses to be told not to, so thinking off
-    is left unsaid for it and it thinks only as much as it needs.
+    A model that always thinks refuses to be told not to, so the caller
+    must ask for thinking on for it (`thinking_for_model` in the core does).
 
     Args:
         model: The OpenRouter model name, sent as given.
@@ -269,9 +265,8 @@ def build_request(
         "model": model,
         "messages": messages,
         "provider": {"only": [model_maker(model)]},
+        "reasoning": {"enabled": thinking},
     }
-    if thinking or model not in MODELS_THAT_ALWAYS_THINK:
-        request["reasoning"] = {"enabled": thinking}
     if tools:
         request["tools"] = [to_tool_schema(tool) for tool in tools]
         if not may_call_tools:

@@ -97,36 +97,6 @@ def test_the_thinking_switch_becomes_reasoning_enabled(thinking: bool) -> None:
     assert json.loads(request.content)["reasoning"] == {"enabled": thinking}
 
 
-@pytest.mark.parametrize(
-    "model", ["anthropic/claude-opus-5.5", "anthropic/claude-fable-5.2"]
-)
-def test_thinking_off_is_left_unsaid_for_a_model_that_always_thinks(
-    model: str,
-) -> None:
-    requests: list[httpx.Request] = []
-    chat_model = openrouter_with(httpx.Response(200, json=openrouter_reply()), requests)
-
-    chat_model.generate(
-        model=model, thinking=False, instructions="Be Zeph.", history=HISTORY
-    )
-
-    assert "reasoning" not in json.loads(requests[0].content)
-
-
-def test_thinking_on_is_still_said_for_a_model_that_always_thinks() -> None:
-    requests: list[httpx.Request] = []
-    chat_model = openrouter_with(httpx.Response(200, json=openrouter_reply()), requests)
-
-    chat_model.generate(
-        model="anthropic/claude-opus-5.5",
-        thinking=True,
-        instructions="Be Zeph.",
-        history=HISTORY,
-    )
-
-    assert json.loads(requests[0].content)["reasoning"] == {"enabled": True}
-
-
 def test_the_reply_text_tokens_and_reasoning_are_returned() -> None:
     chat_model = openrouter_with(
         httpx.Response(

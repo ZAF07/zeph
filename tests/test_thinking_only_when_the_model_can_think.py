@@ -37,6 +37,7 @@ def settings_with(model: str, thinking: bool) -> PlatformSettings:
     return PlatformSettings(
         {
             "models_that_cannot_think": [MODEL_THAT_CANT_THINK],
+            "models_that_always_think": [],
             "response_model": model,
             "response_thinking": thinking,
         }
