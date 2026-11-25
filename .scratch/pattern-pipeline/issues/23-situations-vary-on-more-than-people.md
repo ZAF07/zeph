@@ -21,7 +21,7 @@ Today Zeph mostly varies **one thing: the person**.
 - An Exploration's "would it differ" way only swaps the person: "would it have gone differently with someone else, like a friend / a colleague / family / a partner" (`other_person`, `aimed_question` in `src/companion/core/agenda.py`).
 - A missing "part of life" is only home, work or with friends, and is always asked with a person attached.
 - A counter-test asks "would you have done the same with someone else".
-- An Observation's tags are relationship, power, setting (home, work, social) and stance (`SituationTags`). The day is kept. There is no tag for the kind of event, the place beyond those three settings, the time of day or week, or the User's mood. The event lives only in the free-text context line.
+- An Observation's tags are relationship, power, setting (home, work, social, online) and stance (`SituationTags`). The day is kept. There is no tag for the kind of event, the place beyond those three settings, the time of day or week, or the User's mood. The event lives only in the free-text context line.
 - Scoring counts a situation as a Life Thread, or the same person and setting. "Anyone would act the same" (`anyone_would_when`) can match only those tags.
 
 ## What the owner wants
@@ -44,7 +44,7 @@ Zeph should learn which of these, and which mixes, make a Pattern show up or not
 3. Time and mood: when the story happened, or when it was told? A story told on Sunday night about Monday morning.
 4. How does Zeph choose what to vary next? One variable at a time, the one least covered by the Pattern's evidence so far, or the one that best splits for and against?
 5. New Exploration needs or ways, such as "not seen in a group yet" or "only seen when tired"? How do they sit next to today's unclear / missing part of life / counter-test, and the least-pushy way order?
-6. Scoring: does a different mix count as a different situation? Should "anyone would act the same" match on the new tags?
+6. Scoring: does a different mix count as a different situation? Should "anyone would act the same" match on the new tags? Inside one situation, only the strongest Observation per person counts, up to 3 people (`people_per_situation`): should the same person in a different mix (tired or calm, alone or in a group) count apart, so the cap is on mixes rather than people?
 7. Narrowing: how does a Pattern record the mix it holds in, and how is that shared (issue 08) and tested with a Prediction (issue 09)?
 8. Thought Experiments: should they also say which variable they vary, so code can pick one that changes the missing variable?
 9. Privacy and care: mood and time can be sensitive. What may be kept and shown under "Things you said that Zeph kept"? Any exclusions?
