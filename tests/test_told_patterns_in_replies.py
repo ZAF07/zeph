@@ -12,6 +12,7 @@ from companion.core.models import (
     ObservationDirection,
     PatternNarrowing,
     PatternState,
+    Relationship,
 )
 from companion.core.pattern_sharing import (
     Showing,
@@ -360,3 +361,19 @@ def test_asked_for_patterns_after_one_was_told_the_reply_recalls_it_and_no_other
     assert f"- (being tested) {APPROVED_WORDING}" in asked
     assert "Tell them no other pattern" in asked
     assert STILL_GETTING_TO_KNOW not in asked
+
+
+def test_evidence_that_only_narrows_a_pattern_is_not_acting_against_it() -> None:
+    pattern = told(PatternState.SHARED)
+    not_with_partner = story(
+        about="Sam, their partner",
+        direction=ObservationDirection.AGAINST,
+        relationship=Relationship.PARTNER,
+    )
+
+    [in_mind] = told_patterns_in_mind(
+        [pattern], PATTERN_TYPES, [story(about="Mei"), not_with_partner], {}
+    )
+
+    assert in_mind.last_showed is not None
+    assert in_mind.last_acted_against is None

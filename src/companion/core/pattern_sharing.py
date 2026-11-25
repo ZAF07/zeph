@@ -270,7 +270,8 @@ def told_patterns_in_mind(
     Returns:
         Those being tested (shared) and those confirmed that have words to
         show, oldest told first, each with where it last showed up and
-        where they last acted against it. One they disagreed with or that
+        where they last acted against it (evidence that only narrows it
+        left out, as it is already in where it shows). One they disagreed with or that
         didn't hold up is never among them.
     """
     told: list[ToldPatternInMind] = []
@@ -280,7 +281,9 @@ def told_patterns_in_mind(
         wording = wording_told(pattern, pattern_types)
         if pattern.state not in STATES_A_REPLY_MAY_NAME or wording is None:
             continue
-        its_observations = observations_of(pattern.pattern_type_id, observations)
+        its_observations = without_narrowing(
+            observations_of(pattern.pattern_type_id, observations)
+        )
         told.append(
             ToldPatternInMind(
                 number=len(told) + 1,
