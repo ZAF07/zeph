@@ -38,6 +38,8 @@ The hash is written out in the migration, so later seed changes don't change wha
 
 The warning is printed once, in the backend log of the deploy that runs the migration (`docker compose logs backend | grep "Kept the stored"`). Check for it after a deploy that changes a prompt.
 
+What the Admin does about a kept edit is in `docs/PROMPT_EDITS_AND_DEPLOYS_GUIDE.md`.
+
 A stored prompt that already differs from the previous seed for any reason (an Admin's edit, or an older seed text that was never reloaded) counts as edited and is kept.
 
 Migrations 0073, 0078, 0080, 0081, 0086, 0100 and 0101 removed prompts without this check. They have already run on production and stay as they are.

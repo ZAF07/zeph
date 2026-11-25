@@ -9,6 +9,8 @@ If the prompt is edited on prod again before the deploy, take a new copy first.
 
 ## To restore after the deploy
 
+The full guide, for this and later deploys, is `docs/PROMPT_EDITS_AND_DEPLOYS_GUIDE.md`.
+
 1. Deploy as usual. The Reply Plan prompt on prod is now the new seed text, which has the new Curiosity and Pattern sharing rules.
 2. See what your edit changed: compare the two files here.
 3. Dashboard → Admin → Prompts & models → Reply Plan → Prompt. Put your changes back into the new text. Don't paste the old prompt over it whole, or the new rules are lost.
