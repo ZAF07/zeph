@@ -136,4 +136,4 @@ A seed case loads only where its key isn't stored, so editing the seed file alon
 ## Completion
 
 - Completed: 2026-11-25
-- Commit: <filled in after the merge>
+- Commit: cf2e70e6 (merge of pattern-29-understanding-eval-failing-cases into main; work commits c252075e, e6c7defd and the archive commit)
