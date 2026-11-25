@@ -68,4 +68,4 @@ Evidence (25 Nov 2026, worktree stack on 3030/8030, real model `deepseek/deepsee
 ## Completion
 
 - Completed: 2026-11-25
-- Commit: <to be filled in after the merge>
+- Commit: 9d875d5d (merge of `pattern-19-whole-pipeline-eval` into main; work commits d965df98, 12054598, c92af531, 0ef70be3, 67321f52)
