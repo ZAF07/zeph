@@ -71,4 +71,4 @@ Every model in the list today (DeepSeek flash and pro, Claude) can think, so not
 ## Completion
 
 - Completed: 2026-11-25
-- Commit: <to be filled in after the merge>
+- Commit: 74de51d (merge of openrouter-07-thinking-switch; work in 8b908f7 e82b243 1e20ce2)
