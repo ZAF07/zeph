@@ -142,6 +142,10 @@ available_models:
   - anthropic/claude-opus-5.5
   - anthropic/claude-fable-5.2
 
+# The models above that can't think. A core service using one runs with
+# thinking off, and Admins can't turn its thinking on.
+models_that_cannot_think: []
+
 # The model that writes the Companion's replies.
 response_model: deepseek/deepseek-v4.1-flash-1017
 response_thinking: false

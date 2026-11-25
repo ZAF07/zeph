@@ -30,6 +30,7 @@ from companion.core.platform_settings import (
     LIFE_THREADS_CLOSENESS_PERCENT,
     LIFE_THREADS_PER_REPLY,
     LIFE_THREADS_TEXTS_TO_SEARCH,
+    thinking_to_use,
 )
 from companion.core.ports import Clock, Embedder, Repositories
 from companion.core.transcripts import to_transcript_lines
@@ -808,7 +809,9 @@ class LifeThreadKeeper:
                 snapshot=snapshot,
                 step=ModelStep.LIFE_THREADS,
                 model=settings.get(LIFE_THREAD_KEEPING_MODEL),
-                thinking=settings.get(LIFE_THREAD_KEEPING_THINKING),
+                thinking=thinking_to_use(
+                    settings, LIFE_THREAD_KEEPING_MODEL, LIFE_THREAD_KEEPING_THINKING
+                ),
                 instructions=settings.get(LIFE_THREAD_KEEPING_PROMPT),
                 history=[ChatLine(role=ChatRole.USER, text=description)],
             )

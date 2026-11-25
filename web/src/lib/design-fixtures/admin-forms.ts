@@ -176,6 +176,7 @@ const coreServices: CoreServices = {
     },
   ],
   model_choices: ["deepseek-chat", "deepseek-reasoner"],
+  models_that_cannot_think: [],
 };
 
 /**

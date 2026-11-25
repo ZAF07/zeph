@@ -70,6 +70,7 @@ from companion.core.platform_settings import (
     REPLY_PLAN_MODEL,
     REPLY_PLAN_PROMPT,
     REPLY_PLAN_THINKING,
+    thinking_to_use,
 )
 from companion.core.ports import Clock, Repositories
 from companion.core.recent_messages import RecentMessages, describe_recent_messages
@@ -1565,7 +1566,9 @@ class ReplyPlanService:
                 snapshot=snapshot,
                 step=ModelStep.REPLY_PLAN,
                 model=settings.get(REPLY_PLAN_MODEL),
-                thinking=settings.get(REPLY_PLAN_THINKING),
+                thinking=thinking_to_use(
+                    settings, REPLY_PLAN_MODEL, REPLY_PLAN_THINKING
+                ),
                 instructions=(
                     f"{settings.get(PERSONA_OUTLOOK)}\n\n"
                     f"{settings.get(REPLY_PLAN_PROMPT)}"

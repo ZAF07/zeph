@@ -318,10 +318,11 @@ class CoreServiceResponse(BaseModel):
 
 
 class CoreServicesResponse(BaseModel):
-    """The core services and the models Admins can pick for them."""
+    """The core services, the models Admins can pick and those that can't think."""
 
     services: list[CoreServiceResponse]
     model_choices: list[str]
+    models_that_cannot_think: list[str]
 
 
 class HelplineResponse(BaseModel):
@@ -1618,6 +1619,9 @@ def build_admin_api_router(
                 for service in CORE_SERVICES
             ],
             model_choices=platform_settings_service.model_choices(),
+            models_that_cannot_think=(
+                platform_settings_service.models_that_cannot_think()
+            ),
         )
 
     @router.get("/helplines")

@@ -1,6 +1,6 @@
 # 07 — Thinking switch only when the model can think
 
-Status: needs-triage
+Status: ready-for-agent
 Blocked by: 04
 
 ## Parent
@@ -31,3 +31,8 @@ Every model in the list today (DeepSeek flash and pro, Claude) can think, so not
 - 04
 
 ## Comments
+
+- 2026-11-25, operator's answers to the open questions:
+  - "Can this model think" comes from a Platform Setting list of models that can't think (`models_that_cannot_think`), kept beside `available_models` and filled by the seed or a migration. Empty today. Not read from OpenRouter.
+  - A service with thinking on whose model is changed to one that can't think gets its thinking saved as off.
+- 2026-11-25, in progress on branch `openrouter-07-thinking-switch` (worktree `ai-chat-companion-openrouter-07`).

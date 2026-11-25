@@ -24,6 +24,7 @@ from companion.core.platform_settings import (
     UNDERSTANDING_MODEL,
     UNDERSTANDING_PROMPT,
     UNDERSTANDING_THINKING,
+    thinking_to_use,
 )
 from companion.core.ports import Clock, Repositories
 from companion.core.recent_messages import RecentMessages, describe_recent_messages
@@ -377,7 +378,9 @@ class UnderstandingService:
                 snapshot=snapshot,
                 step=ModelStep.UNDERSTANDING,
                 model=settings.get(UNDERSTANDING_MODEL),
-                thinking=settings.get(UNDERSTANDING_THINKING),
+                thinking=thinking_to_use(
+                    settings, UNDERSTANDING_MODEL, UNDERSTANDING_THINKING
+                ),
                 instructions=settings.get(UNDERSTANDING_PROMPT),
                 history=[ChatLine(role=ChatRole.USER, text=description)],
             )

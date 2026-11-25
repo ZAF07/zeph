@@ -23,6 +23,7 @@ from companion.core.platform_settings import (
     PHOTO_THINKING,
     PHOTO_VIEWING_OFF_NOTE,
     SEND_PHOTO_TOOL_DESCRIPTION,
+    thinking_to_use,
 )
 from companion.core.ports import (
     ChatChannel,
@@ -520,7 +521,7 @@ class PhotoService:
                 answer = self._chat_model.look(
                     snapshot=snapshot,
                     model=settings.get(PHOTO_MODEL),
-                    thinking=settings.get(PHOTO_THINKING),
+                    thinking=thinking_to_use(settings, PHOTO_MODEL, PHOTO_THINKING),
                     instructions=instructions,
                     photo=image,
                 )

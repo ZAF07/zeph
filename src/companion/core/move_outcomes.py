@@ -30,6 +30,7 @@ from companion.core.platform_settings import (
     MOVE_OUTCOME_KEEPING_THINKING,
     MOVE_OUTCOMES_CLOSENESS_PERCENT,
     MOVE_OUTCOMES_PER_UNDERSTANDING,
+    thinking_to_use,
 )
 from companion.core.ports import Clock, Embedder, Repositories
 from companion.core.transcripts import to_transcript_lines
@@ -388,7 +389,9 @@ class MoveOutcomeKeeper:
                 snapshot=snapshot,
                 step=ModelStep.MOVE_OUTCOMES,
                 model=settings.get(MOVE_OUTCOME_KEEPING_MODEL),
-                thinking=settings.get(MOVE_OUTCOME_KEEPING_THINKING),
+                thinking=thinking_to_use(
+                    settings, MOVE_OUTCOME_KEEPING_MODEL, MOVE_OUTCOME_KEEPING_THINKING
+                ),
                 instructions=settings.get(MOVE_OUTCOME_KEEPING_PROMPT),
                 history=[ChatLine(role=ChatRole.USER, text=description)],
             )

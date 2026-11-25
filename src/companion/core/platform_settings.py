@@ -223,6 +223,7 @@ TYPING_SECONDS_PER_CHARACTER = Setting("typing_seconds_per_character", read_numb
 MIN_TYPING_SECONDS = Setting("min_typing_seconds", read_number)
 MAX_TYPING_SECONDS = Setting("max_typing_seconds", read_number)
 AVAILABLE_MODELS = Setting("available_models", read_text_list)
+MODELS_THAT_CANNOT_THINK = Setting("models_that_cannot_think", read_text_list)
 RESPONSE_MODEL = Setting("response_model", read_text)
 RESPONSE_THINKING = Setting("response_thinking", read_on_off)
 PERSONA = Setting("persona", read_text)
@@ -2232,6 +2233,59 @@ def check_waits_fit_under_the_cap(
         )
 
 
+def thinking_to_use(
+    settings: PlatformSettings, model: Setting[str], thinking: Setting[bool]
+) -> bool:
+    """Say whether a core service's call should ask its model to think.
+
+    Args:
+        settings: The platform settings.
+        model: The setting holding the model the service uses.
+        thinking: The setting holding the service's thinking switch.
+
+    Returns:
+        True if the switch is on and the model can think.
+    """
+    can_think = settings.get(model) not in settings.get(MODELS_THAT_CANNOT_THINK)
+    return can_think and settings.get(thinking)
+
+
+def with_thinking_fitted_to_the_models(
+    settings: PlatformSettings, values: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Keep thinking off for each core service whose model can't think, after a change.
+
+    Only a service whose model or thinking is being changed is looked at, so
+    other settings can always be saved.
+
+    Args:
+        settings: The platform settings before the change.
+        values: The checked new value for each setting key being changed.
+
+    Returns:
+        The values to save: the ones given, plus thinking off for each
+        service changed to a model that can't think while its thinking was
+        on.
+
+    Raises:
+        InvalidSettingError: If thinking would be turned on for a model
+            that can't think.
+    """
+    models_that_cannot_think = settings.get(MODELS_THAT_CANNOT_THINK)
+    fitted_values = dict(values)
+    for service in CORE_SERVICES:
+        if not {service.model_key, service.thinking_key} & values.keys():
+            continue
+        model = values.get(service.model_key, settings.values[service.model_key])
+        if model not in models_that_cannot_think:
+            continue
+        if values.get(service.thinking_key):
+            label = EDITABLE_SETTINGS_BY_KEY[service.thinking_key].label
+            raise InvalidSettingError(f"The {label} can't be on: {model} can't think.")
+        fitted_values[service.thinking_key] = False
+    return fitted_values
+
+
 class PlatformSettingsService:
     """Lets Admins read and change the platform settings they manage.
 
@@ -2278,8 +2332,19 @@ class PlatformSettingsService:
         """
         return self._settings.load().get(AVAILABLE_MODELS)
 
+    def models_that_cannot_think(self) -> list[str]:
+        """List the models whose thinking can't be turned on.
+
+        Returns:
+            The model names.
+        """
+        return self._settings.load().get(MODELS_THAT_CANNOT_THINK)
+
     def update(self, admin: User, values: Mapping[str, Any]) -> list[StoredSetting]:
         """Check and save setting changes, all together or not at all.
+
+        A core service changed to a model that can't think gets its thinking
+        saved as off.
 
         Args:
             admin: The Admin making the change.
@@ -2290,13 +2355,16 @@ class PlatformSettingsService:
 
         Raises:
             InvalidSettingError: If a key may not be changed, a value is not
-                valid, or the Message wait cap would be shorter than a wait;
-                nothing is saved.
+                valid, the Message wait cap would be shorter than a wait, or
+                thinking would be on for a model that can't think; nothing
+                is saved.
         """
-        validated_values = {
+        checked_values = {
             key: self.checked_value(key, value) for key, value in values.items()
         }
-        check_waits_fit_under_the_cap(self._settings.load(), validated_values)
+        settings = self._settings.load()
+        check_waits_fit_under_the_cap(settings, checked_values)
+        validated_values = with_thinking_fitted_to_the_models(settings, checked_values)
         if validated_values:
             self._settings.save_many(validated_values, self._clock.now(), admin.id)
         return self.list_editable()

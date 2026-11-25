@@ -22,6 +22,7 @@ from companion.core.platform_settings import (
     KNOWLEDGE_WHEN_IT_HELPS_MODEL,
     KNOWLEDGE_WHEN_IT_HELPS_PROMPT,
     KNOWLEDGE_WHEN_IT_HELPS_THINKING,
+    thinking_to_use,
 )
 from companion.core.ports import (
     ChatModel,
@@ -636,7 +637,11 @@ class KnowledgeService:
         try:
             answer = self._chat_model.generate(
                 model=settings.get(KNOWLEDGE_WHEN_IT_HELPS_MODEL),
-                thinking=settings.get(KNOWLEDGE_WHEN_IT_HELPS_THINKING),
+                thinking=thinking_to_use(
+                    settings,
+                    KNOWLEDGE_WHEN_IT_HELPS_MODEL,
+                    KNOWLEDGE_WHEN_IT_HELPS_THINKING,
+                ),
                 instructions=settings.get(KNOWLEDGE_WHEN_IT_HELPS_PROMPT),
                 history=[
                     ChatLine(

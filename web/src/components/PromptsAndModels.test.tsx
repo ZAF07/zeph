@@ -36,6 +36,7 @@ const coreServices: CoreServices = {
     },
   ],
   model_choices: ["deepseek-flash", "deepseek-v4-pro"],
+  models_that_cannot_think: [],
 };
 
 const settings: AdminSettings = {
@@ -232,6 +233,60 @@ describe("PromptsAndModels", () => {
     expect(card.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 
+  it("keeps the thinking switch off and locked for a model that can't think", async () => {
+    apiClient.getCoreServices.mockResolvedValue({
+      ...coreServices,
+      models_that_cannot_think: ["deepseek-v4-pro"],
+    });
+    const user = userEvent.setup();
+    renderWithQueries(<PromptsAndModels />);
+    const card = within(
+      await screen.findByRole("region", { name: "Response composition" }),
+    );
+    const thinkingSwitch = card.getByRole("switch", {
+      name: "Thinking for Response composition",
+    });
+    await user.click(thinkingSwitch);
+    expect(thinkingSwitch).toBeChecked();
+
+    await user.selectOptions(card.getByLabelText("Model"), "deepseek-v4-pro");
+
+    expect(thinkingSwitch).not.toBeChecked();
+    expect(thinkingSwitch).toBeDisabled();
+    await user.click(card.getByRole("button", { name: "Save" }));
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      response_prompt: "Reply briefly.",
+      response_model: "deepseek-v4-pro",
+      response_thinking: false,
+    });
+  });
+
+  it("lets thinking be switched on again for a model that can think", async () => {
+    apiClient.getCoreServices.mockResolvedValue({
+      ...coreServices,
+      models_that_cannot_think: ["deepseek-v4-pro"],
+    });
+    apiClient.getAdminSettings.mockResolvedValue({
+      ...settings,
+      response_model: { ...settings.response_model!, value: "deepseek-v4-pro" },
+    });
+    const user = userEvent.setup();
+    renderWithQueries(<PromptsAndModels />);
+    const card = within(
+      await screen.findByRole("region", { name: "Response composition" }),
+    );
+    const thinkingSwitch = card.getByRole("switch", {
+      name: "Thinking for Response composition",
+    });
+    expect(thinkingSwitch).toBeDisabled();
+
+    await user.selectOptions(card.getByLabelText("Model"), "deepseek-flash");
+    await user.click(thinkingSwitch);
+
+    expect(thinkingSwitch).toBeEnabled();
+    expect(thinkingSwitch).toBeChecked();
+  });
+
   it("says so when saving a service fails", async () => {
     apiClient.updateAdminSettings.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
@@ -271,6 +326,7 @@ describe("PromptsAndModels", () => {
         },
       ],
       model_choices: ["deepseek-flash"],
+      models_that_cannot_think: [],
     });
     apiClient.getAdminSettings.mockResolvedValue({
       photo_description_prompt: {
@@ -375,6 +431,7 @@ describe("PromptsAndModels", () => {
           },
         ],
         model_choices: ["deepseek-flash"],
+        models_that_cannot_think: [],
       });
       apiClient.getAdminSettings.mockResolvedValue({
         ...settings,
@@ -461,6 +518,7 @@ describe("PromptsAndModels", () => {
     apiClient.getCoreServices.mockResolvedValue({
       services: [],
       model_choices: [],
+      models_that_cannot_think: [],
     });
 
     renderWithQueries(<PromptsAndModels />);
@@ -498,6 +556,7 @@ describe("PromptsAndModels", () => {
           },
         ],
         model_choices: coreServices.model_choices,
+        models_that_cannot_think: [],
       });
     });
 

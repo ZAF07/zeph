@@ -30,22 +30,27 @@ import { useSaveAdminSettings } from "@/lib/use-admin-settings";
  * description) each with its name and hint above it. Grouped extra prompts
  * sit in groups that are folded shut until clicked. One save bar saves them
  * together. The prompt is combined with the Persona when the service runs.
- * When the backend refuses a save, the save bar shows its reason.
+ * When the backend refuses a save, the save bar shows its reason. While the
+ * chosen model can't think, the thinking switch is off and can't be changed,
+ * and thinking is saved as off.
  *
  * @param props - `service` is the core service, `modelChoices` the models
- *   Admins can pick, `settings` the saved settings, and `isOpen` and
- *   `onToggle` open and fold the card.
+ *   Admins can pick, `modelsThatCannotThink` the ones of those that can't
+ *   think, `settings` the saved settings, and `isOpen` and `onToggle` open
+ *   and fold the card.
  * @returns The card.
  */
 export function CoreServiceCard({
   service,
   modelChoices,
+  modelsThatCannotThink,
   settings,
   isOpen,
   onToggle,
 }: {
   service: CoreService;
   modelChoices: string[];
+  modelsThatCannotThink: string[];
   settings: AdminSettings;
   isOpen: boolean;
   onToggle: () => void;
@@ -55,7 +60,9 @@ export function CoreServiceCard({
   const savedThinking = onOffSetting(settings, service.thinking_key);
   const savedPrompt = textSetting(settings, service.prompt_key);
   const [model, setModel] = useState(savedModel);
-  const [thinking, setThinking] = useState(savedThinking);
+  const [thinkingSwitch, setThinkingSwitch] = useState(savedThinking);
+  const modelCanThink = !modelsThatCannotThink.includes(model);
+  const thinking = modelCanThink && thinkingSwitch;
   const [prompt, setPrompt] = useState(savedPrompt);
   const allExtraPrompts = [
     ...service.extra_prompts,
@@ -92,7 +99,7 @@ export function CoreServiceCard({
 
   function discard() {
     setModel(savedModel);
-    setThinking(savedThinking);
+    setThinkingSwitch(savedThinking);
     setPrompt(savedPrompt);
     setExtraPrompts(savedExtraPrompts);
     setLimits(savedLimits);
@@ -182,8 +189,9 @@ export function CoreServiceCard({
             <Switch
               label={`Thinking for ${service.name}`}
               checked={thinking}
+              disabled={!modelCanThink}
               onChange={(isOn) => {
-                setThinking(isOn);
+                setThinkingSwitch(isOn);
                 saveSettings.reset();
               }}
             />
