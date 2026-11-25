@@ -76,4 +76,4 @@ Design for many Users and more than one backend: the helper runs inside the migr
 ## Completion
 
 - Completed: 2026-11-25
-- Commit: <merge commit, filled in after the merge>
+- Commit: 14a869e2 (merge of `pattern-28-migrations-keep-prompt-edits` into main; work commits 9682fcfe, 775143a8, 99949e50)
