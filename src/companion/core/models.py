@@ -3415,6 +3415,8 @@ class Prediction:
         made_at: When it was given.
         outcome: How it went; None until the User says or code closes it.
         outcome_at: When the outcome was read or set; None without one.
+        outcome_conversation_id: The Conversation the User said how it
+            went in; None when code set the outcome or there is none.
     """
 
     id: UUID
@@ -3424,6 +3426,7 @@ class Prediction:
     made_at: datetime
     outcome: PredictionOutcome | None = None
     outcome_at: datetime | None = None
+    outcome_conversation_id: UUID | None = None
 
     @property
     def is_open(self) -> bool:
@@ -3529,6 +3532,7 @@ class PatternMoveReason(StrEnum):
     PREDICTIONS_CAME_TRUE = "predictions_came_true"
     STRONG_EVIDENCE_AFTER_SHARING = "strong_evidence_after_sharing"
     SCORE_UNDER_FLOOR = "score_under_floor"
+    PREDICTIONS_DID_NOT = "predictions_did_not"
 
 
 @dataclass(frozen=True)

@@ -433,7 +433,10 @@ def read_prediction_outcomes_answer(answer: str) -> list[Any]:
 
 
 def plan_prediction_outcomes(
-    entries: Sequence[Any], open_predictions: Mapping[int, Prediction], now: datetime
+    entries: Sequence[Any],
+    open_predictions: Mapping[int, Prediction],
+    conversation_id: UUID,
+    now: datetime,
 ) -> list[Prediction]:
     """Keep the outcomes the tagging model read for a Prediction it was shown.
 
@@ -441,6 +444,7 @@ def plan_prediction_outcomes(
         entries: The outcomes, as the model wrote them.
         open_predictions: The Predictions still open, by the number the
             model was shown.
+        conversation_id: The Conversation the User said them in.
         now: When they were read.
 
     Returns:
@@ -465,7 +469,12 @@ def plan_prediction_outcomes(
             or prediction.id in kept
         ):
             continue
-        kept[prediction.id] = replace(prediction, outcome=outcome, outcome_at=now)
+        kept[prediction.id] = replace(
+            prediction,
+            outcome=outcome,
+            outcome_at=now,
+            outcome_conversation_id=conversation_id,
+        )
     return list(kept.values())
 
 
@@ -1518,7 +1527,10 @@ class PatternTagger:
                 snapshot.user.contested_gathering_enabled,
             ),
             prediction_outcomes=plan_prediction_outcomes(
-                read_prediction_outcomes_answer(answer), predictions, now
+                read_prediction_outcomes_answer(answer),
+                predictions,
+                conversation_id,
+                now,
             ),
         )
 

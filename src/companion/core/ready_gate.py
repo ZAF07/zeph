@@ -13,7 +13,6 @@ from companion.core.models import (
     ChatRole,
     ExplorationTry,
     ModelStep,
-    NarrowingTag,
     Observation,
     ObservationDirection,
     PatternMove,
@@ -40,12 +39,14 @@ from companion.core.pattern_scoring import (
     ScoringNumbers,
     StateBars,
     logged_move,
+    narrowings_of,
     observation_points,
     score_observations,
     scoring_numbers,
     sign_strengths_of,
     state_bars,
     state_for,
+    without_narrowing,
 )
 from companion.core.platform_settings import (
     PATTERN_OTHER_SIDE_MODEL,
@@ -241,90 +242,6 @@ def ready_check(facts: GateFacts, bars: ReadyBars) -> ReadyCheck | None:
     return None
 
 
-def tag_value(observation: Observation, tag: NarrowingTag) -> str | None:
-    """Read one of an Observation's situation tags.
-
-    Args:
-        observation: The Observation.
-        tag: Which tag.
-
-    Returns:
-        Its value; None when the tag is empty.
-    """
-    value = (
-        observation.tags.relationship
-        if tag == NarrowingTag.RELATIONSHIP
-        else observation.tags.power
-    )
-    return value.value if value else None
-
-
-def narrowings_of(observations: Sequence[Observation]) -> tuple[PatternNarrowing, ...]:
-    """Work out where a Pattern holds and where it was shown not to happen.
-
-    A Pattern is narrowed by a tag (who the other person is, or where they
-    stand) when its clear evidence against is all with other kinds of
-    people than any of its clear evidence for: "with seniors, not with
-    friends". Observations that carry no weight are left out.
-
-    Args:
-        observations: The Observations of the Pattern.
-
-    Returns:
-        One narrowing per tag that tells the two apart; none when the
-        evidence against is with the same kinds of people, or there is none.
-    """
-    clear = [
-        observation
-        for observation in observations
-        if not observation.unclear
-        and not observation.situational
-        and not observation.excluded
-    ]
-    narrowings = []
-    for tag in NarrowingTag:
-        holds_with = {
-            tag_value(observation, tag)
-            for observation in clear
-            if observation.direction == ObservationDirection.FOR
-        } - {None}
-        against = [
-            tag_value(observation, tag)
-            for observation in clear
-            if observation.direction == ObservationDirection.AGAINST
-        ]
-        not_with = set(against) - {None}
-        if not holds_with or not not_with or None in against:
-            continue
-        if holds_with & not_with:
-            continue
-        narrowings.append(
-            PatternNarrowing(
-                tag=tag,
-                holds_with=tuple(sorted(value for value in holds_with if value)),
-                not_with=tuple(sorted(value for value in not_with if value)),
-            )
-        )
-    return tuple(narrowings)
-
-
-def narrows(observation: Observation, narrowings: Sequence[PatternNarrowing]) -> bool:
-    """Say whether an Observation against only narrows its Pattern.
-
-    Args:
-        observation: The Observation.
-        narrowings: The Pattern's narrowings.
-
-    Returns:
-        True when it is evidence against from a kind of situation the
-        Pattern is narrowed away from.
-    """
-    return observation.direction == ObservationDirection.AGAINST and any(
-        tag_value(observation, narrowing.tag) in narrowing.not_with
-        for narrowing in narrowings
-    )
-
-
 def gate_facts(
     pattern_type: PatternType,
     observations: Sequence[Observation],
@@ -346,11 +263,7 @@ def gate_facts(
         asked yet.
     """
     narrowings = narrowings_of(observations)
-    counted = [
-        observation
-        for observation in observations
-        if not narrows(observation, narrowings)
-    ]
+    counted = without_narrowing(observations)
 
     return GateFacts(
         score=weighing.score(counted),
@@ -944,7 +857,7 @@ class ReadyKeeper:
                         pattern_type, its_observations, its_tries, safety, weighing
                     ),
                     bars=ready_bars(settings, pattern_type),
-                    scored=weighing.score(its_observations),
+                    scored=weighing.score(without_narrowing(its_observations)),
                 )
             )
         return all_judged

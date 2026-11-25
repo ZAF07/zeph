@@ -20,6 +20,7 @@ from companion.core.models import (
     Observation,
     PatternMoveCause,
     PatternMoveReason,
+    PatternReaction,
     PatternState,
     PatternType,
     PlatformSettings,
@@ -38,6 +39,7 @@ from companion.core.pattern_scoring import (
     score_observations,
     scoring_numbers,
     sign_strengths_of,
+    without_narrowing,
 )
 from companion.core.pattern_sharing import describe_where_it_shows
 from companion.core.platform_settings import (
@@ -46,7 +48,9 @@ from companion.core.platform_settings import (
     PATTERN_CONFIRM_POINTS_AFTER_SHARING,
     PREDICTION_FOLLOW_UP_DROP,
     PREDICTION_FOLLOW_UP_WAIT,
+    PREDICTIONS_TO_CLOSE,
     PREDICTIONS_TO_CONFIRM,
+    PREDICTIONS_UNANSWERED_TO_STOP,
     thinking_for_model,
 )
 from companion.core.ports import Clock, Repositories
@@ -55,6 +59,13 @@ from companion.core.timing import users_today
 from companion.core.usage import UsageRecordingChatModel
 
 logger = logging.getLogger(__name__)
+
+OUTCOMES_THAT_COUNT = frozenset(
+    {PredictionOutcome.CAME_TRUE, PredictionOutcome.DID_NOT}
+)
+REACTIONS_THAT_BRING_A_PATTERN_UP = frozenset(
+    {PatternReaction.AGREED, PatternReaction.PUSHED_BACK}
+)
 
 WHY_FOLLOW_UP = (
     "What they noticed in their own life tests the Pattern you told them, "
@@ -87,10 +98,14 @@ class FollowUpNumbers:
             it hasn't come up, before the Companion asks how it went.
         drop_after: How long after that same moment a Prediction with no
             answer is dropped.
+        unanswered_to_stop: After this many Predictions in a row got no
+            answer, no new one is offered until the User brings the
+            Pattern up.
     """
 
     wait: timedelta
     drop_after: timedelta
+    unanswered_to_stop: int
 
 
 @dataclass(frozen=True)
@@ -99,13 +114,16 @@ class ConfirmBars:
 
     Attributes:
         predictions_to_confirm: How many Predictions that came true
-            confirm it.
+            confirm it, when more came true than didn't.
+        predictions_to_close: How many Predictions that didn't come true
+            close it, when more didn't than did.
         confirmed_at_points_after_sharing: The score from Observations
             said after the day it was shared that confirms it.
         closed_under_points: A score under this closes it.
     """
 
     predictions_to_confirm: int
+    predictions_to_close: int
     confirmed_at_points_after_sharing: int
     closed_under_points: int
 
@@ -119,6 +137,7 @@ class SharedPatternFacts:
         scored: Its score with its reactions and Prediction outcomes
             counted, and the situations it showed in.
         came_true: How many of its Predictions came true.
+        did_not: How many of its Predictions didn't come true.
         points_after_sharing: The score of its Observations said on a
             later day than it was shared, alone.
     """
@@ -126,6 +145,7 @@ class SharedPatternFacts:
     pattern: CatalogPattern
     scored: PatternScore
     came_true: int
+    did_not: int
     points_after_sharing: float
 
 
@@ -141,6 +161,8 @@ class FollowUpInput:
         pattern_types: The Pattern Types in the catalog now, by ID.
         predictions: Every Prediction given to them, oldest first.
         curiosities: Their Curiosities about Predictions, in any state.
+        reactions: How they took the Patterns they were told, one per
+            Pattern and Conversation.
     """
 
     user_id: UUID
@@ -150,6 +172,7 @@ class FollowUpInput:
     pattern_types: Mapping[str, PatternType]
     predictions: Sequence[Prediction]
     curiosities: Sequence[Curiosity]
+    reactions: Sequence[ReactionToPattern] = ()
 
 
 @dataclass(frozen=True)
@@ -215,6 +238,35 @@ class GivenCheck:
     prediction: str
 
 
+def counted_once(
+    observations: Sequence[Observation], predictions: Sequence[Prediction]
+) -> list[Observation]:
+    """Leave out the Observations from a Conversation that settled a Prediction.
+
+    A story that says how a Prediction went is often tagged as an
+    Observation too. The Prediction's outcome is what counts, so one event
+    never moves the Pattern twice.
+
+    Args:
+        observations: The Observations of a shared Pattern.
+        predictions: The Predictions given for it.
+
+    Returns:
+        The Observations not said in a Conversation where the User said a
+        Prediction came true or didn't.
+    """
+    settled_in = {
+        prediction.outcome_conversation_id
+        for prediction in predictions
+        if prediction.outcome in OUTCOMES_THAT_COUNT
+    }
+    return [
+        observation
+        for observation in observations
+        if observation.conversation_id not in settled_in
+    ]
+
+
 def shared_pattern_facts(
     pattern: CatalogPattern,
     observations: Sequence[Observation],
@@ -224,6 +276,10 @@ def shared_pattern_facts(
     time_zone: str | None,
 ) -> SharedPatternFacts:
     """Work out what a Pattern the User was told is confirmed or closed from.
+
+    Evidence against that only narrows the Pattern is left out, as scoring
+    and the ready gate leave it out, and so is every Observation from a
+    Conversation that settled one of its Predictions.
 
     Args:
         pattern: The Pattern.
@@ -237,18 +293,20 @@ def shared_pattern_facts(
 
     Returns:
         Its score with reactions and Prediction outcomes counted, how many
-        Predictions came true and the score of the Observations said on
-        a later day than it was shared, so nothing from the Conversation
-        it was shared in counts as new.
+        Predictions came true and how many didn't, and the score of the
+        Observations said on a later day than it was shared, so nothing
+        from the Conversation it was shared in counts as new.
     """
     numbers, today = weighing.numbers, weighing.today
-    scored = score_observations(observations, weighing.sign_strengths, numbers, today)
+    counted = without_narrowing(counted_once(observations, predictions))
+    scored = score_observations(counted, weighing.sign_strengths, numbers, today)
     said_after_sharing = [
         observation
-        for observation in observations
+        for observation in counted
         if pattern.shared_at is not None
         and observation.day > users_today(time_zone, pattern.shared_at)
     ]
+    outcomes = [prediction.outcome for prediction in predictions]
     return SharedPatternFacts(
         pattern=pattern,
         scored=replace(
@@ -257,10 +315,8 @@ def shared_pattern_facts(
             + reaction_points(reactions, numbers, today, time_zone)
             + prediction_points(predictions, numbers, today, time_zone),
         ),
-        came_true=sum(
-            prediction.outcome == PredictionOutcome.CAME_TRUE
-            for prediction in predictions
-        ),
+        came_true=outcomes.count(PredictionOutcome.CAME_TRUE),
+        did_not=outcomes.count(PredictionOutcome.DID_NOT),
         points_after_sharing=score_observations(
             said_after_sharing, weighing.sign_strengths, numbers, today
         ).points,
@@ -277,16 +333,22 @@ def shared_move(
         bars: The Admin-set bars.
 
     Returns:
-        Closed when its score is under the floor; else confirmed when
-        enough of its Predictions came true or the evidence since it was
-        shared is strong enough; None when it stays shared, or isn't
-        shared.
+        Closed when its score is under the floor, or when enough of its
+        Predictions didn't come true and more didn't than did; else
+        confirmed when enough came true and more did than didn't, or the
+        evidence since it was shared is strong enough; None when it stays
+        shared, or isn't shared.
     """
     if facts.pattern.state != PatternState.SHARED:
         return None
     if facts.scored.points < bars.closed_under_points:
         return PatternState.CLOSED, PatternMoveReason.SCORE_UNDER_FLOOR
-    if facts.came_true >= bars.predictions_to_confirm:
+    if facts.did_not >= bars.predictions_to_close and facts.did_not > facts.came_true:
+        return PatternState.CLOSED, PatternMoveReason.PREDICTIONS_DID_NOT
+    if (
+        facts.came_true >= bars.predictions_to_confirm
+        and facts.came_true > facts.did_not
+    ):
         return PatternState.CONFIRMED, PatternMoveReason.PREDICTIONS_CAME_TRUE
     if facts.points_after_sharing >= bars.confirmed_at_points_after_sharing:
         return PatternState.CONFIRMED, PatternMoveReason.STRONG_EVIDENCE_AFTER_SHARING
@@ -522,6 +584,48 @@ def plan_follow_up(
     )
 
 
+def stopped_for_no_answers(
+    follow_up_input: FollowUpInput,
+    pattern: CatalogPattern,
+    dropped_now: Sequence[Prediction],
+    numbers: FollowUpNumbers,
+) -> bool:
+    """Say whether a shared Pattern gets no new Prediction for now.
+
+    Args:
+        follow_up_input: What the User's Curiosities are planned from.
+        pattern: The shared Pattern, with no open Prediction left.
+        dropped_now: Its Predictions being dropped now for having no answer.
+        numbers: The Admin-set times and numbers.
+
+    Returns:
+        True when its newest Predictions in a row, as many as Admins set,
+        all got no answer, and the User hasn't agreed with the Pattern or
+        pushed back on it since the last of them was dropped.
+    """
+    dropped_by_id = {prediction.id: prediction for prediction in dropped_now}
+    newest_first = [
+        dropped_by_id.get(prediction.id, prediction)
+        for prediction in reversed(follow_up_input.predictions)
+        if prediction.pattern_id == pattern.id
+    ]
+    unanswered = []
+    for prediction in newest_first:
+        if prediction.outcome != PredictionOutcome.NOT_FOLLOWED_UP:
+            break
+        unanswered.append(prediction)
+    if len(unanswered) < numbers.unanswered_to_stop:
+        return False
+    stopped_at = unanswered[0].outcome_at
+    return not any(
+        reaction.pattern_id == pattern.id
+        and reaction.reaction in REACTIONS_THAT_BRING_A_PATTERN_UP
+        and stopped_at is not None
+        and reaction.reacted_at > stopped_at
+        for reaction in follow_up_input.reactions
+    )
+
+
 def plan_pattern_follow_ups(
     follow_up_input: FollowUpInput, pattern: CatalogPattern, numbers: FollowUpNumbers
 ) -> PatternFollowUps:
@@ -537,7 +641,9 @@ def plan_pattern_follow_ups(
         dropped. Only its newest open Prediction is followed up; an older
         open one, one whose last day passed, and every open one once the
         User asked the Companion to drop a Curiosity about this Pattern,
-        are dropped. After that ask nothing new is written.
+        are dropped. After that ask nothing new is written. Nor is a new
+        Prediction offered once enough in a row got no answer, until the
+        User brings the Pattern up.
     """
     now = follow_up_input.now
     its_curiosities = [
@@ -571,6 +677,8 @@ def plan_pattern_follow_ups(
         )
     else:
         dropped += [not_followed_up(newest, now)] if newest is not None else []
+        if stopped_for_no_answers(follow_up_input, pattern, dropped, numbers):
+            return PatternFollowUps(dropped=dropped)
         planned = plan_new_prediction(
             follow_up_input, pattern, its_curiosities, numbers
         )
@@ -588,9 +696,11 @@ def plan_follow_ups(
     the drop time, each counted from when it was given or from when the
     User last said it hasn't come up. One with no answer by the last day
     is dropped: it counts nothing. A shared Pattern with no open
-    Prediction gets a Curiosity that offers it a new one. Once the User
-    asked the Companion to drop one of a Pattern's, nothing more is
-    written for that Pattern.
+    Prediction gets a Curiosity that offers it a new one, unless its last
+    Predictions in a row, as many as Admins set, got no answer and the
+    User hasn't brought the Pattern up since. Once the User asked the
+    Companion to drop one of a Pattern's, nothing more is written for
+    that Pattern.
 
     Args:
         follow_up_input: What they are planned from.
@@ -685,6 +795,7 @@ def follow_up_numbers(settings: PlatformSettings) -> FollowUpNumbers:
     return FollowUpNumbers(
         wait=settings.get(PREDICTION_FOLLOW_UP_WAIT),
         drop_after=settings.get(PREDICTION_FOLLOW_UP_DROP),
+        unanswered_to_stop=settings.get(PREDICTIONS_UNANSWERED_TO_STOP),
     )
 
 
@@ -699,6 +810,7 @@ def confirm_bars(settings: PlatformSettings) -> ConfirmBars:
     """
     return ConfirmBars(
         predictions_to_confirm=settings.get(PREDICTIONS_TO_CONFIRM),
+        predictions_to_close=settings.get(PREDICTIONS_TO_CLOSE),
         confirmed_at_points_after_sharing=settings.get(
             PATTERN_CONFIRM_POINTS_AFTER_SHARING
         ),
@@ -839,6 +951,7 @@ class PredictionKeeper:
                     },
                     predictions=repositories.patterns.list_predictions(user.id),
                     curiosities=curiosities,
+                    reactions=repositories.patterns.list_reactions(user.id),
                 ),
                 follow_up_numbers(snapshot.settings),
             )

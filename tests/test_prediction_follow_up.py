@@ -421,6 +421,103 @@ def test_a_prediction_that_didnt_is_a_strong_sign_against_and_can_close_the_patt
     assert moves_of(client.engine, user_id)[-1].id == move.id
 
 
+def test_a_story_that_settles_a_prediction_and_is_tagged_too_counts_once(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    user_id = share_and_end(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+    )
+    shared_at_points = moves_of(client.engine, user_id)[-1].points
+    set_platform_setting(client.engine, "pattern_half_life_days", 100000)
+    set_platform_setting(
+        client.engine, "pattern_closed_under_points", int(shared_at_points) - 100
+    )
+    clock.advance(timedelta(days=7))
+    quotes_before = len(observations_of(client.engine, user_id))
+
+    ask_and_answer(client, chat_model, clock, "no, I actually said no to her")
+    end(
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+        DID_NOT,
+        observations=[
+            observation_entry(
+                sign="D1",
+                direction="against",
+                quote="I actually said no to her",
+                thread=None,
+            )
+        ],
+    )
+
+    [prediction] = predictions_of(client.engine, user_id)
+    kept = observations_of(client.engine, user_id)
+    assert len(kept) == quotes_before + 1
+    assert prediction.outcome_conversation_id == kept[-1].conversation_id
+    move = moves_of(client.engine, user_id)[-1]
+    assert states_and_causes([move]) == [("shared", "closed", "conversation_tagged")]
+    assert move.points == pytest.approx(shared_at_points - 140, abs=1)
+
+
+def test_enough_predictions_that_didnt_come_true_close_a_shared_pattern(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    user_id = share_and_end(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+    )
+    set_platform_setting(client.engine, "predictions_to_close", 1)
+    clock.advance(timedelta(days=7))
+
+    ask_and_answer(client, chat_model, clock, "no, I actually said no to her")
+    end(chat_model, clock, scheduler, seeded_settings, DID_NOT)
+
+    assert belonging(client.engine, user_id).state == PatternState.CLOSED
+    move = moves_of(client.engine, user_id)[-1]
+    assert move.reason == PatternMoveReason.PREDICTIONS_DID_NOT
+    assert move.points > -150
+    assert waiting(client.engine, user_id) == []
+
+
+def test_the_closing_and_stopping_numbers_are_settings_with_hints_and_eval_overrides(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    keys = ("predictions_to_close", "predictions_unanswered_to_stop")
+
+    settings = client.get("/api/admin/settings", headers=admin).json()["settings"]
+    choices = client.get("/api/admin/setting-override-choices", headers=admin).json()
+
+    assert {key: settings[key]["value"] for key in keys} == dict.fromkeys(keys, 2)
+    assert all(settings[key]["hint"] for key in keys)
+    assert set(keys) <= {setting["key"] for setting in choices["settings"]}
+
+
 def test_strong_evidence_after_sharing_confirms_a_shared_pattern(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,

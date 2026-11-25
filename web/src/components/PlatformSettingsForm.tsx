@@ -309,6 +309,16 @@ const fieldSections: {
         unit: "came true",
       },
       {
+        key: "predictions_to_close",
+        label: "Predictions that didn’t come true to close a Pattern",
+        unit: "didn’t",
+      },
+      {
+        key: "predictions_unanswered_to_stop",
+        label: "Unanswered Predictions in a row before Zeph stops offering",
+        unit: "in a row",
+      },
+      {
         key: "pattern_confirm_points_after_sharing",
         label: "Score from new evidence that confirms a shared Pattern",
         unit: "points",

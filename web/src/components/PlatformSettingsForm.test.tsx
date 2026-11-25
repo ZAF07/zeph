@@ -124,6 +124,8 @@ const settings: AdminSettings = {
   prediction_follow_up_wait_days: seeded(7),
   prediction_follow_up_drop_days: seeded(21),
   predictions_to_confirm: seeded(2),
+  predictions_to_close: seeded(2),
+  predictions_unanswered_to_stop: seeded(2),
   pattern_confirm_points_after_sharing: seeded(300),
   pattern_ruled_out_topics: seeded(
     ["abuse", "self-harm or suicide"],

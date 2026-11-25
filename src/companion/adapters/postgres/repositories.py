@@ -4220,6 +4220,7 @@ class PostgresPatternRepository:
                     made_at=prediction.made_at,
                     outcome=_value_or_none(prediction.outcome),
                     outcome_at=prediction.outcome_at,
+                    outcome_conversation_id=prediction.outcome_conversation_id,
                 )
             )
 
@@ -4239,12 +4240,14 @@ class PostgresPatternRepository:
                 .values(
                     outcome=bindparam("new_outcome"),
                     outcome_at=bindparam("new_outcome_at"),
+                    outcome_conversation_id=bindparam("new_conversation_id"),
                 ),
                 [
                     {
                         "prediction_id": prediction.id,
                         "new_outcome": _value_or_none(prediction.outcome),
                         "new_outcome_at": prediction.outcome_at,
+                        "new_conversation_id": prediction.outcome_conversation_id,
                     }
                     for prediction in settled
                 ],
@@ -4274,6 +4277,7 @@ class PostgresPatternRepository:
                 made_at=row.made_at,
                 outcome=PredictionOutcome(row.outcome) if row.outcome else None,
                 outcome_at=row.outcome_at,
+                outcome_conversation_id=row.outcome_conversation_id,
             )
             for row in rows
         ]

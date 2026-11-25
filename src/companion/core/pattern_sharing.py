@@ -37,6 +37,7 @@ from companion.core.pattern_scoring import (
     scoring_numbers,
     sign_strengths_of,
     situation_of,
+    without_narrowing,
 )
 from companion.core.platform_settings import (
     CHECK_IN_MODEL,
@@ -618,7 +619,9 @@ class PatternSharing:
             changed, moves = [], []
             for pattern in rejected:
                 scored = score_observations(
-                    observations_of(pattern.pattern_type_id, observations),
+                    without_narrowing(
+                        observations_of(pattern.pattern_type_id, observations)
+                    ),
                     sign_strengths,
                     numbers,
                     today,

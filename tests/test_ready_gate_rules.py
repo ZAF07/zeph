@@ -13,7 +13,9 @@ from companion.core.models import (
     NarrowingTag,
     Observation,
     ObservationDirection,
+    PatternMoveCause,
     PatternNarrowing,
+    PatternState,
     PatternTypeStatus,
     Power,
     ReadyCheck,
@@ -25,7 +27,13 @@ from companion.core.models import (
 )
 from companion.core.observations import UserText
 from companion.core.pattern_catalog import read_pattern_types
-from companion.core.pattern_scoring import PatternScore, ScoringNumbers
+from companion.core.pattern_scoring import (
+    PatternScore,
+    ScoringNumbers,
+    StateBars,
+    plan_pattern_moves,
+    without_narrowing,
+)
 from companion.core.ready_gate import (
     GateFacts,
     ReadyBars,
@@ -358,6 +366,68 @@ def test_evidence_against_with_no_kind_of_person_tagged_never_narrows() -> None:
     ]
 
     assert narrowings_of(observations) == ()
+
+
+def test_evidence_against_with_nobody_named_does_not_switch_narrowing_off() -> None:
+    with_family = three_stories_in_two_conversations()
+    not_with_partner = story(
+        about="their husband",
+        direction=ObservationDirection.AGAINST,
+        relationship=Relationship.PARTNER,
+    )
+    summing_up = story(
+        about="themselves",
+        direction=ObservationDirection.AGAINST,
+        relationship=None,
+        power=None,
+    )
+    observations = [*with_family, not_with_partner, summing_up]
+
+    counted = without_narrowing(observations)
+
+    assert narrowings_of(observations) == (
+        PatternNarrowing(
+            tag=NarrowingTag.RELATIONSHIP,
+            holds_with=("colleague", "family", "friend"),
+            not_with=("partner",),
+        ),
+    )
+    assert not_with_partner not in counted
+    assert summing_up in counted
+    assert facts_of(observations, tries=[]).points_against == 140
+
+
+def test_scoring_leaves_out_evidence_that_only_narrows_like_the_gate() -> None:
+    with_family = [story(about="Mei, their sister"), story(about="their mother")]
+    not_with_partner = [
+        story(
+            about="their husband",
+            direction=ObservationDirection.AGAINST,
+            relationship=Relationship.PARTNER,
+            quote=quote,
+        )
+        for quote in ("I told him no", "I said what I wanted")
+    ]
+    bars = StateBars(
+        suspected_situations=2, suspected_points=100, closed_under_points=-150
+    )
+
+    planned = plan_pattern_moves(
+        uuid4(),
+        [],
+        [*with_family, *not_with_partner],
+        WEIGHING.sign_strengths,
+        WEIGHING.numbers,
+        bars,
+        TODAY,
+        NOW,
+        PatternMoveCause.CONVERSATION_TAGGED,
+        None,
+    )
+
+    [pattern] = planned.added
+    assert pattern.state == PatternState.SUSPECTED
+    assert planned.moves[-1].points == 280
 
 
 def test_stories_where_anyone_would_act_the_same_by_the_catalog_now_block() -> None:

@@ -610,6 +610,11 @@ predictions = Table(
     Column("made_at", DateTime(timezone=True), nullable=False),
     Column("outcome", Text),
     Column("outcome_at", DateTime(timezone=True)),
+    Column(
+        "outcome_conversation_id",
+        Uuid,
+        ForeignKey("conversations.id", ondelete="SET NULL"),
+    ),
 )
 
 pattern_reactions = Table(
