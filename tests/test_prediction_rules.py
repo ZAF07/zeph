@@ -35,6 +35,7 @@ from companion.core.predictions import (
     GivenCheck,
     PlannedFollowUps,
     SharedPatternFacts,
+    follow_up_window,
     plan_follow_ups,
     read_given_check,
     shared_move,
@@ -51,7 +52,9 @@ from tests.test_ready_gate_rules import (
 
 NUMBERS = FollowUpNumbers(wait=timedelta(days=7), drop_after=timedelta(days=21))
 BARS = ConfirmBars(
-    predictions_to_confirm=2, points_after_sharing=300, closed_under_points=-150
+    predictions_to_confirm=2,
+    confirmed_at_points_after_sharing=300,
+    closed_under_points=-150,
 )
 USER = uuid4()
 SHARED_AT = NOW - timedelta(days=30)
@@ -279,6 +282,50 @@ def test_nothing_more_is_asked_about_a_pattern_once_they_asked_zeph_to_drop_it()
     assert [curiosity.id for curiosity in plan.curiosities.updated] == [give.id]
 
 
+def test_dropping_one_drops_the_open_prediction_too() -> None:
+    pattern = shared_pattern()
+    given = prediction(pattern, made_days_ago=10)
+    [follow_up] = planned([pattern], [given]).curiosities.added
+    dropped = replace(asked(follow_up), reaction=ThreadReaction.ASKED_TO_DROP)
+
+    plan = planned([pattern], [given], [dropped])
+
+    assert [(item.id, item.outcome) for item in plan.not_followed_up] == [
+        (given.id, PredictionOutcome.NOT_FOLLOWED_UP)
+    ]
+
+
+def test_only_the_newest_open_prediction_is_followed_up() -> None:
+    pattern = shared_pattern()
+    older = prediction(pattern, made_days_ago=5)
+    newest = prediction(pattern, made_days_ago=1)
+
+    plan = planned([pattern], [older, newest])
+
+    assert [item.id for item in plan.not_followed_up] == [older.id]
+    assert [item.prediction_id for item in plan.curiosities.added] == [newest.id]
+
+
+def test_a_new_prediction_they_let_pass_is_not_offered_again_before_the_wait() -> None:
+    pattern = shared_pattern()
+    [offer] = planned([pattern], []).curiosities.added
+    let_pass = asked(offer, days_ago=2)
+
+    [again] = planned([pattern], [], [let_pass]).curiosities.added
+
+    assert again.prediction_id is None
+    assert again.not_before == TODAY + timedelta(days=5)
+
+
+def test_a_drop_time_shorter_than_the_wait_never_ends_before_the_first_day() -> None:
+    pattern = shared_pattern()
+    numbers = FollowUpNumbers(wait=timedelta(days=7), drop_after=timedelta(days=3))
+
+    window = follow_up_window(prediction(pattern), numbers, "UTC")
+
+    assert window.first_day == window.last_day == TODAY + timedelta(days=7)
+
+
 @pytest.mark.parametrize(
     "state",
     [PatternState.CONFIRMED, PatternState.CONTESTED, PatternState.CLOSED],
@@ -362,25 +409,32 @@ def test_only_a_shared_pattern_is_confirmed_or_closed_this_way() -> None:
 
 def test_a_shared_patterns_score_counts_reactions_and_prediction_outcomes() -> None:
     pattern = shared_pattern()
-    before = [
-        replace(story(about=name), tagged_at=SHARED_AT) for name in ("Mei", "Jun")
-    ]
-    after = [story(about="Priya")]
+    shared_on = TODAY - timedelta(days=30)
+    earlier = [replace(story(about=name), day=shared_on) for name in ("Mei", "Jun")]
+    later = [story(about="Priya")]
     predictions = [
         prediction(pattern, outcome=PredictionOutcome.CAME_TRUE),
         prediction(pattern, outcome=PredictionOutcome.DID_NOT),
         prediction(pattern, outcome=PredictionOutcome.CAME_TRUE),
     ]
+    faded = 140 * 0.5 ** (30 / 75)
 
     found = shared_pattern_facts(
-        pattern, [*before, *after], [], predictions, WEIGHING, "UTC"
+        pattern, [*earlier, *later], [], predictions, WEIGHING, "UTC"
     )
 
     assert found.came_true == 2
-    assert found.scored == PatternScore(
-        points=pytest.approx(3 * 140 + 140), situations=3
-    )
+    assert found.scored.points == pytest.approx(2 * faded + 140 + 140)
+    assert found.scored.situations == 3
     assert found.points_after_sharing == pytest.approx(140)
+
+
+def test_what_was_said_on_the_day_it_was_shared_is_not_new_evidence() -> None:
+    pattern = replace(shared_pattern(), shared_at=NOW)
+
+    found = shared_pattern_facts(pattern, [story()], [], [], WEIGHING, "UTC")
+
+    assert found.points_after_sharing == 0
 
 
 def test_evidence_against_after_sharing_counts_against_the_new_evidence() -> None:

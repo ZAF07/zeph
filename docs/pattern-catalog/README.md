@@ -145,7 +145,8 @@ the whole catalog.
 | `anyone_would_when` | Changes which new Observations are situational. Past ones keep how they were marked. |
 | `exclusions` | Changes what the tagging step may flag, from the next Conversation end. An exclusion taken away stops applying at the User's next tagged Conversation. Observations already marked excluded stay so. |
 | `numbers.situations_needed` | The ready gate uses it from the next Conversation end; a ready Pattern that no longer has enough situations goes back to suspected. |
-| `approved_wording`, `prediction_wording`, `numbers.base_rate` | Nothing yet; they wait for sharing. |
+| `approved_wording`, `prediction_wording` | Used from the next time a Pattern is shared, followed up or given a new Prediction. A follow-up Curiosity already waiting keeps the words it was written with. |
+| `numbers.base_rate` | Nothing yet. |
 | `status` draft → approved | Its Patterns may become ready from the next Conversation end. A draft gathers evidence silently and is never ready; approved → draft sends a ready Pattern back to suspected. Needs `approved_by` and `approved_on`. |
 | `status` → archived | Today nothing: the tagging step is sent every Pattern Type in the catalog, archived ones too, so an archived one is still looked for. To come: it stops being looked for and is never shared. Keep the file; never delete it. |
 | A file deleted | It leaves the catalog, but its stored versions and Observations stay. Archive instead. |

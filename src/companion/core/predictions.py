@@ -1,6 +1,6 @@
 import json
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping, Sequence, Set
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 from uuid import UUID, uuid4
@@ -70,9 +70,11 @@ GIVEN_CHECK_PROMPT = (
     "message as it will be sent. Answer with JSON only: "
     '{"given": true or false, "prediction": "..."}. "given" is true only if '
     "the message asks them to notice or watch for something in their own "
-    "life from now on; a question about what already happened is not "
-    'enough. "prediction" is that one thing, in the message\'s own words; '
-    '"" if it gives none.'
+    "life from now on, and it is the thing that Prediction describes, in "
+    "any words and with their own people; a question about what already "
+    "happened, or something else to watch for, is not enough. "
+    '"prediction" is that one thing, in the message\'s own words; "" if it '
+    "gives none."
 )
 
 
@@ -98,13 +100,13 @@ class ConfirmBars:
     Attributes:
         predictions_to_confirm: How many Predictions that came true
             confirm it.
-        points_after_sharing: The score from Observations tagged after it
-            was shared that confirms it.
+        confirmed_at_points_after_sharing: The score from Observations
+            said after the day it was shared that confirms it.
         closed_under_points: A score under this closes it.
     """
 
     predictions_to_confirm: int
-    points_after_sharing: int
+    confirmed_at_points_after_sharing: int
     closed_under_points: int
 
 
@@ -117,8 +119,8 @@ class SharedPatternFacts:
         scored: Its score with its reactions and Prediction outcomes
             counted, and the situations it showed in.
         came_true: How many of its Predictions came true.
-        points_after_sharing: The score of its Observations tagged after
-            it was shared, alone.
+        points_after_sharing: The score of its Observations said on a
+            later day than it was shared, alone.
     """
 
     pattern: CatalogPattern
@@ -165,6 +167,42 @@ class PlannedFollowUps:
 
 
 @dataclass(frozen=True)
+class FollowUpWindow:
+    """When an open Prediction may be followed up.
+
+    Attributes:
+        counted_from: The moment the window counts from: when the
+            Prediction was given, or when the User last said it hasn't
+            come up.
+        first_day: The first day, in the User's time zone, the Companion
+            may ask how it went.
+        last_day: The last day it may ask; after it the Prediction is
+            dropped.
+    """
+
+    counted_from: datetime
+    first_day: date
+    last_day: date
+
+
+@dataclass(frozen=True)
+class PatternFollowUps:
+    """What is planned for the Curiosities about one shared Pattern's Predictions.
+
+    Attributes:
+        added: The new Curiosities.
+        kept_ids: The waiting Curiosities that stay; any other waiting one
+            is closed.
+        dropped: The Predictions dropped for having no answer, each with
+            that outcome.
+    """
+
+    added: Sequence[Curiosity] = ()
+    kept_ids: Set[UUID] = frozenset()
+    dropped: Sequence[Prediction] = ()
+
+
+@dataclass(frozen=True)
 class GivenCheck:
     """What the check after a message that was to give a Prediction found.
 
@@ -199,15 +237,17 @@ def shared_pattern_facts(
 
     Returns:
         Its score with reactions and Prediction outcomes counted, how many
-        Predictions came true and the score of the Observations tagged
-        after it was shared.
+        Predictions came true and the score of the Observations said on
+        a later day than it was shared, so nothing from the Conversation
+        it was shared in counts as new.
     """
     numbers, today = weighing.numbers, weighing.today
     scored = score_observations(observations, weighing.sign_strengths, numbers, today)
-    tagged_after_sharing = [
+    said_after_sharing = [
         observation
         for observation in observations
-        if pattern.shared_at is not None and observation.tagged_at > pattern.shared_at
+        if pattern.shared_at is not None
+        and observation.day > users_today(time_zone, pattern.shared_at)
     ]
     return SharedPatternFacts(
         pattern=pattern,
@@ -222,7 +262,7 @@ def shared_pattern_facts(
             for prediction in predictions
         ),
         points_after_sharing=score_observations(
-            tagged_after_sharing, weighing.sign_strengths, numbers, today
+            said_after_sharing, weighing.sign_strengths, numbers, today
         ).points,
     )
 
@@ -248,7 +288,7 @@ def shared_move(
         return PatternState.CLOSED, PatternMoveReason.SCORE_UNDER_FLOOR
     if facts.came_true >= bars.predictions_to_confirm:
         return PatternState.CONFIRMED, PatternMoveReason.PREDICTIONS_CAME_TRUE
-    if facts.points_after_sharing >= bars.points_after_sharing:
+    if facts.points_after_sharing >= bars.confirmed_at_points_after_sharing:
         return PatternState.CONFIRMED, PatternMoveReason.STRONG_EVIDENCE_AFTER_SHARING
     return None
 
@@ -301,14 +341,11 @@ def new_prediction_question(pattern: CatalogPattern, pattern_type: PatternType) 
     )
 
 
-def prediction_curiosity(
+def waiting_curiosity(
     follow_up_input: FollowUpInput,
     pattern: CatalogPattern,
     question: str,
     why: str,
-    prediction: Prediction | None = None,
-    first_day: date | None = None,
-    last_day: date | None = None,
 ) -> Curiosity:
     """Write a waiting Curiosity about a shared Pattern's Prediction.
 
@@ -317,33 +354,27 @@ def prediction_curiosity(
         pattern: The shared Pattern.
         question: The instruction the reply is given.
         why: Why the Companion wonders.
-        prediction: The Prediction it asks about; None when it gives a
-            new one.
-        first_day: The first day it may be asked; None for any day.
-        last_day: The last day it may be asked; None for no last day.
 
     Returns:
-        The Curiosity.
+        The Curiosity, with no first or last day and no Prediction yet.
     """
     return Curiosity(
         id=uuid4(),
         user_id=follow_up_input.user_id,
         question=question,
         why=why,
-        not_before=first_day,
+        not_before=None,
         sensitivity=CuriositySensitivity.MEDIUM,
         state=CuriosityState.WAITING,
         created_at=follow_up_input.now,
         aim=CuriosityAim.PREDICTION,
-        not_after=last_day,
         pattern_id=pattern.id,
-        prediction_id=prediction.id if prediction is not None else None,
     )
 
 
 def follow_up_window(
     prediction: Prediction, numbers: FollowUpNumbers, time_zone: str | None
-) -> tuple[datetime, date, date]:
+) -> FollowUpWindow:
     """Work out when an open Prediction may be followed up.
 
     Args:
@@ -352,9 +383,9 @@ def follow_up_window(
         time_zone: The User's IANA time zone, for the days.
 
     Returns:
-        The moment the window counts from (when it was given, or when the
-        User last said it hasn't come up), the first day the Companion
-        may ask and the last.
+        The window, counted from when the Prediction was given or from
+        when the User last said it hasn't come up. Its last day is never
+        before its first, whatever the Admin-set times.
     """
     counted_from = (
         prediction.outcome_at
@@ -362,11 +393,188 @@ def follow_up_window(
         and prediction.outcome_at is not None
         else prediction.made_at
     )
-    return (
-        counted_from,
-        users_today(time_zone, counted_from + numbers.wait),
-        users_today(time_zone, counted_from + numbers.drop_after),
+    return FollowUpWindow(
+        counted_from=counted_from,
+        first_day=users_today(time_zone, counted_from + numbers.wait),
+        last_day=users_today(
+            time_zone, counted_from + max(numbers.wait, numbers.drop_after)
+        ),
     )
+
+
+def not_followed_up(prediction: Prediction, now: datetime) -> Prediction:
+    """Drop an open Prediction that got no answer.
+
+    Args:
+        prediction: The Prediction.
+        now: When it is dropped.
+
+    Returns:
+        The Prediction with the outcome "not followed up", which counts
+        nothing.
+    """
+    return replace(
+        prediction, outcome=PredictionOutcome.NOT_FOLLOWED_UP, outcome_at=now
+    )
+
+
+def plan_new_prediction(
+    follow_up_input: FollowUpInput,
+    pattern: CatalogPattern,
+    its_curiosities: Sequence[Curiosity],
+    numbers: FollowUpNumbers,
+) -> PatternFollowUps:
+    """Plan the Curiosity that offers a shared Pattern a new Prediction.
+
+    Args:
+        follow_up_input: What the User's Curiosities are planned from.
+        pattern: The shared Pattern, with no open Prediction.
+        its_curiosities: The Curiosities about its Predictions, in any
+            state.
+        numbers: The Admin-set times.
+
+    Returns:
+        The waiting offer, kept; with none, a new one, asked not before
+        the Admin-set wait after the last offer was made, so one the User
+        let pass isn't offered again in every Conversation.
+    """
+    offers = [
+        curiosity for curiosity in its_curiosities if curiosity.prediction_id is None
+    ]
+    waiting = [
+        curiosity for curiosity in offers if curiosity.state == CuriosityState.WAITING
+    ]
+    if waiting:
+        return PatternFollowUps(kept_ids={curiosity.id for curiosity in waiting})
+    offered_at = [
+        curiosity.raised_at for curiosity in offers if curiosity.raised_at is not None
+    ]
+    pattern_type = follow_up_input.pattern_types[pattern.pattern_type_id]
+    offer = waiting_curiosity(
+        follow_up_input,
+        pattern,
+        new_prediction_question(pattern, pattern_type),
+        WHY_A_NEW_PREDICTION,
+    )
+    first_day = (
+        users_today(follow_up_input.time_zone, max(offered_at) + numbers.wait)
+        if offered_at
+        else None
+    )
+    return PatternFollowUps(added=[replace(offer, not_before=first_day)])
+
+
+def plan_follow_up(
+    follow_up_input: FollowUpInput,
+    pattern: CatalogPattern,
+    its_curiosities: Sequence[Curiosity],
+    prediction: Prediction,
+    window: FollowUpWindow,
+) -> PatternFollowUps:
+    """Plan the Curiosity that asks how a shared Pattern's open Prediction went.
+
+    Args:
+        follow_up_input: What the User's Curiosities are planned from.
+        pattern: The shared Pattern.
+        its_curiosities: The Curiosities about its Predictions, in any
+            state.
+        prediction: Its open Prediction, whose last day hasn't passed.
+        window: When it may be followed up.
+
+    Returns:
+        The follow-up waiting for this window, kept; a new one when none
+        waits and none was asked in this window; nothing once one was
+        asked, so it is asked once per window.
+    """
+    its_follow_ups = [
+        curiosity
+        for curiosity in its_curiosities
+        if curiosity.prediction_id == prediction.id
+    ]
+    waiting = [
+        curiosity
+        for curiosity in its_follow_ups
+        if curiosity.state == CuriosityState.WAITING
+        and curiosity.not_before == window.first_day
+    ]
+    asked_in_this_window = any(
+        curiosity.raised_at is not None and curiosity.raised_at > window.counted_from
+        for curiosity in its_follow_ups
+    )
+    if waiting or asked_in_this_window:
+        return PatternFollowUps(kept_ids={curiosity.id for curiosity in waiting})
+    pattern_type = follow_up_input.pattern_types[pattern.pattern_type_id]
+    follow_up = waiting_curiosity(
+        follow_up_input,
+        pattern,
+        follow_up_question(pattern, pattern_type, prediction),
+        WHY_FOLLOW_UP,
+    )
+    return PatternFollowUps(
+        added=[
+            replace(
+                follow_up,
+                not_before=window.first_day,
+                not_after=window.last_day,
+                prediction_id=prediction.id,
+            )
+        ]
+    )
+
+
+def plan_pattern_follow_ups(
+    follow_up_input: FollowUpInput, pattern: CatalogPattern, numbers: FollowUpNumbers
+) -> PatternFollowUps:
+    """Decide which Curiosities about one shared Pattern's Predictions wait.
+
+    Args:
+        follow_up_input: What the User's Curiosities are planned from.
+        pattern: The shared Pattern, whose Pattern Type is in the catalog.
+        numbers: The Admin-set times.
+
+    Returns:
+        The new Curiosities, the waiting ones to keep and the Predictions
+        dropped. Only its newest open Prediction is followed up; an older
+        open one, one whose last day passed, and every open one once the
+        User asked the Companion to drop a Curiosity about this Pattern,
+        are dropped. After that ask nothing new is written.
+    """
+    now = follow_up_input.now
+    its_curiosities = [
+        curiosity
+        for curiosity in follow_up_input.curiosities
+        if curiosity.pattern_id == pattern.id
+    ]
+    still_open = [
+        prediction
+        for prediction in follow_up_input.predictions
+        if prediction.pattern_id == pattern.id and prediction.is_open
+    ]
+    if any(
+        curiosity.reaction == ThreadReaction.ASKED_TO_DROP
+        for curiosity in its_curiosities
+    ):
+        return PatternFollowUps(
+            dropped=[not_followed_up(prediction, now) for prediction in still_open]
+        )
+    dropped = [not_followed_up(prediction, now) for prediction in still_open[:-1]]
+    newest = still_open[-1] if still_open else None
+    window = (
+        follow_up_window(newest, numbers, follow_up_input.time_zone)
+        if newest is not None
+        else None
+    )
+    today = users_today(follow_up_input.time_zone, now)
+    if newest is not None and window is not None and today <= window.last_day:
+        planned = plan_follow_up(
+            follow_up_input, pattern, its_curiosities, newest, window
+        )
+    else:
+        dropped += [not_followed_up(newest, now)] if newest is not None else []
+        planned = plan_new_prediction(
+            follow_up_input, pattern, its_curiosities, numbers
+        )
+    return replace(planned, dropped=dropped)
 
 
 def plan_follow_ups(
@@ -380,7 +588,7 @@ def plan_follow_ups(
     the drop time, each counted from when it was given or from when the
     User last said it hasn't come up. One with no answer by the last day
     is dropped: it counts nothing. A shared Pattern with no open
-    Prediction gets a Curiosity that gives it a new one. Once the User
+    Prediction gets a Curiosity that offers it a new one. Once the User
     asked the Companion to drop one of a Pattern's, nothing more is
     written for that Pattern.
 
@@ -392,98 +600,18 @@ def plan_follow_ups(
         The new Curiosities, the waiting ones now closed and the
         Predictions dropped.
     """
-    today = users_today(follow_up_input.time_zone, follow_up_input.now)
-    shared = {
-        pattern.id: pattern
+    per_pattern = [
+        plan_pattern_follow_ups(follow_up_input, pattern, numbers)
         for pattern in follow_up_input.patterns
         if pattern.state == PatternState.SHARED
         and pattern.pattern_type_id in follow_up_input.pattern_types
+    ]
+    kept_ids = {
+        curiosity_id for planned in per_pattern for curiosity_id in planned.kept_ids
     }
-    added: list[Curiosity] = []
-    not_followed_up: list[Prediction] = []
-    kept_ids: set[UUID] = set()
-    for pattern in shared.values():
-        pattern_type = follow_up_input.pattern_types[pattern.pattern_type_id]
-        its_curiosities = [
-            curiosity
-            for curiosity in follow_up_input.curiosities
-            if curiosity.pattern_id == pattern.id
-        ]
-        if any(
-            curiosity.reaction == ThreadReaction.ASKED_TO_DROP
-            for curiosity in its_curiosities
-        ):
-            continue
-        waiting = [
-            curiosity
-            for curiosity in its_curiosities
-            if curiosity.state == CuriosityState.WAITING
-        ]
-        still_open = [
-            prediction
-            for prediction in follow_up_input.predictions
-            if prediction.pattern_id == pattern.id and prediction.is_open
-        ]
-        prediction = still_open[-1] if still_open else None
-        if prediction is not None:
-            counted_from, first_day, last_day = follow_up_window(
-                prediction, numbers, follow_up_input.time_zone
-            )
-            if today > last_day:
-                not_followed_up.append(
-                    replace(
-                        prediction,
-                        outcome=PredictionOutcome.NOT_FOLLOWED_UP,
-                        outcome_at=follow_up_input.now,
-                    )
-                )
-                prediction = None
-        if prediction is None:
-            giving = [
-                curiosity for curiosity in waiting if curiosity.prediction_id is None
-            ]
-            kept_ids.update(curiosity.id for curiosity in giving)
-            if not giving:
-                added.append(
-                    prediction_curiosity(
-                        follow_up_input,
-                        pattern,
-                        new_prediction_question(pattern, pattern_type),
-                        WHY_A_NEW_PREDICTION,
-                    )
-                )
-            continue
-        its_follow_ups = [
-            curiosity
-            for curiosity in its_curiosities
-            if curiosity.prediction_id == prediction.id
-        ]
-        waiting_for_this_window = [
-            curiosity
-            for curiosity in its_follow_ups
-            if curiosity.state == CuriosityState.WAITING
-            and curiosity.not_before == first_day
-        ]
-        asked_in_this_window = any(
-            curiosity.raised_at is not None and curiosity.raised_at > counted_from
-            for curiosity in its_follow_ups
-        )
-        kept_ids.update(curiosity.id for curiosity in waiting_for_this_window)
-        if not waiting_for_this_window and not asked_in_this_window:
-            added.append(
-                prediction_curiosity(
-                    follow_up_input,
-                    pattern,
-                    follow_up_question(pattern, pattern_type, prediction),
-                    WHY_FOLLOW_UP,
-                    prediction,
-                    first_day,
-                    last_day,
-                )
-            )
     return PlannedFollowUps(
         curiosities=CuriosityChanges(
-            added=added,
+            added=[curiosity for planned in per_pattern for curiosity in planned.added],
             updated=[
                 replace(curiosity, state=CuriosityState.CLOSED)
                 for curiosity in follow_up_input.curiosities
@@ -492,7 +620,9 @@ def plan_follow_ups(
             ],
             reactions={},
         ),
-        not_followed_up=not_followed_up,
+        not_followed_up=[
+            prediction for planned in per_pattern for prediction in planned.dropped
+        ],
     )
 
 
@@ -569,7 +699,9 @@ def confirm_bars(settings: PlatformSettings) -> ConfirmBars:
     """
     return ConfirmBars(
         predictions_to_confirm=settings.get(PREDICTIONS_TO_CONFIRM),
-        points_after_sharing=settings.get(PATTERN_CONFIRM_POINTS_AFTER_SHARING),
+        confirmed_at_points_after_sharing=settings.get(
+            PATTERN_CONFIRM_POINTS_AFTER_SHARING
+        ),
         closed_under_points=settings.get(PATTERN_CLOSED_UNDER_POINTS),
     )
 

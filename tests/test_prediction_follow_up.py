@@ -487,8 +487,9 @@ def test_a_pattern_shared_with_no_prediction_gets_one_only_when_the_check_says_s
     assert predictions_of(client.engine, user_id) == []
     [again] = waiting(client.engine, user_id)
     assert again.id != give.id
+    assert again.not_before is not None
 
-    clock.advance(timedelta(days=1))
+    clock.advance(timedelta(days=7))
     chat_model.script_given_check(RuntimeError("model down"))
     ask_and_answer(client, chat_model, clock, "sure")
 
