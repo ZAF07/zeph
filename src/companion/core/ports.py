@@ -28,6 +28,7 @@ from companion.core.models import (
     CuriosityChanges,
     DailyUsage,
     DaySummary,
+    DeletedQuote,
     EmbeddedChunk,
     ExclusionFlag,
     Exploration,
@@ -1396,10 +1397,32 @@ class ObservationRepository(Protocol):
         ...
 
     def delete_for_user(self, user_id: UUID) -> None:
-        """Delete all of a User's Observations and exclusion flags.
+        """Delete a User's Observations, exclusion flags and deleted-quote records.
 
         Args:
             user_id: The User's ID.
+        """
+        ...
+
+    def note_deleted_quotes(self, deleted: Sequence[DeletedQuote]) -> None:
+        """Keep a record of quotes a User deleted, so none is kept again.
+
+        Args:
+            deleted: The records; one already kept is left as it is.
+        """
+        ...
+
+    def list_deleted_quote_hashes(
+        self, user_id: UUID, conversation_id: UUID
+    ) -> frozenset[str]:
+        """List the hashes of the quotes a User deleted from one Conversation.
+
+        Args:
+            user_id: The User's ID.
+            conversation_id: The Conversation the quotes were said in.
+
+        Returns:
+            The hashes; none when they deleted no quote from it.
         """
         ...
 

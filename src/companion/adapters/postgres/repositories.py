@@ -42,6 +42,7 @@ from companion.adapters.postgres.tables import (
     curiosities,
     daily_usage,
     day_summaries,
+    deleted_quotes,
     exploration_tries,
     explorations,
     feature_switches,
@@ -117,6 +118,7 @@ from companion.core.models import (
     CuriosityTreatment,
     DailyUsage,
     DaySummary,
+    DeletedQuote,
     Directness,
     EvidenceKind,
     ExcludedEvidence,
@@ -3539,7 +3541,7 @@ class PostgresObservationRepository:
             )
 
     def delete_for_user(self, user_id: UUID) -> None:
-        """Delete all of a User's Observations and exclusion flags.
+        """Delete a User's Observations, exclusion flags and deleted-quote records.
 
         Args:
             user_id: The User's ID.
@@ -3553,6 +3555,52 @@ class PostgresObservationRepository:
                     pattern_exclusion_flags.c.user_id == user_id
                 )
             )
+            connection.execute(
+                delete(deleted_quotes).where(deleted_quotes.c.user_id == user_id)
+            )
+
+    def note_deleted_quotes(self, deleted: Sequence[DeletedQuote]) -> None:
+        """Keep a record of quotes a User deleted, so none is kept again.
+
+        Args:
+            deleted: The records; one already kept is left as it is.
+        """
+        if not deleted:
+            return
+        with self._database.begin() as connection:
+            connection.execute(
+                insert(deleted_quotes).on_conflict_do_nothing(),
+                [
+                    {
+                        "user_id": record.user_id,
+                        "conversation_id": record.conversation_id,
+                        "quote_hash": record.quote_hash,
+                        "deleted_at": record.deleted_at,
+                    }
+                    for record in deleted
+                ],
+            )
+
+    def list_deleted_quote_hashes(
+        self, user_id: UUID, conversation_id: UUID
+    ) -> frozenset[str]:
+        """List the hashes of the quotes a User deleted from one Conversation.
+
+        Args:
+            user_id: The User's ID.
+            conversation_id: The Conversation the quotes were said in.
+
+        Returns:
+            The hashes; none when they deleted no quote from it.
+        """
+        with self._database.connect() as connection:
+            hashes = connection.execute(
+                select(deleted_quotes.c.quote_hash).where(
+                    deleted_quotes.c.user_id == user_id,
+                    deleted_quotes.c.conversation_id == conversation_id,
+                )
+            ).scalars()
+            return frozenset(hashes)
 
     def replace_exclusion_flags(
         self, user_id: UUID, flags: Sequence[ExclusionFlag]

@@ -1,8 +1,8 @@
 # 30 — Owner decisions before Pattern sharing is on for a real User
 
-Status: needs-info
+Status: ready-for-agent
 Track: shared
-Blocked by: none (needs a decision session with the owner first, see below)
+Blocked by: none
 
 ## Parent
 
@@ -46,6 +46,47 @@ Logged as a future risk "if a Conversation is ever tagged twice". But `make matc
 - **Scoring counts evidence that only narrows a Pattern**, while the gate leaves it out, so a true narrow Pattern may never become ready. Should scoring use the gate's rule? (20 → 07)
 - **Curiosity Check-ins ignore backing off**: a User who brushed off two questions can get a "Something I've been wondering" Check-in the next day. Should backing off hold Check-ins too? (20 → 02)
 - **A told Pattern whose Pattern Type left the catalog** can't be seen or deleted on the Patterns tab. Keep the wording on the Pattern when it is shared? Must be done before any Pattern Type is removed. (20 → 18)
+
+## The owner's answers (25 Nov 2026)
+
+Asked one at a time in a `/grilling` session.
+
+| # | Question | Answer |
+|---|---|---|
+| 1 | Asked "what patterns do you see in me?": the Read or the gate? | **The gate wins.** With nothing ready, Zeph says it is still getting to know them and may talk about one recent situation, never a claim about who they are. With a Pattern ready, the ask is the moment to share it properly. The Agenda's if / then stays shown to the Reply Plan. An Understanding Eval case is added. |
+| 2 | One story counts twice | **The Prediction only.** When a Conversation settles a Prediction, that Conversation's Observations of the same Pattern Type count nothing for that Pattern. The quotes are still kept and shown. |
+| 3 | Ruled-out topics | The four, plus **addiction**, **sexuality and gender** and **mental health diagnoses**. A topic added later reaches **new Observations only**. |
+| 4 | Deleting a Pattern they disagreed with | **Keep a "never again" mark** (User and Pattern Type, none of their words) when the deleted Pattern was one they disagreed with or that didn't hold up. Zeph never notes or shares that Pattern Type for them again. Delete My Data removes the mark. |
+| 5 | Can a deleted quote come back? | An agent checks with a test (below). |
+| 6 | "Strong evidence after sharing" is 300 | **Keep 300.** |
+| 7 | A shared Pattern can hardly be closed | **Closed when 2 Predictions didn't come true and more didn't than did** (the 2 is an Admin setting). Confirmed by Predictions only when more came true than didn't. The score floor stays. |
+| 8 | A new Prediction is the same as the last | **Three Prediction wordings per Pattern Type**, each testing a different side; code picks one this User hasn't had. Claude drafts all 45, the owner corrects them, with a guide in `docs/`. |
+| 9 | A Prediction nobody answers | Counts nothing and Zeph offers a new one, **but after 2 in a row go unanswered Zeph stops** giving Predictions for that Pattern until the User brings it up (the 2 is an Admin setting). |
+| 10 | Scoring counts evidence that only narrows | **One rule for scoring and the gate.** Also: evidence against with no person named no longer switches narrowing off. |
+| 11 | Curiosity Check-ins ignore backing off | **Leave it.** Nothing is built. (So the asked check on Curiosity Check-ins, section 27 of issue 20, is not built here either.) |
+| 12 | A told Pattern whose Pattern Type left the catalog | **Keep the wording on the Pattern when it is shared**, and show that. |
+
+Added by the owner in the same session:
+
+- **Ask the follow-up when the User next talks about that person or situation**, with the 7 days as the fallback. A fixed wait alone is too passive.
+- **Replies are shown the Patterns Zeph has told the User** (being tested and confirmed). Zeph may build its Read on one and name it when today's story fits ("the thing we're testing" for one being tested; plainly for a confirmed one). Never one they disagreed with, never while they are struggling.
+- **After each Conversation the backend tracks where each told Pattern showed up** (for or against, with whom, in which Life Thread), with no new model call, and the next replies are told.
+- **Reflections** (guided reflection on a confirmed Pattern) is the owner's idea for a new feature: its own issue, `34-reflections-on-a-confirmed-pattern.md`.
+
+## The build, split into issues
+
+| Issue | What | From |
+|---|---|---|
+| `35-deleted-quote-comes-back-when-its-day-is-tagged-again.md` | Bug: a deleted quote is kept again when its day is tagged again | question 5 |
+| `36-a-shared-pattern-is-confirmed-and-closed-fairly.md` | One story counts once, closing on failed Predictions, a stop after unanswered ones, one narrowing rule | answers 2, 6, 7, 9, 10 |
+| `37-what-a-user-deletes-or-was-told-stays-that-way.md` | "Never again" mark, the wording a User was told, the ruled-out topics | answers 3, 4, 12 |
+| `38-predictions-test-different-sides-and-are-followed-up-in-time.md` | Three Prediction wordings per Pattern Type, follow-up when they next talk about it, the owner's guide | answer 8, added item |
+| `39-replies-know-the-patterns-zeph-told-and-the-gate-holds-when-asked.md` | Replies are shown told Patterns and where they showed up; the gate wins when asked; an Eval case | answer 1, added items |
+| `34-reflections-on-a-confirmed-pattern.md` | Reflections, the owner's idea: needs its own decision session | added item |
+
+Order: 35, 36, 37, 38, 39, on one branch (`pattern-30-owner-decisions-before-sharing`), one commit per issue.
+
+**Question 5, checked (25 Nov 2026):** yes, a deleted quote comes back. `test_a_quote_the_user_deleted_is_not_kept_again_when_its_day_is_tagged_again` kept 1 Observation where 0 were expected. Filed as issue 35.
 
 ## Acceptance criteria
 

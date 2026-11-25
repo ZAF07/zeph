@@ -54,7 +54,11 @@ from tests.test_patterns import (
     patterns_of,
     start_goes_quiet_pattern,
 )
-from tests.test_patterns_dashboard import keep_pattern, threads_by_title
+from tests.test_patterns_dashboard import (
+    keep_pattern,
+    maya_headers,
+    threads_by_title,
+)
 
 ABSORBED = "ACH.ABSORB.PULL"
 BELONG = "CONF.AVOID.BELONG"
@@ -353,6 +357,54 @@ def test_a_conversation_tagged_again_twice_keeps_each_quote_once(
 
     assert (report.conversations_tagged, report.observations_kept) == (1, 0)
     assert len(observations_of(client.engine, user_id)) == 1
+
+
+def test_a_quote_the_user_deleted_is_not_kept_again_when_its_day_is_tagged_again(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    user_id = have_unmatched_pattern(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+    )
+    chat_model.script_pattern_matching(matching_answer(ABSORBED))
+    chat_model.script_pattern_tagging(tagging_answer(FORGOT_TO_EAT))
+    matcher_of(client, chat_model, clock).match()
+    [first] = patterns_of(client.engine, user_id)
+    [kept] = observations_of(client.engine, user_id)
+    deleted = client.delete(
+        f"/api/kept-quotes/{kept.id}", headers=maya_headers(auth_verifier)
+    )
+    keep_pattern(
+        client.engine,
+        user_id,
+        "Loses whole days to whatever is new.",
+        PatternState.UNMATCHED,
+        [(item.day, item.thread_id, "Again.") for item in first.evidence],
+    )
+    chat_model.script_pattern_matching(matching_answer(ABSORBED))
+    chat_model.script_pattern_tagging(
+        tagging_answer(
+            FORGOT_TO_EAT,
+            {**FORGOT_TO_EAT, "quote": "I never eat when the app has me"},
+        )
+    )
+
+    [report] = matcher_of(client, chat_model, clock).match()
+
+    assert deleted.status_code == 204
+    assert (report.conversations_tagged, report.observations_kept) == (1, 0)
+    assert observations_of(client.engine, user_id) == []
 
 
 def test_evidence_whose_messages_message_retention_deleted_is_not_tagged(

@@ -4,7 +4,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.core.models import (
@@ -62,6 +62,16 @@ def tagging_answer(*entries: dict[str, Any]) -> str:
 def observations_of(engine: Engine, user_id: str) -> list[Observation]:
     """List a User's Observations through the Observation repository."""
     return build_postgres_repositories(engine).observations.list_for_user(UUID(user_id))
+
+
+def deleted_quote_count(engine: Engine, user_id: str) -> int:
+    """Count the records of quotes a User deleted."""
+    with engine.connect() as connection:
+        count: int = connection.execute(
+            text("SELECT count(*) FROM deleted_quotes WHERE user_id = :user_id"),
+            {"user_id": user_id},
+        ).scalar_one()
+    return count
 
 
 def turn_noticing_on(client: TestClient, auth_verifier: FakeAuthVerifier) -> str:
@@ -404,6 +414,7 @@ def test_deleting_a_life_thread_removes_its_observations(
     assert [
         observation.quote for observation in observations_of(client.engine, user_id)
     ] == ["Then I stewed on it all night"]
+    assert deleted_quote_count(client.engine, user_id) == 1
 
 
 def test_delete_my_data_removes_every_observation(

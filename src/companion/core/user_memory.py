@@ -17,6 +17,7 @@ from companion.core.models import (
     User,
     UserPortrait,
 )
+from companion.core.observations import deleted_quotes_of
 from companion.core.pattern_catalog import PatternCatalogService
 from companion.core.pattern_scoring import PatternScorer
 from companion.core.platform_settings import (
@@ -211,8 +212,9 @@ class UserMemoryService:
         """Delete one of a User's Life Threads, so it is never brought up again.
 
         Its evidence in Patterns goes with it, and so does a Pattern left
-        with no evidence. So do its Observations, and the User's Patterns
-        of Pattern Types are scored again at once.
+        with no evidence. So do its Observations, whose quotes are never
+        kept again, and the User's Patterns of Pattern Types are scored
+        again at once.
 
         Args:
             user_id: The User's ID.
@@ -223,6 +225,16 @@ class UserMemoryService:
         """
         with self._repositories.transaction() as transaction:
             in_transaction = transaction.repositories
+            self._note_deleted_quotes(
+                in_transaction,
+                [
+                    observation
+                    for observation in in_transaction.observations.list_for_user(
+                        user_id
+                    )
+                    if observation.thread_id == thread_id
+                ],
+            )
             if not in_transaction.life_threads.delete(user_id, thread_id):
                 raise LifeThreadNotFoundError
             in_transaction.patterns.delete_without_evidence(user_id)
@@ -260,7 +272,8 @@ class UserMemoryService:
         """Delete a Pattern Zeph told a User about, so it is gone at once.
 
         The Observations whose first Pattern Type is its own go with it,
-        so the quotes it showed never bring it back; its Predictions and
+        so the quotes it showed never bring it back, and those quotes are
+        never kept again; its Predictions and
         the User's reactions to it go too. The
         User is locked while it is deleted, as scoring locks them, and
         their other Patterns are scored again at once.
@@ -283,6 +296,16 @@ class UserMemoryService:
             ]
             if not told:
                 raise PatternNotFoundError
+            self._note_deleted_quotes(
+                in_transaction,
+                [
+                    observation
+                    for observation in in_transaction.observations.list_for_user(
+                        user_id
+                    )
+                    if observation.pattern_type_id == told[0].pattern_type_id
+                ],
+            )
             in_transaction.observations.delete_of_pattern_type(
                 user_id, told[0].pattern_type_id
             )
@@ -309,7 +332,8 @@ class UserMemoryService:
 
         The User is locked while it is deleted, as scoring locks them, so a
         Conversation end already scoring finishes first and the scoring after
-        the deletion never counts it.
+        the deletion never counts it. A record that it was deleted is kept,
+        without its words, so tagging its day again never keeps it again.
 
         Args:
             user_id: The User's ID.
@@ -320,9 +344,18 @@ class UserMemoryService:
         """
         with self._repositories.transaction() as transaction:
             transaction.lock_user(user_id)
-            if not transaction.repositories.observations.delete(
-                user_id, observation_id
-            ):
+            in_transaction = transaction.repositories
+            self._note_deleted_quotes(
+                in_transaction,
+                [
+                    observation
+                    for observation in in_transaction.observations.list_for_user(
+                        user_id
+                    )
+                    if observation.id == observation_id
+                ],
+            )
+            if not in_transaction.observations.delete(user_id, observation_id):
                 raise KeptQuoteNotFoundError
         self._score_patterns_again(user_id)
 
@@ -376,6 +409,19 @@ class UserMemoryService:
         """
         if not self._repositories.user_portraits.clear(user_id, self._clock.now()):
             raise UserPortraitNotFoundError
+
+    def _note_deleted_quotes(
+        self, repositories: Repositories, observations: list[Observation]
+    ) -> None:
+        """Keep a record that the User deleted some kept quotes.
+
+        Args:
+            repositories: The repositories, inside the deleting transaction.
+            observations: The Observations about to be deleted.
+        """
+        repositories.observations.note_deleted_quotes(
+            deleted_quotes_of(observations, self._clock.now())
+        )
 
     def _score_patterns_again(self, user_id: UUID) -> None:
         """Score the User's Patterns of Pattern Types again, after Observations went.

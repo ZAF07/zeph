@@ -26,6 +26,8 @@ from companion.core.observations import (
     DroppedEntry,
     DropReason,
     TaggingContext,
+    deleted_quotes_of,
+    hash_of_quote,
     ignored_pattern_types,
     is_situational,
     plan_exclusion_flags,
@@ -114,6 +116,27 @@ def entry(**changes: Any) -> dict[str, Any]:
         "evidence": "real_story",
         **changes,
     }
+
+
+def test_a_quote_the_user_deleted_is_dropped_and_its_record_holds_no_words() -> None:
+    [kept] = plan_observations([entry()], context()).kept
+    [record] = deleted_quotes_of([kept], SENT_AT)
+    deleted = replace(context(), deleted_quote_hashes=frozenset({record.quote_hash}))
+
+    planned = plan_observations(
+        [entry(quote="I said  yes to Mei again"), entry(quote="It’s fine, honestly")],
+        deleted,
+    )
+
+    assert (record.user_id, record.conversation_id) == (MEI.user_id, CONVERSATION_ID)
+    assert record.quote_hash == hash_of_quote("I said yes to Mei again")
+    assert "Mei" not in record.quote_hash
+    assert [observation.quote for observation in planned.kept] == [
+        "It’s fine, honestly"
+    ]
+    assert [dropped.reason for dropped in planned.dropped_entries] == [
+        DropReason.DELETED_BY_USER
+    ]
 
 
 def test_a_valid_observation_is_kept_with_everything_it_needs() -> None:

@@ -750,6 +750,25 @@ observations = Table(
     Column("raised_by_user", Boolean, nullable=False, server_default="false"),
 )
 
+deleted_quotes = Table(
+    "deleted_quotes",
+    metadata,
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "conversation_id",
+        Uuid,
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("quote_hash", Text, primary_key=True),
+    Column("deleted_at", DateTime(timezone=True), nullable=False),
+)
+
 pattern_exclusion_flags = Table(
     "pattern_exclusion_flags",
     metadata,

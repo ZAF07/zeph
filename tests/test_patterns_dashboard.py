@@ -36,7 +36,11 @@ from tests.test_pattern_sharing import (
     share,
 )
 from tests.test_pattern_states import BELONG
-from tests.test_pattern_tagging import observation_entry, observations_of
+from tests.test_pattern_tagging import (
+    deleted_quote_count,
+    observation_entry,
+    observations_of,
+)
 from tests.test_patterns import (
     GOES_QUIET,
     MUM,
@@ -352,6 +356,7 @@ def test_deleting_a_pattern_removes_it_with_its_own_quotes_and_rewrites_the_port
     )
     [shown] = patterns_shown(client, headers)
     portraits_before = len(chat_model.portrait_calls)
+    quotes_before = len(observations_of(client.engine, user_id))
     assert shown["state"] == "confirmed"
     assert APPROVED_WORDING in chat_model.portrait_calls[-1].history[0].text
 
@@ -371,6 +376,7 @@ def test_deleting_a_pattern_removes_it_with_its_own_quotes_and_rewrites_the_port
     assert predictions_of(client.engine, user_id) == []
     kept = client.get("/api/kept-quotes", headers=headers).json()["quotes"]
     assert [quote["quote"] for quote in kept] == [UNCLEAR_QUOTE]
+    assert deleted_quote_count(client.engine, user_id) == quotes_before - 1
     assert len(chat_model.portrait_calls) == portraits_before + 1
     assert APPROVED_WORDING not in chat_model.portrait_calls[-1].history[0].text
     portrait = client.get("/api/user-portrait", headers=headers).json()["portrait"]

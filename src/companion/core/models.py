@@ -3491,6 +3491,26 @@ class ExclusionFlag:
     flagged_at: datetime
 
 
+@dataclass(frozen=True)
+class DeletedQuote:
+    """A record that a User deleted a quote kept as evidence, so it is never kept again.
+
+    It holds none of their words: only which Conversation the quote was
+    from and a hash of it.
+
+    Attributes:
+        user_id: The User.
+        conversation_id: The Conversation the quote was said in.
+        quote_hash: A hash of the quote, evened out.
+        deleted_at: When they deleted it.
+    """
+
+    user_id: UUID
+    conversation_id: UUID
+    quote_hash: str
+    deleted_at: datetime
+
+
 class PatternMoveCause(StrEnum):
     """What made code look at a User's Patterns again, so one moved."""
 

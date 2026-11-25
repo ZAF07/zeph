@@ -1,3 +1,4 @@
+import hashlib
 import json
 import logging
 import re
@@ -21,6 +22,7 @@ from companion.core.models import (
     ConversationMessage,
     CuriosityAim,
     DaySummary,
+    DeletedQuote,
     EvidenceKind,
     ExcludedEvidence,
     ExclusionFlag,
@@ -105,6 +107,8 @@ class TaggingContext:
         not_gathered_pattern_type_ids: The Pattern Types of the Patterns
             the User disagreed with, while they have gathering on those
             turned off; no Observation naming one is kept.
+        deleted_quote_hashes: The hashes of the quotes the User deleted
+            from that Conversation; none is kept again.
     """
 
     user_id: UUID
@@ -118,6 +122,7 @@ class TaggingContext:
     ruled_out_topics: frozenset[str] = frozenset()
     ignored_pattern_type_ids: frozenset[str] = frozenset()
     not_gathered_pattern_type_ids: frozenset[str] = frozenset()
+    deleted_quote_hashes: frozenset[str] = frozenset()
 
 
 class DropReason(StrEnum):
@@ -131,6 +136,7 @@ class DropReason(StrEnum):
     MISSING_DETAILS = "no context line or no one it is about"
     REPEAT = "repeats one already kept"
     NOT_GATHERED = "a Pattern they disagreed with, with gathering turned off"
+    DELETED_BY_USER = "a quote the User deleted"
 
 
 @dataclass(frozen=True)
@@ -220,6 +226,41 @@ def even_out(text: str) -> str:
         straight, without spaces around it.
     """
     return WHITESPACE_RUNS.sub(" ", text.translate(EVENED_OUT_CHARACTERS)).strip()
+
+
+def hash_of_quote(quote: str) -> str:
+    """Hash a quote, so a deleted one can be known again without keeping its words.
+
+    Args:
+        quote: The quote.
+
+    Returns:
+        The SHA-256 of the quote, evened out.
+    """
+    return hashlib.sha256(even_out(quote).encode()).hexdigest()
+
+
+def deleted_quotes_of(
+    observations: Sequence[Observation], now: datetime
+) -> list[DeletedQuote]:
+    """Write the records that say a User deleted some kept quotes.
+
+    Args:
+        observations: The Observations being deleted.
+        now: When they are deleted.
+
+    Returns:
+        One record per Observation, with a hash in place of its quote.
+    """
+    return [
+        DeletedQuote(
+            user_id=observation.user_id,
+            conversation_id=observation.conversation_id,
+            quote_hash=hash_of_quote(observation.quote),
+            deleted_at=now,
+        )
+        for observation in observations
+    ]
 
 
 def find_quoted_text(quote: str, user_texts: Sequence[UserText]) -> UserText | None:
@@ -873,7 +914,8 @@ def check_observation(entry: Any, context: TaggingContext) -> Observation | Drop
         aren't in the catalog, its quote isn't word for word in the User's
         own texts, a tag or its kind of evidence isn't from its list, or it
         has no context or who it is about, or it names a Pattern Type the
-        User disagreed with while they have gathering turned off. One that
+        User disagreed with while they have gathering turned off, or its
+        quote is one the User deleted. One that
         names a Thought
         Experiment put to the User in the Conversation is a "what if"
         answer, whatever kind the model wrote. A ruled-out topic is kept
@@ -898,6 +940,8 @@ def check_observation(entry: Any, context: TaggingContext) -> Observation | Drop
     quoted_text = find_quoted_text(quote, context.user_texts) if quote else None
     if quote is None or quoted_text is None:
         return DropReason.QUOTE_NOT_WORD_FOR_WORD
+    if hash_of_quote(quote) in context.deleted_quote_hashes:
+        return DropReason.DELETED_BY_USER
     tags = read_tags(entry)
     evidence_kind = read_choice(entry, "evidence", EvidenceKind)
     if tags is None or evidence_kind is None:
@@ -1453,6 +1497,11 @@ class PatternTagger:
                     list(told.values()),
                     reactions,
                     snapshot.user.contested_gathering_enabled,
+                ),
+                deleted_quote_hashes=(
+                    self._repositories.observations.list_deleted_quote_hashes(
+                        snapshot.user.id, conversation_id
+                    )
                 ),
             ),
         )
