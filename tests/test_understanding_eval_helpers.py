@@ -58,7 +58,7 @@ def test_the_understanding_cases_cover_every_check_the_issue_asks_for() -> None:
     assert any(expect.found and expect.not_raised for expect in expectations)
     assert any(expect.curiosity_raised is True for expect in expectations)
     assert any(expect.curiosity_raised is False for expect in expectations)
-    assert any(expect.asked_why is True for expect in expectations)
+    assert any(expect.asked_why is False for expect in expectations)
     assert any(expect.knowledge is True for expect in expectations)
     assert any(expect.knowledge is False for expect in expectations)
     assert any(expect.rules for expect in expectations)
@@ -655,7 +655,8 @@ def test_the_understanding_cases_check_moves_and_web_search() -> None:
     no_search = cases["research-with-web-search-off"]
     assert no_search.web_search is False
     assert no_search.messages[0].expect.rules == ["honest_no_lookup"]
-    assert cases["small-talk-makes-no-move"].messages[0].expect.no_move is True
+    small_talk = cases["small-talk-stays-light"].messages[0].expect
+    assert small_talk.rules == ["spilled_coffee_stays_light"]
 
 
 def test_a_supporting_move_without_a_lead_is_not_a_lead() -> None:
@@ -729,12 +730,15 @@ def test_the_next_move_in_mind_is_checked_ignoring_case() -> None:
     ]
 
 
-def test_the_understanding_cases_check_the_next_move_and_move_outcomes() -> None:
+def test_the_understanding_cases_check_hosting_help_and_move_outcomes() -> None:
     seed_cases: list[UnderstandingCase] = seeded(EvalName.UNDERSTANDING)
     cases = {case.id: case for case in seed_cases}
 
-    first, second = cases["next-move-held-then-made"].messages
-    assert first.expect.next_move and first.expect.next_move == second.expect.lead_move
+    first, second = cases["hosting-help-over-two-messages"].messages
+    assert first.expect.rules == ["starts_them_off_on_hosting"]
+    assert second.expect.rules == ["fits_hosts_to_their_budget"]
+    strong_mood = cases["strong-mood-unknown-cause"].messages[0].expect
+    assert strong_mood.rules == ["gentle_probe"]
     exhausted = cases["no-push-when-exhausted"]
     frustrated = cases["push-when-frustrated"]
     assert exhausted.memory == frustrated.memory

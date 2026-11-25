@@ -239,6 +239,23 @@ rules:
     (e.g. what's on today, or how come so little sleep), the way a curious
     friend would. It doesn't treat it as a crisis or a vent, guess how they
     feel, or ask more than one question.
+  spilled_coffee_stays_light: >-
+    Zeph's last reply stays light and short and matches their joking tone. It
+    reacts to the mishap, and a joke or a light question about the cat or the
+    keyboard is fine. It gives no advice, tips or steps for saving the
+    keyboard, and doesn't turn it serious or ask how they feel.
+  starts_them_off_on_hosting: >-
+    Zeph's last reply gives them somewhere to start on hosting: it names real
+    hosting options, or a clear first step, or asks what it needs to know to
+    look for them (like their stack or budget). It doesn't only sympathise,
+    and doesn't hand the work back by asking what's on their shortlist or
+    what they have looked at.
+  fits_hosts_to_their_budget: >-
+    Zeph's last reply names real hosting options with managed Postgres and
+    rough prices, says which fit about SGD 20 a month for their setup (at
+    least one does) and is honest about any that go over, and says where the
+    information came from. It doesn't hand the work back by asking what's on
+    their shortlist or what they have looked at.
   no_why_question: >-
     Zeph's last reply doesn't ask why they feel this way. Asking what
     happened or what was said is fine.
@@ -371,6 +388,9 @@ cases:
           not_raised: [Things with Dad since the divorce]
           rules: [leaves_dad_alone]
 
+  # The reply is checked, not `asked_why`: the Reply Plan may set "ask why"
+  # or lead with Get curious, and the reply asks what is behind the mood
+  # either way (issue 33).
   - id: strong-mood-unknown-cause
     memory: *maya
     messages:
@@ -378,7 +398,6 @@ cases:
           honestly I'm in the BEST mood today, like I'm buzzing and can't sit
           still haha
         expect:
-          asked_why: true
           rules: [gentle_probe]
 
   - id: curiosity-raised-once
@@ -579,7 +598,10 @@ cases:
           need: [Advice, Accountability]
           rules: [honest_no_lookup]
 
-  - id: small-talk-makes-no-move
+  # A light Move is fine in small talk, so no Move is expected or ruled out:
+  # the rule checks the reply stays light (issue 33). It was
+  # `small-talk-makes-no-move`.
+  - id: small-talk-stays-light
     memory: *arjun
     messages:
       - text: >-
@@ -587,9 +609,16 @@ cases:
           my phone lol
         expect:
           need: [Just chatting]
-          no_move: true
+          rules: [spilled_coffee_stays_light]
 
-  - id: next-move-held-then-made
+  # Zeph may help at once on "where do I even start", or first ask what it
+  # needs to know; the first rule accepts both, never handing the work back.
+  # Once they say what they need, the second rule checks the reply found
+  # hosts and fitted them to the budget, whether Research led or supported.
+  # It asks for one host that fits, not two: with a front end and an API to
+  # run, only one of the made-up hosts honestly comes in under budget
+  # (issue 33). It was `next-move-held-then-made`.
+  - id: hosting-help-over-two-messages
     memory: *arjun
     web_results: *hosts
     messages:
@@ -597,14 +626,15 @@ cases:
           I need to sort out hosting for my app this week. where do I even
           start
         expect:
-          next_move: [Research]
+          need: [Accountability, Advice]
+          no_move: false
+          rules: [starts_them_off_on_hosting]
       - text: >-
           it's a Next.js front end with a Python API and it needs managed
           Postgres, I don't want to run my own database. budget is SGD 15-20
           a month
         expect:
-          lead_move: [Research]
-          rules: [names_hosts_under_budget]
+          rules: [fits_hosts_to_their_budget]
 
   - id: no-push-when-exhausted
     now: 2026-11-14T01:00:00
