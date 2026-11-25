@@ -5,7 +5,6 @@ from types import ModuleType
 from typing import Any
 from uuid import UUID
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
@@ -58,8 +57,7 @@ def patterns_of(engine: Engine, user_id: str) -> list[Pattern]:
 
 
 def set_pattern_state(engine: Engine, state: PatternState) -> None:
-    """Put every Pattern in a state, as one kept before the Pattern Catalog
-    could be."""
+    """Put every Pattern in a state."""
     with engine.begin() as connection:
         connection.execute(
             text("UPDATE patterns SET state = :state"), {"state": state.value}
@@ -287,7 +285,6 @@ def test_keeping_never_confirms_or_closes_a_pattern_whatever_the_model_writes(
     )
     [pattern] = patterns_of(client.engine, user_id)
     assert pattern.state == PatternState.UNMATCHED
-    assert pattern.last_reaction is None
 
     end_with_pattern_answer(
         *have_pattern_answer,
@@ -309,8 +306,7 @@ def test_keeping_never_confirms_or_closes_a_pattern_whatever_the_model_writes(
     assert len(pattern.evidence) == 3
 
 
-@pytest.mark.parametrize("state", [PatternState.CONFIRMED, PatternState.CLOSED])
-def test_keeping_adds_nothing_to_a_confirmed_or_closed_pattern(
+def test_keeping_adds_nothing_to_a_confirmed_pattern(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -318,12 +314,11 @@ def test_keeping_adds_nothing_to_a_confirmed_or_closed_pattern(
     clock: FakeClock,
     scheduler: FakeScheduler,
     seeded_settings: dict[str, Any],
-    state: PatternState,
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
     user_id = maya_id(client, auth_verifier)
     start_goes_quiet_pattern(client, chat_model, clock, scheduler, seeded_settings)
-    set_pattern_state(client.engine, state)
+    set_pattern_state(client.engine, PatternState.CONFIRMED)
     before = patterns_of(client.engine, user_id)
 
     end_with_pattern_answer(
@@ -340,7 +335,7 @@ def test_keeping_adds_nothing_to_a_confirmed_or_closed_pattern(
 
     assert patterns_of(client.engine, user_id) == before
     seen = chat_model.pattern_keeping_calls[-1].history[0].text
-    assert f"[1] ({state.value}) {GOES_QUIET}" in seen
+    assert f"[1] (confirmed) {GOES_QUIET}" in seen
 
 
 def test_with_user_memory_off_no_pattern_is_started_or_changed(

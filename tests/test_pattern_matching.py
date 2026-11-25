@@ -52,7 +52,6 @@ from tests.test_pattern_tagging import (
 from tests.test_patterns import (
     GOES_QUIET,
     patterns_of,
-    set_pattern_state,
     start_goes_quiet_pattern,
 )
 from tests.test_patterns_dashboard import keep_pattern, threads_by_title
@@ -420,39 +419,6 @@ def test_a_matching_run_that_fails_leaves_the_pattern_for_the_next_run(
     assert printed == [f"User {user_id}: skipped (it failed; see the backend log)"]
 
 
-def test_a_closed_pattern_is_linked_but_its_evidence_is_left_alone(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    chat_model: ScriptedChatModel,
-    clock: FakeClock,
-    scheduler: FakeScheduler,
-    seeded_settings: dict[str, Any],
-) -> None:
-    user_id = have_unmatched_pattern(
-        client,
-        auth_verifier,
-        chat_channel,
-        chat_model,
-        clock,
-        scheduler,
-        seeded_settings,
-    )
-    set_pattern_state(client.engine, PatternState.CLOSED)
-    tagging_calls = len(chat_model.pattern_tagging_calls)
-    chat_model.script_pattern_matching(matching_answer(ABSORBED))
-
-    [report] = matcher_of(client, chat_model, clock).match()
-
-    [pattern] = patterns_of(client.engine, user_id)
-    assert (pattern.state, pattern.matched_pattern_type_id) == (
-        PatternState.CLOSED,
-        ABSORBED,
-    )
-    assert report.conversations_tagged == 0
-    assert len(chat_model.pattern_tagging_calls) == tagging_calls
-
-
 def test_the_admin_command_prints_ids_and_counts_and_never_a_users_words(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
@@ -591,11 +557,8 @@ def test_each_evidence_day_is_tagged_against_every_pattern_type_its_patterns_fit
     first, second = date(2026, 11, 1), date(2026, 11, 2)
     unmatched = written_pattern(PatternState.UNMATCHED, [(second, work), (first, home)])
     confirmed = written_pattern(PatternState.CONFIRMED, [(second, home)])
-    closed = written_pattern(PatternState.CLOSED, [(date(2026, 11, 3), home)])
 
-    days = plan_days_to_tag_again(
-        [(unmatched, "A.B.C"), (confirmed, "D.E.F"), (closed, "A.B.C")]
-    )
+    days = plan_days_to_tag_again([(unmatched, "A.B.C"), (confirmed, "D.E.F")])
 
     assert days == [
         DayToTagAgain(first, frozenset({"A.B.C"}), frozenset({home})),

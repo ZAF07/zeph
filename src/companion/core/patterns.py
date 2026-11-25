@@ -2,7 +2,7 @@ import json
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -23,7 +23,6 @@ from companion.core.models import (
     ModelStep,
     Pattern,
     PatternEvidence,
-    PatternReaction,
     PatternState,
     PatternToSave,
     PatternType,
@@ -39,7 +38,6 @@ from companion.core.platform_settings import (
     PATTERN_KEEPING_PROMPT,
     PATTERN_KEEPING_THINKING,
     PATTERN_KEEPING_THREADS,
-    PATTERN_PUSHED_BACK_WAIT,
     thinking_to_use,
 )
 from companion.core.ports import Clock, Embedder, Repositories
@@ -57,16 +55,6 @@ logger = logging.getLogger(__name__)
 FEWEST_THREADS_TO_START_A_PATTERN = 2
 MOST_PATTERNS_IN_MIND = 10
 NEEDS_GENERAL_DESCRIPTION = "(needs a general description) "
-STATE_WORDS = {
-    PatternState.UNMATCHED: "unmatched",
-    PatternState.CONFIRMED: "confirmed",
-    PatternState.CLOSED: "closed",
-}
-REACTION_WORDS = {
-    PatternReaction.AGREED: "they agreed",
-    PatternReaction.PUSHED_BACK: "they pushed back",
-    PatternReaction.BRUSHED_OFF: "they brushed it off",
-}
 
 
 @dataclass(frozen=True)
@@ -112,76 +100,36 @@ class RemindedPattern:
     pattern: Pattern
 
 
-def describe_pattern(pattern: Pattern, time_zone: str | None) -> str:
-    """Write a Pattern, its state, when it was last offered and its evidence.
+def describe_pattern(pattern: Pattern) -> str:
+    """Write a Pattern, its state and its evidence.
 
     Args:
         pattern: The Pattern.
-        time_zone: The User's IANA time zone, for the days.
 
     Returns:
-        E.g. "(confirmed; last offered 3 Nov 2026, they agreed) When
-        something grabs them... Evidence:" then one "- " line per piece.
+        E.g. "(unmatched) When something grabs them... Evidence:" then one
+        "- " line per piece.
     """
-    notes = [STATE_WORDS[pattern.state]]
-    if pattern.last_offered_at is not None:
-        reaction = (
-            REACTION_WORDS[pattern.last_reaction]
-            if pattern.last_reaction
-            else "not known how they took it"
-        )
-        notes.append(
-            f"last offered {format_day(pattern.last_offered_at, time_zone)}, {reaction}"
-        )
     evidence_lines = "\n".join(
         f"  - {format_calendar_day(item.day)}, {item.thread_title}: {item.line}"
         for item in pattern.evidence
     )
-    return f"({'; '.join(notes)}) {pattern.pattern} Evidence:\n{evidence_lines}"
+    return f"({pattern.state.value}) {pattern.pattern} Evidence:\n{evidence_lines}"
 
 
-def may_come_to_mind(
-    pattern: Pattern, now: datetime, pushed_back_wait: timedelta
-) -> bool:
-    """Say whether a Pattern may come to mind for a reply.
-
-    A closed Pattern never does. One the User pushed back on waits the
-    Admin-set time after it was offered.
-
-    Args:
-        pattern: The Pattern.
-        now: The current time.
-        pushed_back_wait: How long to wait after they pushed back.
-
-    Returns:
-        True if it may come to mind.
-    """
-    if pattern.state == PatternState.CLOSED:
-        return False
-    return not (
-        pattern.last_reaction == PatternReaction.PUSHED_BACK
-        and pattern.last_offered_at is not None
-        and now < pattern.last_offered_at + pushed_back_wait
-    )
-
-
-def describe_patterns_in_mind(
-    reminded: Sequence[RemindedPattern], time_zone: str | None
-) -> str:
+def describe_patterns_in_mind(reminded: Sequence[RemindedPattern]) -> str:
     """Write the Patterns in mind as the Reply Plan model reads them.
 
     Args:
         reminded: The Patterns, numbered.
-        time_zone: The User's IANA time zone, for the days.
 
     Returns:
-        One block per Pattern, with its state, when it was last offered and
-        how they took it, and its evidence; "None." if there are none.
+        One block per Pattern, with its state and its evidence; "None." if
+        there are none.
     """
     return (
         "\n".join(
-            f"[{item.number}] {describe_pattern(item.pattern, time_zone)}"
-            for item in reminded
+            f"[{item.number}] {describe_pattern(item.pattern)}" for item in reminded
         )
         or "None."
     )
@@ -287,7 +235,7 @@ def describe_patterns_to_keep(
     pattern_lines = "\n".join(
         f"[{number}] "
         f"{NEEDS_GENERAL_DESCRIPTION if needs_general_description(pattern) else ''}"
-        f"{describe_pattern(pattern, time_zone)}"
+        f"{describe_pattern(pattern)}"
         for number, pattern in known.items()
     )
     touched_lines = describe_numbered_threads(touched, time_zone)
@@ -547,10 +495,9 @@ class PatternReminder:
         mind, then those that came to mind earlier in the Conversation, at
         most `MOST_PATTERNS_IN_MIND`. The search uses what the User means
         and their latest texts, as many as Life Threads are searched on,
-        with the Life Thread closeness bar. A closed Pattern never comes to
-        mind, and one they pushed back on waits the Admin-set time. Each one
-        found is kept in mind for the rest of the Conversation. If the
-        search can't be embedded, Patterns come only through their Threads.
+        with the Life Thread closeness bar. Each one found is kept in mind
+        for the rest of the Conversation. If the search can't be embedded,
+        Patterns come only through their Threads.
 
         Args:
             snapshot: The User being answered.
@@ -563,25 +510,23 @@ class PatternReminder:
             The Patterns, numbered from 1.
         """
         now = self._clock.now()
-        wait = snapshot.settings.get(PATTERN_PUSHED_BACK_WAIT)
         pattern_repository = self._repositories.patterns
-        allowed = {
+        patterns_by_id = {
             pattern.id: pattern
             for pattern in pattern_repository.list_for_user(snapshot.user.id)
-            if may_come_to_mind(pattern, now, wait)
         }
-        if not allowed:
+        if not patterns_by_id:
             return []
         thread_ids = {item.thread.id for item in threads}
         linked_ids = [
             pattern.id
-            for pattern in allowed.values()
+            for pattern in patterns_by_id.values()
             if pattern.thread_ids & thread_ids
         ]
         close_ids = [
             pattern_id
             for pattern_id in self._find_close_ids(snapshot, conversation_id, meaning)
-            if pattern_id in allowed
+            if pattern_id in patterns_by_id
         ]
         found_ids = list(dict.fromkeys([*close_ids, *linked_ids]))
         pattern_repository.keep_in_mind(conversation_id, found_ids, now)
@@ -589,7 +534,9 @@ class PatternReminder:
             [*found_ids, *pattern_repository.list_in_mind_ids(conversation_id)]
         )
         in_mind = [
-            allowed[pattern_id] for pattern_id in in_mind_ids if pattern_id in allowed
+            patterns_by_id[pattern_id]
+            for pattern_id in in_mind_ids
+            if pattern_id in patterns_by_id
         ]
         return [
             RemindedPattern(number=number, pattern=pattern)

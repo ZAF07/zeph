@@ -866,11 +866,6 @@ starter_thought_experiments_per_conversation: 1
 # an entry's words as the first description grouped under it.
 unmatched_grouping_closeness_percent: 80
 
-# After the User pushes back on a Pattern Zeph offered as its view, and the
-# Pattern isn't closed, it waits this many days before it comes to mind in a
-# reply again. A closed Pattern never comes to mind.
-pattern_pushed_back_wait_days: 30
-
 # How close in meaning (cosine similarity, as a percent) a Pattern must be to
 # what the User means and their latest texts to come to mind with no Thread.
 # Patterns are worded in general terms, so they score lower than Threads: with
@@ -1437,10 +1432,10 @@ pattern_tagging_prompt: |-
 
 # The matching pass, run by an Admin command (`make match-patterns`), never by
 # a reply or a Conversation end. For each Pattern with no Pattern Type that
-# wasn't matched yet (those kept before the Pattern Catalog, and unmatched
-# ones), this call says which Pattern Type it fits, or none. Code keeps the
-# answer only when the Pattern Type is in the catalog, then tags the
-# Conversations behind the Pattern's evidence again against it (ADR-0024).
+# wasn't matched yet, this call says which Pattern Type it fits, or none.
+# Code keeps the answer only when the Pattern Type is in the catalog, then
+# tags the Conversations behind the Pattern's evidence again against it
+# (ADR-0024).
 pattern_matching_model: deepseek/deepseek-v4.1-flash-1017
 pattern_matching_thinking: true
 

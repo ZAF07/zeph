@@ -354,7 +354,6 @@ STARTER_THOUGHT_EXPERIMENTS_PER_CONVERSATION = Setting(
 UNMATCHED_GROUPING_CLOSENESS_PERCENT = Setting(
     "unmatched_grouping_closeness_percent", read_whole_number
 )
-PATTERN_PUSHED_BACK_WAIT = Setting("pattern_pushed_back_wait_days", read_days)
 PATTERN_CLOSENESS_PERCENT = Setting("pattern_closeness_percent", read_whole_number)
 PORTRAIT_MODEL = Setting("portrait_model", read_text)
 PORTRAIT_THINKING = Setting("portrait_thinking", read_on_off)
@@ -1607,18 +1606,6 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
             "one entry on the Unmatched Patterns page, for Patterns kept from "
             "now on. The same way in other words scores about 74–88; a "
             "different way up to about 78."
-        ),
-    ),
-    EditableSetting(
-        PATTERN_PUSHED_BACK_WAIT.key,
-        "Wait after a pushed-back Pattern",
-        SettingKind.WHOLE_NUMBER,
-        minimum=1,
-        maximum=365,
-        hint=(
-            "Days before a Pattern the User pushed back on comes to mind for the "
-            "Reply Plan again, so Zeph doesn't offer the same view too soon. A "
-            "closed Pattern never comes back."
         ),
     ),
     EditableSetting(

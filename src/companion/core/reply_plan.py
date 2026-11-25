@@ -477,7 +477,7 @@ def describe_message_for_reply_plan(
         f"\n\nPatterns in mind: what you've noticed keeps showing up across "
         f"their life. An unmatched one is only your guess: your Read may think "
         f"with it, but never offer it or say it as a pattern:\n"
-        f"{describe_patterns_in_mind(patterns, snapshot.user.time_zone)}"
+        f"{describe_patterns_in_mind(patterns)}"
         f"\n\nThings you've been wondering about them, whose time has come "
         f"{describe_due_curiosities(due, snapshot.user.time_zone)}"
         f"{awaiting_line}"

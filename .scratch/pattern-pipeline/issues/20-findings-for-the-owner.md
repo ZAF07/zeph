@@ -244,12 +244,16 @@ If there is nothing, the section holds one line: "Nothing found."
 
 ### A push-back on a confirmed old Pattern is no longer recorded
 
+- **Settled (25 Nov 2026, issue 24):** the confirmed and closed Patterns kept before the catalog were deleted, so this can't happen any more.
+
 - **Kind:** risk
 - **What:** a confirmed Pattern kept before the Pattern Catalog can still be offered with the Read (`read_pattern_offered` in `core/reply_plan.py`), but the keeping step no longer reads how the User took it (`plan_pattern_changes` in `core/patterns.py`). `last_offered_at` and `last_reaction` stay as they were.
 - **Impact:** the live User can reject a Pattern they once agreed with and Zeph keeps using and offering it, with no wait. The Reply Plan keeps reading "they agreed".
 - **Suggested fix:** in issue 09 (contested), read the reaction to an offered confirmed Pattern in code's terms and make it contested. Until then, a small option is to stop offering old confirmed Patterns. An hour either way.
 
 ### The ready gate doesn't know a User already agreed with a matched Pattern
+
+- **Settled (25 Nov 2026, issue 24):** no agreed Pattern from before the catalog is left, so there is nothing to share twice.
 
 - **Kind:** potential failure
 - **What:** a match is a link (`patterns.matched_pattern_type_id`); the old confirmed Pattern and the Pattern of that Pattern Type are two rows. Nothing yet reads the link.

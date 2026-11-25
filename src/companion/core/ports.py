@@ -1383,9 +1383,9 @@ class ObservationRepository(Protocol):
 class PatternRepository(Protocol):
     """Stores each User's Patterns, and the log of their moves.
 
-    A Pattern with no Pattern Type (an unmatched one, or one kept before the
-    Pattern Catalog) has its own words and evidence and is found by meaning;
-    only those are read by the methods that return a `Pattern`. A Pattern of
+    A Pattern with no Pattern Type (an unmatched one) has its own words and
+    evidence and is found by meaning; only those are read by the methods
+    that return a `Pattern`. A Pattern of
     a Pattern Type is fed by Observations and moved by code.
     """
 

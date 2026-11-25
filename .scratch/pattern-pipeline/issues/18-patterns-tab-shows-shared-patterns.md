@@ -22,7 +22,6 @@ This adds Dashboard UI: read `web/design/README.md` first, add or extend the ref
 - [ ] Noticed, suspected, ready, never-shared closed and unmatched Patterns are not returned by the API at all
 - [ ] A User can delete any shown Pattern; it is gone at once and the User Portrait is rewritten without it
 - [ ] The contested section has the silent gathering switch
-- [ ] Confirmed Patterns from before this work still show
 - [ ] New Copy slots hold every heading, label and empty state
 - [ ] Each criterion above was checked in the running app (`/run`) before being ticked, and the checks for the languages touched pass
 
@@ -31,3 +30,5 @@ This adds Dashboard UI: read `web/design/README.md` first, add or extend the ref
 - `08-sharing-a-ready-pattern.md`
 
 ## Comments
+
+- 25 Nov 2026 (issue 24): the line "Confirmed Patterns from before this work still show" was removed. The owner had the confirmed and closed Patterns kept before the Pattern Catalog deleted, so the tab is empty until this issue fills it from Patterns of Pattern Types. The tab, `GET /api/patterns` and `DELETE /api/patterns/{id}` still read the old confirmed rows (`list_confirmed`, `delete_confirmed`); rewire them here.

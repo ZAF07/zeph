@@ -167,7 +167,6 @@ from companion.core.models import (
     PatternMove,
     PatternMoveCause,
     PatternPicked,
-    PatternReaction,
     PatternState,
     PatternToSave,
     PatternTypeVersion,
@@ -3295,10 +3294,6 @@ def _to_pattern(row: Row[Any], evidence: Sequence[PatternEvidence]) -> Pattern:
         evidence=tuple(evidence),
         started_at=row.started_at,
         updated_at=row.updated_at,
-        last_offered_at=row.last_offered_at,
-        last_reaction=(
-            PatternReaction(row.last_reaction) if row.last_reaction else None
-        ),
         confirmed_at=row.confirmed_at,
         matched_pattern_type_id=row.matched_pattern_type_id,
         general_description=row.general_description,
@@ -3713,10 +3708,6 @@ class PostgresPatternRepository:
                                 "state": to_save.pattern.state.value,
                                 "started_at": to_save.pattern.started_at,
                                 "updated_at": to_save.pattern.updated_at,
-                                "last_offered_at": to_save.pattern.last_offered_at,
-                                "last_reaction": _stored_reaction(
-                                    to_save.pattern.last_reaction
-                                ),
                                 "confirmed_at": to_save.pattern.confirmed_at,
                                 "general_description": (
                                     to_save.pattern.general_description
@@ -3738,8 +3729,6 @@ class PostgresPatternRepository:
                         pattern=bindparam("new_pattern"),
                         state=bindparam("new_state"),
                         updated_at=bindparam("new_updated_at"),
-                        last_offered_at=bindparam("new_last_offered_at"),
-                        last_reaction=bindparam("new_last_reaction"),
                         confirmed_at=bindparam("new_confirmed_at"),
                         general_description=bindparam("new_general_description"),
                         unmatched_entry_id=bindparam("new_unmatched_entry_id"),
@@ -3754,10 +3743,6 @@ class PostgresPatternRepository:
                             "new_pattern": to_save.pattern.pattern,
                             "new_state": to_save.pattern.state.value,
                             "new_updated_at": to_save.pattern.updated_at,
-                            "new_last_offered_at": to_save.pattern.last_offered_at,
-                            "new_last_reaction": _stored_reaction(
-                                to_save.pattern.last_reaction
-                            ),
                             "new_confirmed_at": to_save.pattern.confirmed_at,
                             "new_general_description": (
                                 to_save.pattern.general_description
@@ -3991,18 +3976,6 @@ class PostgresPatternRepository:
             connection.execute(
                 delete(pattern_moves).where(pattern_moves.c.user_id == user_id)
             )
-
-
-def _stored_reaction(reaction: PatternReaction | None) -> str | None:
-    """Write a Pattern's last reaction the way it is stored.
-
-    Args:
-        reaction: The reaction; None if never offered.
-
-    Returns:
-        Its value, e.g. "pushed_back"; None if there is none.
-    """
-    return reaction.value if reaction else None
 
 
 def _delete_patterns_without_evidence(connection: Connection, user_id: UUID) -> None:

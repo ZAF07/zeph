@@ -552,8 +552,6 @@ patterns = Table(
     Column("state", Text, nullable=False),
     Column("started_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
-    Column("last_offered_at", DateTime(timezone=True)),
-    Column("last_reaction", Text),
     Column("confirmed_at", DateTime(timezone=True)),
     Column("matched_pattern_type_id", Text),
     Column("general_description", Text),

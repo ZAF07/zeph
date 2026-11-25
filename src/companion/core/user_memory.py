@@ -223,7 +223,7 @@ class UserMemoryService:
     def list_confirmed_patterns(self, user_id: UUID) -> list[Pattern]:
         """List the Patterns a User agreed with, newest agreed first.
 
-        Unmatched and closed Patterns are never shown to the User.
+        Unmatched Patterns are never shown to the User.
 
         Args:
             user_id: The User's ID.
