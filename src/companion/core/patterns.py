@@ -45,12 +45,18 @@ from companion.core.platform_settings import (
 from companion.core.ports import Clock, Embedder, Repositories
 from companion.core.timing import day_span, users_today
 from companion.core.transcripts import to_transcript_lines
+from companion.core.unmatched_review import (
+    UnmatchedGrouper,
+    needs_general_description,
+    read_general_description,
+)
 from companion.core.usage import UsageRecordingChatModel
 
 logger = logging.getLogger(__name__)
 
 FEWEST_THREADS_TO_START_A_PATTERN = 2
 MOST_PATTERNS_IN_MIND = 10
+NEEDS_GENERAL_DESCRIPTION = "(needs a general description) "
 STATE_WORDS = {
     PatternState.UNMATCHED: "unmatched",
     PatternState.CONFIRMED: "confirmed",
@@ -275,10 +281,13 @@ def describe_patterns_to_keep(
     Returns:
         Today's date, the Threads, the Pattern Types, the Patterns, the
         days behind their evidence and the Conversation under the day it
-        started.
+        started. An unmatched Pattern with no general description yet is
+        marked as needing one.
     """
     pattern_lines = "\n".join(
-        f"[{number}] {describe_pattern(pattern, time_zone)}"
+        f"[{number}] "
+        f"{NEEDS_GENERAL_DESCRIPTION if needs_general_description(pattern) else ''}"
+        f"{describe_pattern(pattern, time_zone)}"
         for number, pattern in known.items()
     )
     touched_lines = describe_numbered_threads(touched, time_zone)
@@ -386,32 +395,42 @@ def add_new_evidence(
     entry: dict[str, Any],
     existing: Pattern,
     threads: dict[int, LifeThread],
+    user_name: str | None,
     conversation_day: date,
     now: datetime,
 ) -> Pattern:
-    """Add the evidence the model wrote to an unmatched Pattern already kept.
+    """Add what the model wrote to an unmatched Pattern already kept.
 
-    Only an unmatched Pattern changes, and only by gaining evidence: its
-    state never does.
+    Only an unmatched Pattern changes, and only by gaining evidence or, if
+    it has none yet, its general description: its state never does, and a
+    general description once kept is never rewritten.
 
     Args:
         entry: The Pattern, as the model wrote it.
         existing: The Pattern kept so far.
         threads: The Threads it was shown, by number.
+        user_name: What the Companion calls the User, which a general
+            description may not hold.
         conversation_day: The day the Conversation started, for evidence
             with no readable day.
         now: When the change is made.
 
     Returns:
-        The Pattern, with its new evidence or as it was.
+        The Pattern, with what is new or as it was.
     """
     if existing.state != PatternState.UNMATCHED:
         return existing
     new_evidence = read_evidence(entry, threads, conversation_day)
-    if not new_evidence:
+    general_description = existing.general_description or read_general_description(
+        entry.get("general"), user_name
+    )
+    if not new_evidence and general_description == existing.general_description:
         return existing
     return replace(
-        existing, evidence=(*existing.evidence, *new_evidence), updated_at=now
+        existing,
+        evidence=(*existing.evidence, *new_evidence),
+        general_description=general_description,
+        updated_at=now,
     )
 
 
@@ -420,23 +439,28 @@ def plan_pattern_changes(
     threads: dict[int, LifeThread],
     known: dict[int, Pattern],
     user_id: UUID,
+    user_name: str | None,
     conversation_day: date,
     now: datetime,
 ) -> PlannedPatterns:
     """Turn the Patterns the model wrote into unmatched Patterns to save.
 
     An entry whose "pattern" is a known Pattern's number adds evidence to
-    it, if it is unmatched; one whose "pattern" is text starts an unmatched
-    Pattern, only if its evidence comes from two or more different Threads.
-    An unknown number or one already used is skipped. Whatever state or
-    reaction the model writes is ignored: no Pattern's state ever changes
-    here.
+    it, if it is unmatched, and its general description if it has none; one
+    whose "pattern" is text starts an unmatched Pattern, only if its
+    evidence comes from two or more different Threads. An unknown number or
+    one already used is skipped. Whatever state or reaction the model
+    writes is ignored: no Pattern's state ever changes here. A general
+    description that could tell who it is about is dropped, and the Pattern
+    is kept without one.
 
     Args:
         entries: The Patterns, as the model wrote them.
         threads: The Threads it was shown, by number.
         known: The Patterns it was shown, by number.
         user_id: The User whose Patterns they are.
+        user_name: What the Companion calls the User, which a general
+            description may not hold.
         conversation_day: The day the Conversation started, for evidence
             with no readable day.
         now: When the changes are made.
@@ -466,6 +490,9 @@ def plan_pattern_changes(
                     evidence=tuple(evidence),
                     started_at=now,
                     updated_at=now,
+                    general_description=read_general_description(
+                        entry.get("general"), user_name
+                    ),
                 )
             )
             continue
@@ -475,7 +502,9 @@ def plan_pattern_changes(
         if existing is None or value in used_numbers:
             continue
         used_numbers.add(value)
-        pattern = add_new_evidence(entry, existing, threads, conversation_day, now)
+        pattern = add_new_evidence(
+            entry, existing, threads, user_name, conversation_day, now
+        )
         if pattern != existing:
             changed.append(pattern)
     return PlannedPatterns(added=added, changed=changed)
@@ -608,13 +637,16 @@ class PatternKeeper:
     across two or more Threads and fits no Pattern Type. It never starts,
     confirms or closes a Pattern of a Pattern Type: code does, from
     Observations (ADR-0024). New Patterns are embedded, so they can be
-    found by meaning.
+    found by meaning. Each unmatched Pattern also gets a general
+    description with nothing about the User, grouped with like ones from
+    other Users for Admins to review.
     """
 
     def __init__(
         self,
         repositories: Repositories,
         pattern_catalog: PatternCatalogService,
+        unmatched_grouper: UnmatchedGrouper,
         chat_model: UsageRecordingChatModel,
         embedder: Embedder,
         clock: Clock,
@@ -625,12 +657,15 @@ class PatternKeeper:
             repositories: Where Life Threads, Patterns, Conversations and
                 Day Summaries are stored.
             pattern_catalog: Reads the Pattern Types in the catalog now.
+            unmatched_grouper: Groups unmatched Patterns by their general
+                descriptions.
             chat_model: Writes the Patterns and records the tokens used.
             embedder: Embeds the touched Threads and each new Pattern.
             clock: Tells the current time.
         """
         self._repositories = repositories
         self._pattern_catalog = pattern_catalog
+        self._unmatched_grouper = unmatched_grouper
         self._chat_model = chat_model
         self._embedder = embedder
         self._clock = clock
@@ -653,7 +688,9 @@ class PatternKeeper:
         Patterns with no Pattern Type, and the days behind the evidence of
         the Patterns linked to those Threads (up to the Admin-set number).
         An unreadable answer is asked again once; if it is still unreadable
-        nothing changes.
+        nothing changes. Every unmatched Pattern with a general description
+        and no unmatched entry yet, new or kept earlier, is grouped under
+        one.
 
         Args:
             snapshot: The User whose Conversation it was; User Memory works
@@ -710,13 +747,27 @@ class PatternKeeper:
             logger.warning("Pattern keeping gave no readable answer")
             return
         planned = plan_pattern_changes(
-            entries, threads, known, user_id, conversation_day, now
+            entries,
+            threads,
+            known,
+            user_id,
+            snapshot.user.name,
+            conversation_day,
+            now,
         )
+        kept = {pattern.id: pattern for pattern in known.values()}
+        latest = kept | {pattern.id: pattern for pattern in planned.changed}
         self._repositories.patterns.save_many(
-            added=[self._to_save(pattern) for pattern in planned.added],
+            added=[
+                self._to_save(pattern)
+                for pattern in self._unmatched_grouper.link(settings, planned.added)
+            ],
             changed=[
                 PatternToSave(pattern=pattern, embedding=None)
-                for pattern in planned.changed
+                for pattern in self._unmatched_grouper.link(
+                    settings, list(latest.values())
+                )
+                if pattern != kept[pattern.id]
             ],
         )
 

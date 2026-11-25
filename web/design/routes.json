@@ -40,6 +40,7 @@
   {"ref":"AdminPrompts","path":"/admin/prompts","auth":"admin","w":1280},
   {"ref":"AdminPatternCatalog","path":"/admin/pattern-catalog","auth":"admin","w":1280},
   {"ref":"AdminThoughtExperiments","path":"/admin/thought-experiments","auth":"admin","w":1280},
+  {"ref":"AdminUnmatchedPatterns","path":"/admin/unmatched-patterns","auth":"admin","w":1280},
   {"ref":"AdminModelCallTrace","path":"/admin/model-calls/design-trace","auth":"admin","w":1280},
   {"ref":"AdminEvalDaySummaryCase","path":"/admin/evals/cases/day_summary/new","auth":"admin","w":1280},
   {"ref":"AdminEvalTaggingCase","path":"/admin/evals/cases/tagging/new","auth":"admin","w":1280},

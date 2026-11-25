@@ -29,3 +29,13 @@ This adds Dashboard UI: read `web/design/README.md` first, add or extend the ref
 - `16-existing-patterns-move-across-and-unmatched-patterns.md`
 
 ## Comments
+
+Plan (25 Nov 2026, branch `pattern-17-unmatched-review-page`, worktree `ai-chat-companion-pattern-17`):
+
+- **General description.** The Pattern keeping step writes a `general` line with each new unmatched Pattern: the way of acting only, no names, quotes, places or dates. For an unmatched Pattern kept earlier with none (the live User's), it is asked for one too. Code drops a description holding a digit, a quote mark or the User's name; the Pattern is still kept and is asked about again next time. Saved as `patterns.general_description`. The keeping prompt is reloaded from the seed.
+- **Entries, grouped by meaning.** New table `unmatched_entries` (description, embedding, mark, Pattern Type folded into, Users when marked, when). No User ID on it. When a Pattern gets its general description, code embeds it and links the Pattern to the closest entry at or over a new Admin-set bar (`unmatched_grouping_closeness_percent`), or starts a new entry with that description. The entry's words are only ever a general description.
+- **Count.** Users with an unmatched Pattern linked to the entry that the matching command hasn't linked to a Pattern Type. Entries with no Users left aren't listed.
+- **Marks.** To review, new Pattern Type, folded (naming a Pattern Type in the catalog), dropped. Saved with the User count at that time. A dropped entry reads as "to review" again only when its count is above that number.
+- **API.** `GET /api/admin/unmatched-patterns?mark=` (most Users first) and `PUT /api/admin/unmatched-patterns/{id}/mark`, Admins only.
+- **Page.** `/admin/unmatched-patterns`, card-list template with the table template's filter pills: one card per entry (description, mark tag, Users), open to set the mark and the Pattern Type. New reference `AdminUnmatchedPatterns.html`, baseline, menu link.
+- **Migration 0096.** Adds the column, table and link. No User data is removed.

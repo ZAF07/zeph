@@ -298,6 +298,11 @@ const fieldSections: {
         label: "Starter Thought Experiments per Conversation",
         unit: "per chat",
       },
+      {
+        key: "unmatched_grouping_closeness_percent",
+        label: "Unmatched grouping bar",
+        unit: "%",
+      },
     ],
   },
   {

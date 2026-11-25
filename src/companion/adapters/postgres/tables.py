@@ -556,10 +556,30 @@ patterns = Table(
     Column("last_reaction", Text),
     Column("confirmed_at", DateTime(timezone=True)),
     Column("matched_pattern_type_id", Text),
+    Column("general_description", Text),
+    Column(
+        "unmatched_entry_id",
+        Uuid,
+        ForeignKey("unmatched_entries.id", ondelete="SET NULL"),
+        index=True,
+    ),
     Column("embedding", Vector(EMBEDDING_SIZE)),
     UniqueConstraint(
         "user_id", "pattern_type_id", name="uq_patterns_user_id_pattern_type_id"
     ),
+)
+
+unmatched_entries = Table(
+    "unmatched_entries",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("description", Text, nullable=False),
+    Column("embedding", Vector(EMBEDDING_SIZE), nullable=False),
+    Column("mark", Text, nullable=False),
+    Column("folded_into_pattern_type_id", Text),
+    Column("users_when_marked", Integer),
+    Column("marked_at", DateTime(timezone=True)),
+    Column("created_at", DateTime(timezone=True), nullable=False),
 )
 
 pattern_moves = Table(

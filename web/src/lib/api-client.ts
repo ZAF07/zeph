@@ -903,6 +903,31 @@ export type ThoughtExperimentList = {
   pattern_types: PatternTypeChoice[];
 };
 
+/** What an Admin decided about an unmatched entry. */
+export type UnmatchedMark =
+  "to_review" | "new_pattern_type" | "folded" | "dropped";
+
+/**
+ * Something Zeph keeps noticing that fits no Pattern Type, as Admins see
+ * it: a general description with nothing about a User, and how many Users
+ * it appears for. `dropped_before` is true when it was dropped and came
+ * back by appearing for more Users.
+ */
+export type UnmatchedEntry = {
+  id: string;
+  description: string;
+  user_count: number;
+  mark: UnmatchedMark;
+  folded_into_pattern_type_id: string | null;
+  dropped_before: boolean;
+};
+
+/** The unmatched entries, most Users first, and the Pattern Types to fold into. */
+export type UnmatchedEntryList = {
+  entries: UnmatchedEntry[];
+  pattern_types: PatternTypeChoice[];
+};
+
 /** The kinds of file a Knowledge document can be. */
 export type KnowledgeFileType = "text" | "markdown" | "pdf";
 
@@ -1616,6 +1641,14 @@ export type ApiClient = {
     saveAnyway: boolean,
   ) => Promise<ThoughtExperiment>;
   archiveThoughtExperiment: (id: string) => Promise<ThoughtExperiment>;
+  listUnmatchedEntries: (
+    mark: UnmatchedMark | null,
+  ) => Promise<UnmatchedEntryList>;
+  markUnmatchedEntry: (
+    id: string,
+    mark: UnmatchedMark,
+    patternTypeId: string | null,
+  ) => Promise<UnmatchedEntry>;
   listKnowledgeDocuments: () => Promise<KnowledgeDocument[]>;
   getKnowledgeDocument: (id: string) => Promise<KnowledgeDocumentWithText>;
   updateKnowledgeDocumentDetails: (
@@ -2142,6 +2175,16 @@ export function createApiClient(
       request<ThoughtExperiment>(
         `/api/admin/thought-experiments/${id}/archive`,
         "POST",
+      ),
+    listUnmatchedEntries: (mark) =>
+      request<UnmatchedEntryList>(
+        `/api/admin/unmatched-patterns${mark ? `?mark=${mark}` : ""}`,
+      ),
+    markUnmatchedEntry: (id, mark, patternTypeId) =>
+      request<UnmatchedEntry>(
+        `/api/admin/unmatched-patterns/${id}/mark`,
+        "PUT",
+        { mark, pattern_type_id: patternTypeId },
       ),
     listKnowledgeDocuments: async () =>
       (

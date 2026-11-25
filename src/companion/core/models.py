@@ -1247,6 +1247,12 @@ class Pattern:
             None while it is not confirmed.
         matched_pattern_type_id: The Pattern Type the matching pass found
             it fits; None when it fits none or wasn't matched yet.
+        general_description: The way of acting in words that could be true
+            of anyone, with nothing about the User, as Admins read it;
+            None when an unmatched Pattern has none yet, and always for a
+            Pattern that isn't unmatched.
+        unmatched_entry_id: The unmatched entry its general description
+            was grouped under; None when it has none yet.
     """
 
     id: UUID
@@ -1260,6 +1266,8 @@ class Pattern:
     last_reaction: PatternReaction | None = None
     confirmed_at: datetime | None = None
     matched_pattern_type_id: str | None = None
+    general_description: str | None = None
+    unmatched_entry_id: UUID | None = None
 
     @property
     def thread_ids(self) -> set[UUID]:
@@ -1280,6 +1288,55 @@ class PatternToSave:
 
     pattern: Pattern
     embedding: list[float] | None
+
+
+class UnmatchedMark(StrEnum):
+    """What an Admin decided about an unmatched entry."""
+
+    TO_REVIEW = "to_review"
+    NEW_PATTERN_TYPE = "new_pattern_type"
+    FOLDED = "folded"
+    DROPPED = "dropped"
+
+
+@dataclass(frozen=True)
+class UnmatchedEntry:
+    """Something the Companion keeps noticing that fits no Pattern Type.
+
+    Like general descriptions of unmatched Patterns, from any Users, are
+    grouped under one entry. It holds nothing about a User.
+
+    Attributes:
+        id: Our ID for the entry.
+        description: The general description it was started with.
+        mark: What an Admin decided about it.
+        folded_into_pattern_type_id: The Pattern Type it was folded into;
+            None unless its mark is folded.
+        users_when_marked: How many Users it appeared for when it was
+            marked; None while it was never marked.
+        marked_at: When it was last marked; None while it never was.
+    """
+
+    id: UUID
+    description: str
+    mark: UnmatchedMark
+    folded_into_pattern_type_id: str | None
+    users_when_marked: int | None
+    marked_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class CountedUnmatchedEntry:
+    """An unmatched entry with how many Users it appears for now.
+
+    Attributes:
+        entry: The entry.
+        user_count: How many Users have an unmatched Pattern grouped under
+            it that the matching command linked to no Pattern Type.
+    """
+
+    entry: UnmatchedEntry
+    user_count: int
 
 
 class BringUpWay(StrEnum):

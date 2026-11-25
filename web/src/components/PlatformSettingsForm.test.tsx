@@ -123,6 +123,7 @@ const settings: AdminSettings = {
   starter_thought_experiments: seeded(4),
   starter_thought_experiment_days: seeded(14),
   starter_thought_experiments_per_conversation: seeded(1),
+  unmatched_grouping_closeness_percent: seeded(80),
   move_outcomes_per_understanding: seeded(3),
   move_outcomes_closeness_percent: seeded(65),
   curiosities_per_conversation: seeded(1),

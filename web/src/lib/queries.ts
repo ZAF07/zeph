@@ -90,6 +90,7 @@ export const queryKeys = {
   usage: (days: number) => ["usage", days],
   memoryCategories: ["memory-categories"],
   thoughtExperiments: ["thought-experiments"],
+  unmatchedEntries: (mark: string | null) => ["unmatched-entries", mark],
   knowledgeDocuments: ["knowledge-documents"],
   knowledgeDocument: (documentId: string) => ["knowledge-document", documentId],
   stickers: ["stickers"],

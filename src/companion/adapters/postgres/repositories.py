@@ -67,6 +67,7 @@ from companion.adapters.postgres.tables import (
     telegram_connections,
     thought_experiments,
     understandings,
+    unmatched_entries,
     user_feature_switches,
     user_portraits,
     users,
@@ -98,6 +99,7 @@ from companion.core.models import (
     ConversationMessage,
     CopySeedSlot,
     CopySlot,
+    CountedUnmatchedEntry,
     Curiosity,
     CuriosityAim,
     CuriosityChanges,
@@ -200,6 +202,8 @@ from companion.core.models import (
     Understanding,
     UnderstandingForm,
     UnderstandingShape,
+    UnmatchedEntry,
+    UnmatchedMark,
     User,
     UserOverview,
     UserPage,
@@ -3297,6 +3301,8 @@ def _to_pattern(row: Row[Any], evidence: Sequence[PatternEvidence]) -> Pattern:
         ),
         confirmed_at=row.confirmed_at,
         matched_pattern_type_id=row.matched_pattern_type_id,
+        general_description=row.general_description,
+        unmatched_entry_id=row.unmatched_entry_id,
     )
 
 
@@ -3712,6 +3718,12 @@ class PostgresPatternRepository:
                                     to_save.pattern.last_reaction
                                 ),
                                 "confirmed_at": to_save.pattern.confirmed_at,
+                                "general_description": (
+                                    to_save.pattern.general_description
+                                ),
+                                "unmatched_entry_id": (
+                                    to_save.pattern.unmatched_entry_id
+                                ),
                                 "embedding": to_save.embedding,
                             }
                             for to_save in added
@@ -3729,6 +3741,8 @@ class PostgresPatternRepository:
                         last_offered_at=bindparam("new_last_offered_at"),
                         last_reaction=bindparam("new_last_reaction"),
                         confirmed_at=bindparam("new_confirmed_at"),
+                        general_description=bindparam("new_general_description"),
+                        unmatched_entry_id=bindparam("new_unmatched_entry_id"),
                         embedding=func.coalesce(
                             bindparam("new_embedding", type_=patterns.c.embedding.type),
                             patterns.c.embedding,
@@ -3745,6 +3759,12 @@ class PostgresPatternRepository:
                                 to_save.pattern.last_reaction
                             ),
                             "new_confirmed_at": to_save.pattern.confirmed_at,
+                            "new_general_description": (
+                                to_save.pattern.general_description
+                            ),
+                            "new_unmatched_entry_id": (
+                                to_save.pattern.unmatched_entry_id
+                            ),
                             "new_embedding": to_save.embedding,
                         }
                         for to_save in changed
@@ -4354,6 +4374,171 @@ class PostgresExplorationRepository:
             )
             connection.execute(
                 delete(explorations).where(explorations.c.user_id == user_id)
+            )
+
+
+UNMATCHED_ENTRY_COLUMNS = [
+    column for column in unmatched_entries.c if column.name != "embedding"
+]
+
+
+def _to_counted_unmatched_entry(row: Row[Any]) -> CountedUnmatchedEntry:
+    """Turn an `unmatched_entries` row with its User count into an entry.
+
+    Args:
+        row: The row, with `user_count`.
+
+    Returns:
+        The entry and how many Users it appears for.
+    """
+    return CountedUnmatchedEntry(
+        entry=UnmatchedEntry(
+            id=row.id,
+            description=row.description,
+            mark=UnmatchedMark(row.mark),
+            folded_into_pattern_type_id=row.folded_into_pattern_type_id,
+            users_when_marked=row.users_when_marked,
+            marked_at=row.marked_at,
+        ),
+        user_count=row.user_count,
+    )
+
+
+def _select_counted_unmatched_entries() -> Select[Any]:
+    """Build the query for every entry with how many Users it appears for.
+
+    A User counts once per entry, through their unmatched Patterns the
+    matching command linked to no Pattern Type.
+
+    Returns:
+        The query, one row per entry, with `user_count`.
+    """
+    user_count = func.count(patterns.c.user_id.distinct()).label("user_count")
+    return (
+        select(*UNMATCHED_ENTRY_COLUMNS, user_count)
+        .outerjoin(
+            patterns,
+            and_(
+                patterns.c.unmatched_entry_id == unmatched_entries.c.id,
+                patterns.c.state == PatternState.UNMATCHED.value,
+                patterns.c.matched_pattern_type_id.is_(None),
+            ),
+        )
+        .group_by(unmatched_entries.c.id)
+    )
+
+
+class PostgresUnmatchedEntryRepository:
+    """Stores unmatched entries in Postgres, each with its embedding."""
+
+    def __init__(self, database: Database) -> None:
+        """Set up the repository.
+
+        Args:
+            database: Where to run queries: the engine, or one transaction.
+        """
+        self._database = database
+
+    def find_closest_id(
+        self, embedding: list[float], min_closeness: float
+    ) -> UUID | None:
+        """Find the entry closest in meaning to a general description.
+
+        Args:
+            embedding: The general description embedded.
+            min_closeness: How close in meaning an entry must be, from 0 to 1.
+
+        Returns:
+            The closest entry's ID; None if none is close enough.
+        """
+        distance = unmatched_entries.c.embedding.cosine_distance(embedding)
+        with self._database.connect() as connection:
+            closest_id: UUID | None = connection.execute(
+                select(unmatched_entries.c.id)
+                .where(distance <= 1 - min_closeness)
+                .order_by(distance, unmatched_entries.c.created_at)
+                .limit(1)
+            ).scalar_one_or_none()
+        return closest_id
+
+    def add(
+        self, entry: UnmatchedEntry, embedding: list[float], created_at: datetime
+    ) -> None:
+        """Add a new entry.
+
+        Args:
+            entry: The entry, with its ID.
+            embedding: Its description embedded, so like ones are found.
+            created_at: When it is added.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                insert(unmatched_entries).values(
+                    id=entry.id,
+                    description=entry.description,
+                    embedding=embedding,
+                    mark=entry.mark.value,
+                    folded_into_pattern_type_id=entry.folded_into_pattern_type_id,
+                    users_when_marked=entry.users_when_marked,
+                    marked_at=entry.marked_at,
+                    created_at=created_at,
+                )
+            )
+
+    def list_counted(self) -> list[CountedUnmatchedEntry]:
+        """List the entries that appear for at least one User.
+
+        Returns:
+            The entries, most Users first, then oldest first.
+        """
+        user_count = func.count(patterns.c.user_id.distinct())
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                _select_counted_unmatched_entries()
+                .having(user_count > 0)
+                .order_by(
+                    user_count.desc(),
+                    unmatched_entries.c.created_at,
+                    unmatched_entries.c.id,
+                )
+            ).all()
+        return [_to_counted_unmatched_entry(row) for row in rows]
+
+    def get_counted(self, entry_id: UUID) -> CountedUnmatchedEntry | None:
+        """Get one entry with how many Users it appears for now.
+
+        Args:
+            entry_id: The entry's ID.
+
+        Returns:
+            The entry, also when it appears for no User; None if there is
+            no such entry.
+        """
+        with self._database.connect() as connection:
+            row = connection.execute(
+                _select_counted_unmatched_entries().where(
+                    unmatched_entries.c.id == entry_id
+                )
+            ).first()
+        return _to_counted_unmatched_entry(row) if row else None
+
+    def save_mark(self, entry: UnmatchedEntry) -> None:
+        """Save an entry's mark.
+
+        Args:
+            entry: The entry with its new mark, the Pattern Type it is
+                folded into, the Users it appeared for and when.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                update(unmatched_entries)
+                .where(unmatched_entries.c.id == entry.id)
+                .values(
+                    mark=entry.mark.value,
+                    folded_into_pattern_type_id=entry.folded_into_pattern_type_id,
+                    users_when_marked=entry.users_when_marked,
+                    marked_at=entry.marked_at,
+                )
             )
 
 
@@ -7676,6 +7861,7 @@ def _build_repositories(
         curiosities=PostgresCuriosityRepository(database),
         explorations=PostgresExplorationRepository(database),
         thought_experiments=PostgresThoughtExperimentRepository(database),
+        unmatched_entries=PostgresUnmatchedEntryRepository(database),
         move_outcomes=PostgresMoveOutcomeRepository(database),
         user_portraits=PostgresUserPortraitRepository(database),
         knowledge_documents=PostgresKnowledgeDocumentRepository(database),
