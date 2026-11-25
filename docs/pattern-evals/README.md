@@ -129,6 +129,21 @@ replaces that.
   trained reads the catalog, the signs and a sample of tagged Observations,
   and says where they are wrong or harmful.
 
+## First Whole-pipeline results (25 Nov 2026)
+
+Three case runs, on the live settings unless said:
+
+- `ordinary-fortnight` (no true Pattern): nothing became ready. Pass.
+- `folds-with-sister-and-friends` (CONF.AVOID.BELONG): it became ready after
+  5 Conversations. Pass, 1 of 1 true found.
+- The same case with "Situations to be ready" at 9: it stayed suspected,
+  stopped by situations. Pass, 0 of 1 found.
+
+So the chain works end to end and a gate number moves the result as it
+should. This says nothing yet about the 70% target: the look-alike cases
+(`goes-quiet-and-says-fine`, `cannot-stand-waiting`, `never-arrives`) have
+not been run, and no case has had a Pattern shared.
+
 ## How to run the Whole-pipeline Eval
 
 It costs far more than the other Evals: every text is a full reply (the
