@@ -264,7 +264,7 @@ def narrowings_of(observations: Sequence[Observation]) -> tuple[PatternNarrowing
     A Pattern is narrowed by a tag (who the other person is, or where they
     stand) when its clear evidence against is all with other kinds of
     people than any of its clear evidence for: "with seniors, not with
-    friends".
+    friends". Observations that carry no weight are left out.
 
     Args:
         observations: The Observations of the Pattern.
@@ -276,7 +276,9 @@ def narrowings_of(observations: Sequence[Observation]) -> tuple[PatternNarrowing
     clear = [
         observation
         for observation in observations
-        if not observation.unclear and not observation.situational
+        if not observation.unclear
+        and not observation.situational
+        and not observation.excluded
     ]
     narrowings = []
     for tag in NarrowingTag:

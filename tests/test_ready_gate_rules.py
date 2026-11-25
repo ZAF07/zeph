@@ -432,3 +432,22 @@ def test_the_other_side_answer_is_read_strictly(
     answer: str, better: bool | None
 ) -> None:
     assert read_other_side_answer(answer) == better
+
+
+def test_observations_that_carry_no_weight_never_shape_a_narrowing() -> None:
+    during_grief = replace(story(about="Wei, their cousin"), excluded=True)
+    observations = [
+        story(about="Jun", relationship=Relationship.FRIEND),
+        during_grief,
+        story(
+            about="Sam",
+            direction=ObservationDirection.AGAINST,
+            relationship=Relationship.PARTNER,
+        ),
+    ]
+
+    assert narrowings_of(observations) == (
+        PatternNarrowing(
+            tag=NarrowingTag.RELATIONSHIP, holds_with=("friend",), not_with=("partner",)
+        ),
+    )
