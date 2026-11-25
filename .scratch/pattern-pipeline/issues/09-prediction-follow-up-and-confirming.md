@@ -1,6 +1,6 @@
 # 09 — Zeph follows up a Prediction, and Predictions that came true confirm a Pattern
 
-Status: ready-for-agent
+Status: in-progress
 Track: A
 Blocked by: 08
 
@@ -30,3 +30,11 @@ After an Admin-set wait (start 7 days) the Companion asks how the Prediction wen
 ## Comments
 
 - 25 Nov 2026 (from issue 08): sharing is built (`core/pattern_sharing.py`). For this issue: (1) the Prediction as told is in `predictions` (pattern, wording, when); a shared Pattern can have none, when the reply told the Pattern but gave no Prediction, so make one then; (2) reactions are in `pattern_reactions` and are worth points through `reaction_points` in `core/pattern_scoring.py`, but nothing adds them to a shared Pattern's score yet: do that where this issue reads the score to confirm or close; (3) `patterns.shared_at` says when it was first told; (4) the Reply Plan isn't shown shared Patterns yet (only the ready one and contested ones), so it can't follow one up after the Recent Messages have passed; (5) a contested Pattern stays contested even when they later agree.
+
+- 25 Nov 2026 (start, branch `pattern-09-prediction-follow-up`): plan.
+  1. **Follow-up.** At Conversation end, code (`core/predictions.py`, pure rules) writes a Curiosity with the new aim `prediction` for each shared Pattern's open Prediction: not before the Prediction's day + `prediction_follow_up_wait_days` (7), last day + `prediction_follow_up_drop_days` (21) (`curiosities.not_after`, so a late one is never offered). It carries the Pattern's approved wording and the Prediction, since the Reply Plan isn't shown shared Patterns. Offered only while Pattern sharing works.
+  2. **Dropped.** A follow-up not asked by its last day is closed and its Prediction is marked "not followed up" (settled, no weight). One asked and never answered ends the same way at that day.
+  3. **Outcome.** The tagging step is shown the open Predictions and answers `prediction_outcomes` (came true, didn't, hasn't come up); code keeps one only for a Prediction it showed. Came true = one strong sign for, didn't = one strong sign against (fading like reactions); "hasn't come up" adds nothing and starts a new wait from that day.
+  4. **Confirm / close.** Right after reactions are settled, code scores each shared Pattern with its Observations, reactions and Prediction outcomes: under the floor → closed; `predictions_to_confirm` (2) came true, or `pattern_confirm_points_after_sharing` (300) from Observations tagged after it was shared → confirmed. The log keeps a `reason` for each. A closed Pattern that was once shared is never moved again by scoring.
+  5. **New Prediction.** A shared Pattern with no open Prediction (the last settled, or the sharing reply gave none) gets a Curiosity telling the reply to give one from the Pattern Type's wording; a small check after the message (like the shared check) keeps it as worded. Never after the User asked Zeph to drop one for that Pattern.
+  6. **Portrait.** Confirmed Patterns of Pattern Types go into the Portrait's input in their approved wording; shared ones don't.

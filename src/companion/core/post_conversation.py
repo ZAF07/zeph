@@ -47,6 +47,7 @@ from companion.core.platform_settings import (
     thinking_to_use,
 )
 from companion.core.ports import Clock, Embedder, Repositories
+from companion.core.predictions import PredictionKeeper
 from companion.core.ready_gate import ReadyGate
 from companion.core.starter_thought_experiments import StarterThoughtExperimentKeeper
 from companion.core.timing import day_span, users_today
@@ -691,6 +692,7 @@ class PostConversationProcessor:
         pattern_scorer: PatternScorer,
         ready_gate: ReadyGate,
         pattern_sharing: PatternSharing,
+        prediction_keeper: PredictionKeeper,
         pattern_keeper: PatternKeeper,
         curiosity_keeper: CuriosityKeeper,
         agenda_keeper: AgendaKeeper,
@@ -721,6 +723,9 @@ class PostConversationProcessor:
                 right after scoring.
             pattern_sharing: Makes contested the Patterns the User pushed
                 back on, right after tagging.
+            prediction_keeper: Confirms or closes the User's shared
+                Patterns, and writes the Curiosities about their
+                Predictions.
             pattern_keeper: Notes the User's unmatched Patterns.
             curiosity_keeper: Writes, updates and closes the User's
                 Curiosities.
@@ -743,6 +748,7 @@ class PostConversationProcessor:
         self._pattern_scorer = pattern_scorer
         self._ready_gate = ready_gate
         self._pattern_sharing = pattern_sharing
+        self._prediction_keeper = prediction_keeper
         self._pattern_keeper = pattern_keeper
         self._curiosity_keeper = curiosity_keeper
         self._agenda_keeper = agenda_keeper
@@ -768,14 +774,16 @@ class PostConversationProcessor:
         again once, and if it is still unreadable nothing is saved, so a bad
         answer is never retried forever. Once the Conversation is marked
         processed, its Life Threads are kept, then its Observations are
-        tagged, the User's Patterns of Pattern Types scored and the ready
+        tagged, the User's shared Patterns confirmed or closed, their
+        Patterns of Pattern Types scored and the ready
         gate run while Pattern noticing works, then its unmatched Patterns
         from the
         Threads it touched, then the User's Familiarity is worked out, then
         its Curiosities while the
         Curiosities Feature works, then the Agenda and a new User's starter
         Thought Experiments while Pattern exploring
-        works too, then its Move Outcomes, and then the User
+        works too, then the Curiosities about their Predictions while
+        Pattern sharing works, then its Move Outcomes, and then the User
         Portrait is rewritten; if any of them fails, the failure is logged and
         not tried again, so nothing is ever added twice.
 
@@ -805,6 +813,7 @@ class PostConversationProcessor:
         self._tag_observations(snapshot, conversation.id, messages, touched)
         if snapshot.works(Feature.PATTERN_NOTICING):
             self._settle_reactions(snapshot, conversation.id)
+            self._settle_shared_patterns(snapshot, conversation.id)
             self._score_patterns(snapshot, conversation.id)
             self._check_ready(snapshot, conversation.id)
         self._keep_patterns(snapshot, conversation.id, messages, touched)
@@ -813,6 +822,7 @@ class PostConversationProcessor:
             self._keep_curiosities(snapshot, conversation.id, messages)
             self._keep_agenda(snapshot, conversation.id)
             self._keep_starters(snapshot, familiarity)
+            self._keep_prediction_follow_ups(snapshot)
         self._keep_move_outcomes(snapshot, conversation.id, messages)
         self._write_portrait(snapshot)
 
@@ -872,6 +882,32 @@ class PostConversationProcessor:
             self._pattern_sharing.settle_reactions(snapshot, conversation_id)
         except Exception:
             logger.exception("Could not settle reactions to Patterns")
+
+    def _settle_shared_patterns(
+        self, snapshot: UserSnapshot, conversation_id: UUID
+    ) -> None:
+        """Confirm or close the User's shared Patterns, never raising.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            conversation_id: The ended Conversation, in which the tagging
+                step read how their Predictions went.
+        """
+        try:
+            self._prediction_keeper.settle_shared(snapshot, conversation_id)
+        except Exception:
+            logger.exception("Could not confirm or close shared Patterns")
+
+    def _keep_prediction_follow_ups(self, snapshot: UserSnapshot) -> None:
+        """Write the Curiosities about the User's Predictions, never raising.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+        """
+        try:
+            self._prediction_keeper.keep_follow_ups(snapshot)
+        except Exception:
+            logger.exception("Could not keep the follow-ups of Predictions")
 
     def _score_patterns(self, snapshot: UserSnapshot, conversation_id: UUID) -> None:
         """Score the User's Patterns again, logging a failure instead of raising.

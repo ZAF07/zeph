@@ -349,6 +349,12 @@ PATTERN_EXCLUSION_SUMMARY_DAYS = Setting(
 PATTERN_RULED_OUT_TOPICS = Setting("pattern_ruled_out_topics", read_text_list)
 PATTERNS_SHARED_PER_WEEK = Setting("patterns_shared_per_week", read_whole_number)
 PATTERN_SHARE_WAIT = Setting("pattern_share_wait_days", read_days)
+PREDICTION_FOLLOW_UP_WAIT = Setting("prediction_follow_up_wait_days", read_days)
+PREDICTION_FOLLOW_UP_DROP = Setting("prediction_follow_up_drop_days", read_days)
+PREDICTIONS_TO_CONFIRM = Setting("predictions_to_confirm", read_whole_number)
+PATTERN_CONFIRM_POINTS_AFTER_SHARING = Setting(
+    "pattern_confirm_points_after_sharing", read_whole_number
+)
 PATTERN_OTHER_SIDE_MODEL = Setting("pattern_other_side_model", read_text)
 PATTERN_OTHER_SIDE_THINKING = Setting("pattern_other_side_thinking", read_on_off)
 PATTERN_OTHER_SIDE_PROMPT = Setting("pattern_other_side_prompt", read_text)
@@ -1620,6 +1626,54 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
             "A ready Pattern the Reply Plan found no good moment for within "
             "this many days goes out as a Check-in. 0 sends it with the next "
             "Check-in."
+        ),
+    ),
+    EditableSetting(
+        PREDICTION_FOLLOW_UP_WAIT.key,
+        "Days before Zeph asks how a Prediction went",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=90,
+        hint=(
+            "Zeph asks how a Prediction went no sooner than this many days "
+            "after giving it, so the User has had time to notice. It also "
+            "waits this long again after they say it hasn’t come up."
+        ),
+    ),
+    EditableSetting(
+        PREDICTION_FOLLOW_UP_DROP.key,
+        "Days after which an unasked Prediction is dropped",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=365,
+        hint=(
+            "A Prediction with no answer this many days after it was given is "
+            "dropped: Zeph stops asking about it, it counts nothing, and the "
+            "Pattern gets a new one. Keep it above the days before Zeph asks."
+        ),
+    ),
+    EditableSetting(
+        PREDICTIONS_TO_CONFIRM.key,
+        "Predictions that came true to confirm a Pattern",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=10,
+        hint=(
+            "A shared Pattern is confirmed once this many of its Predictions "
+            "came true, as the User reported. A confirmed Pattern goes into "
+            "their User Portrait."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_CONFIRM_POINTS_AFTER_SHARING.key,
+        "Score from new evidence that confirms a shared Pattern",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=10000,
+        hint=(
+            "A shared Pattern is also confirmed once the Observations tagged "
+            "after it was shared reach this score, in points, by themselves. "
+            "Higher means it takes more new evidence."
         ),
     ),
     EditableSetting(

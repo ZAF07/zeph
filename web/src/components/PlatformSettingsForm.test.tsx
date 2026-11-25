@@ -121,6 +121,10 @@ const settings: AdminSettings = {
   pattern_exclusion_summary_days: seeded(7),
   patterns_shared_per_week: seeded(1),
   pattern_share_wait_days: seeded(5),
+  prediction_follow_up_wait_days: seeded(7),
+  prediction_follow_up_drop_days: seeded(21),
+  predictions_to_confirm: seeded(2),
+  pattern_confirm_points_after_sharing: seeded(300),
   pattern_ruled_out_topics: seeded(
     ["abuse", "self-harm or suicide"],
     "Topics no Pattern is drawn or shared from unless the User raised them.",

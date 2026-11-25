@@ -514,6 +514,19 @@ curiosities = Table(
         ForeignKey("thought_experiments.id"),
         index=True,
     ),
+    Column("not_after", Date),
+    Column(
+        "pattern_id",
+        Uuid,
+        ForeignKey("patterns.id", ondelete="CASCADE"),
+        index=True,
+    ),
+    Column(
+        "prediction_id",
+        Uuid,
+        ForeignKey("predictions.id", ondelete="CASCADE"),
+        index=True,
+    ),
     Index("ix_curiosities_user_id_state", "user_id", "state"),
 )
 
@@ -595,6 +608,8 @@ predictions = Table(
     ),
     Column("wording", Text, nullable=False),
     Column("made_at", DateTime(timezone=True), nullable=False),
+    Column("outcome", Text),
+    Column("outcome_at", DateTime(timezone=True)),
 )
 
 pattern_reactions = Table(
@@ -662,6 +677,7 @@ pattern_moves = Table(
     Column("situations", Integer, nullable=False),
     Column("moved_at", DateTime(timezone=True), nullable=False),
     Column("blocked_by", Text),
+    Column("reason", Text),
 )
 
 pattern_evidence = Table(

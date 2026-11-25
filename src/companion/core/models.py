@@ -1405,9 +1405,12 @@ class CuriosityAim(StrEnum):
     NEXT_MOVE = "next_move"
     EXPLORATION = "exploration"
     STARTER = "starter"
+    PREDICTION = "prediction"
 
 
-AIMS_WRITTEN_BY_CODE = frozenset({CuriosityAim.EXPLORATION, CuriosityAim.STARTER})
+AIMS_WRITTEN_BY_CODE = frozenset(
+    {CuriosityAim.EXPLORATION, CuriosityAim.STARTER, CuriosityAim.PREDICTION}
+)
 
 
 @dataclass(frozen=True)
@@ -1427,8 +1430,8 @@ class Curiosity:
         aim: What it is trying to learn: how a commitment went, how
             something looks to them now, whether a guess is right, or where
             they've got to on a next Move never made, an Exploration's
-            need, or how a new User would choose in a starter Thought
-            Experiment.
+            need, how a new User would choose in a starter Thought
+            Experiment, or how a shared Pattern's Prediction went.
         source_memory_item_id: The Memory Item it came from, if any; deleting
             that item deletes it.
         source_life_thread_id: The Life Thread it came from, if any; deleting
@@ -1448,6 +1451,12 @@ class Curiosity:
         thought_experiment_id: The starter Thought Experiment it puts to a
             new User, when code wrote it for that; None otherwise (an
             Exploration's try names its own).
+        not_after: The last day, in the User's time zone, it may be asked;
+            None for no last day.
+        pattern_id: The shared Pattern it is about, when code wrote it for
+            a Prediction; deleting that Pattern deletes it.
+        prediction_id: The Prediction it asks about; None when it tells
+            the reply to give the Pattern a new Prediction.
     """
 
     id: UUID
@@ -1469,6 +1478,9 @@ class Curiosity:
     exploration_id: UUID | None = None
     source_observation_id: UUID | None = None
     thought_experiment_id: UUID | None = None
+    not_after: date | None = None
+    pattern_id: UUID | None = None
+    prediction_id: UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -2526,6 +2538,7 @@ class ModelStep(StrEnum):
     PATTERN_MATCHING = "pattern_matching"
     PATTERN_OTHER_SIDE = "pattern_other_side"
     PATTERN_SHARED_CHECK = "pattern_shared_check"
+    PREDICTION_GIVEN_CHECK = "prediction_given_check"
     PATTERNS = "patterns"
     PORTRAIT = "portrait"
     PERSONAL_STICKERS = "personal_stickers"
@@ -3363,9 +3376,33 @@ class ShareVia(StrEnum):
     CHECK_IN = "check_in"
 
 
+class PredictionOutcome(StrEnum):
+    """How a Prediction went, as the User reported it or code closed it.
+
+    Came true counts as a strong sign for its Pattern and didn't as a
+    strong sign against it. Hasn't come up counts nothing and leaves the
+    Prediction open. Not followed up is set by code when no answer came in
+    time, and counts nothing.
+    """
+
+    CAME_TRUE = "came_true"
+    DID_NOT = "did_not"
+    NOT_COME_UP = "not_come_up"
+    NOT_FOLLOWED_UP = "not_followed_up"
+
+
+OUTCOMES_READ_BY_THE_MODEL = frozenset(
+    {
+        PredictionOutcome.CAME_TRUE,
+        PredictionOutcome.DID_NOT,
+        PredictionOutcome.NOT_COME_UP,
+    }
+)
+
+
 @dataclass(frozen=True)
 class Prediction:
-    """The one thing a User is asked to watch for when a Pattern is shared.
+    """The one thing a User is asked to watch for in a Pattern they were told.
 
     Attributes:
         id: Our ID for the Prediction.
@@ -3373,6 +3410,8 @@ class Prediction:
         pattern_id: The Pattern it tests.
         wording: The Prediction, as the Companion put it to them.
         made_at: When it was given.
+        outcome: How it went; None until the User says or code closes it.
+        outcome_at: When the outcome was read or set; None without one.
     """
 
     id: UUID
@@ -3380,6 +3419,17 @@ class Prediction:
     pattern_id: UUID
     wording: str
     made_at: datetime
+    outcome: PredictionOutcome | None = None
+    outcome_at: datetime | None = None
+
+    @property
+    def is_open(self) -> bool:
+        """Whether it still waits for how it went.
+
+        Returns:
+            True with no outcome, or when it hasn't come up yet.
+        """
+        return self.outcome in {None, PredictionOutcome.NOT_COME_UP}
 
 
 class PatternReaction(StrEnum):
@@ -3450,6 +3500,14 @@ class PatternMoveCause(StrEnum):
     USER_REACTED = "user_reacted"
 
 
+class PatternMoveReason(StrEnum):
+    """Why a Pattern the User was told was confirmed or closed."""
+
+    PREDICTIONS_CAME_TRUE = "predictions_came_true"
+    STRONG_EVIDENCE_AFTER_SHARING = "strong_evidence_after_sharing"
+    SCORE_UNDER_FLOOR = "score_under_floor"
+
+
 @dataclass(frozen=True)
 class PatternMove:
     """One move of a Pattern between states, as its append-only log keeps it.
@@ -3471,6 +3529,8 @@ class PatternMove:
         blocked_by: For a move to ready, the ready check that last stopped
             it before; for a move back from ready, the check it now fails;
             None for any other move.
+        reason: Why a shared Pattern was confirmed or closed; None for any
+            other move.
     """
 
     id: UUID
@@ -3485,6 +3545,7 @@ class PatternMove:
     situations: int
     moved_at: datetime
     blocked_by: ReadyCheck | None = None
+    reason: PatternMoveReason | None = None
 
 
 class ExplorationState(StrEnum):

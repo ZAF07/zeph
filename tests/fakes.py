@@ -24,6 +24,7 @@ from companion.core.models import (
 )
 from companion.core.pattern_sharing import SHARED_CHECK_PROMPT
 from companion.core.ports import ChatTool
+from companion.core.predictions import GIVEN_CHECK_PROMPT
 from companion.core.typing_keeper import TYPING_WAIT_PREFIX
 from companion.core.woven_check_ins import BROUGHT_UP_CHECK_PROMPT
 
@@ -734,6 +735,7 @@ class ScriptedChatModel:
         self._pattern_matching_answers: list[str | Exception] = []
         self._other_side_answers: list[str | Exception] = []
         self._shared_check_answers: list[str | Exception] = []
+        self._given_check_answers: list[str | Exception] = []
         self.safeguard_prompt = safeguard_prompt
         self.memory_processing_prompt = memory_processing_prompt
         self.understanding_prompt = understanding_prompt
@@ -765,6 +767,7 @@ class ScriptedChatModel:
         self.pattern_matching_calls: list[ChatModelCall] = []
         self.other_side_calls: list[ChatModelCall] = []
         self.shared_check_calls: list[ChatModelCall] = []
+        self.given_check_calls: list[ChatModelCall] = []
         self.call_order: list[str] = []
         self.delay_seconds = 0.0
         self.before_next_reply: Callable[[], None] | None = None
@@ -901,6 +904,15 @@ class ScriptedChatModel:
                 returned, to act like a failing model.
         """
         self._shared_check_answers.extend(answers)
+
+    def script_given_check(self, *answers: str | Exception) -> None:
+        """Queue answers to whether a message gave a Prediction, one per call.
+
+        Args:
+            answers: The JSON answers; an exception is raised instead of
+                returned, to act like a failing model.
+        """
+        self._given_check_answers.extend(answers)
 
     def script_brought_up_check(self, *answers: str | Exception) -> None:
         """Queue answers to whether a reply brought up its Check-in, one per call.
@@ -1113,6 +1125,14 @@ class ScriptedChatModel:
                 self._shared_check_answers.pop(0)
                 if self._shared_check_answers
                 else json.dumps({"shared": False, "prediction": ""})
+            )
+        elif instructions == GIVEN_CHECK_PROMPT:
+            self.given_check_calls.append(call)
+            self.call_order.append("given_check")
+            answer = (
+                self._given_check_answers.pop(0)
+                if self._given_check_answers
+                else json.dumps({"given": False, "prediction": ""})
             )
         elif instructions == BROUGHT_UP_CHECK_PROMPT:
             self.brought_up_check_calls.append(call)

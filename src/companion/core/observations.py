@@ -14,6 +14,7 @@ from companion.core.memory_retrieval import format_day, summary_line
 from companion.core.model_call_log import ModelCallLog
 from companion.core.models import (
     AIMS_WRITTEN_BY_CODE,
+    OUTCOMES_READ_BY_THE_MODEL,
     CatalogPattern,
     ChatLine,
     ChatRole,
@@ -35,6 +36,8 @@ from companion.core.models import (
     PatternState,
     PatternType,
     Power,
+    Prediction,
+    PredictionOutcome,
     ReactionToPattern,
     Relationship,
     SituationMatch,
@@ -368,6 +371,84 @@ def plan_reactions(
             reacted_at=now,
         )
     return list(kept.values())
+
+
+def read_prediction_outcomes_answer(answer: str) -> list[Any]:
+    """Read how the tagging model says the User's Predictions went.
+
+    Args:
+        answer: The model's answer, already readable for its Observations.
+
+    Returns:
+        The outcomes, as the model wrote them; empty when it named none.
+    """
+    start, end = answer.find("{"), answer.rfind("}")
+    try:
+        parsed = json.loads(answer[start : end + 1])
+    except json.JSONDecodeError:
+        return []
+    outcomes = parsed.get("prediction_outcomes") if isinstance(parsed, dict) else None
+    return outcomes if isinstance(outcomes, list) else []
+
+
+def plan_prediction_outcomes(
+    entries: Sequence[Any], open_predictions: Mapping[int, Prediction], now: datetime
+) -> list[Prediction]:
+    """Keep the outcomes the tagging model read for a Prediction it was shown.
+
+    Args:
+        entries: The outcomes, as the model wrote them.
+        open_predictions: The Predictions still open, by the number the
+            model was shown.
+        now: When they were read.
+
+    Returns:
+        Each Prediction once with its outcome, the first the model wrote
+        for it; an unknown number or an outcome off the model's list is
+        left out.
+    """
+    kept: dict[UUID, Prediction] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        number = entry.get("prediction")
+        prediction = (
+            open_predictions.get(number)
+            if isinstance(number, int) and not isinstance(number, bool)
+            else None
+        )
+        outcome = read_choice(entry, "outcome", PredictionOutcome)
+        if (
+            prediction is None
+            or outcome not in OUTCOMES_READ_BY_THE_MODEL
+            or prediction.id in kept
+        ):
+            continue
+        kept[prediction.id] = replace(prediction, outcome=outcome, outcome_at=now)
+    return list(kept.values())
+
+
+def describe_predictions_given(
+    predictions: Mapping[int, Prediction], time_zone: str | None
+) -> str:
+    """Write the open Predictions, as the tagging model reads them.
+
+    Args:
+        predictions: The Predictions, by number.
+        time_zone: The User's IANA time zone, for the day each was given.
+
+    Returns:
+        One numbered line per Prediction with the day it was given and its
+        words; "None." with none.
+    """
+    return (
+        "\n".join(
+            f"[{number}] (given {format_day(prediction.made_at, time_zone)}) "
+            f"{prediction.wording}"
+            for number, prediction in predictions.items()
+        )
+        or "None."
+    )
 
 
 def not_gathered_pattern_types(
@@ -1032,6 +1113,7 @@ def describe_conversation_to_tag(
     life_now: LifeNow | None = None,
     ruled_out_topics: Sequence[str] = (),
     told: Mapping[int, CatalogPattern] | None = None,
+    predictions: Mapping[int, Prediction] | None = None,
 ) -> str:
     """Write what the tagging model is given.
 
@@ -1051,13 +1133,15 @@ def describe_conversation_to_tag(
         ruled_out_topics: The Admin-set ruled-out topics.
         told: The Patterns Zeph has told the User, by number; None or
             empty with none.
+        predictions: The Predictions Zeph gave them that are still open,
+            by number; None or empty with none.
 
     Returns:
         Today's date, the Threads, the Pattern Catalog with each Pattern
         Type's exclusions, the tag lists, the unclear stories asked about,
         the Thought Experiments put to them, what is going on in their life
-        now, the ruled-out topics, the Patterns they were told and the
-        Conversation.
+        now, the ruled-out topics, the Patterns they were told, the open
+        Predictions and the Conversation.
     """
     thread_lines = "\n".join(
         f"[{number}] {describe_thread(thread, time_zone)}"
@@ -1081,6 +1165,8 @@ def describe_conversation_to_tag(
         f"Ruled-out topics: {', '.join(ruled_out_topics) or 'none'}\n\n"
         f"Patterns Zeph has told them:\n"
         f"{describe_patterns_told(told or {}, types_by_id)}\n\n"
+        f"Predictions Zeph gave them, still open:\n"
+        f"{describe_predictions_given(predictions or {}, time_zone)}\n\n"
         f"The Conversation:\n{to_transcript_lines(messages, time_zone)}"
     )
 
@@ -1094,12 +1180,15 @@ class Tagged:
         settled: The unclear stories the model settled, as it wrote them.
         exclusion_flags: The exclusions that apply to the User now.
         reactions: How the User took the Patterns they were told.
+        prediction_outcomes: The open Predictions the User said the
+            outcome of, each with it.
     """
 
     planned: PlannedObservations
     settled: list[Any]
     exclusion_flags: list[ExclusionFlag]
     reactions: list[ReactionToPattern]
+    prediction_outcomes: list[Prediction]
 
 
 class PatternTagger:
@@ -1148,7 +1237,8 @@ class PatternTagger:
         tagged and dropped goes into the Model Call Log, never their words.
         The exclusions the model says apply to the User now replace those
         flagged before. How the model says they took a Pattern Zeph told
-        them is kept, one reaction per Pattern and Conversation.
+        them is kept, one reaction per Pattern and Conversation, and so is
+        how they say an open Prediction went.
 
         Args:
             snapshot: The User whose Conversation it was; User Memory works
@@ -1168,6 +1258,7 @@ class PatternTagger:
             entry.pattern_type for entry in self._pattern_catalog.catalog()
         ]
         unclear = self._unclear_asked_in(snapshot, conversation_id)
+        told = self._patterns_told(snapshot, pattern_types)
         tagged = self._tag(
             snapshot,
             conversation_id,
@@ -1177,12 +1268,14 @@ class PatternTagger:
             unclear,
             self._thought_experiments_asked_in(snapshot, conversation_id),
             self._life_now(snapshot),
-            self._patterns_told(snapshot, pattern_types),
+            told,
+            self._open_predictions(snapshot, told),
         )
         if tagged is None:
             return None
         self._repositories.observations.add_many(tagged.planned.kept)
         self._repositories.patterns.add_reactions(tagged.reactions)
+        self._repositories.patterns.save_prediction_outcomes(tagged.prediction_outcomes)
         self._repositories.observations.settle(
             plan_settled(
                 tagged.settled,
@@ -1236,6 +1329,7 @@ class PatternTagger:
             self._thought_experiments_asked_in(snapshot, conversation_id),
             None,
             {},
+            {},
         )
         if tagged is None:
             return []
@@ -1271,6 +1365,7 @@ class PatternTagger:
         thought_experiments: Mapping[int, str],
         life_now: LifeNow | None,
         told: Mapping[int, CatalogPattern],
+        predictions: Mapping[int, Prediction],
     ) -> Tagged | None:
         """Ask the model for a Conversation's Observations and check them.
 
@@ -1290,11 +1385,14 @@ class PatternTagger:
                 telling which exclusions apply; None to flag none.
             told: The Patterns Zeph has told them, by number, for reading
                 how they took one; empty to read none.
+            predictions: Their open Predictions, by number, for reading
+                how one went; empty to read none.
 
         Returns:
             The Observations that passed and those dropped, the unclear
-            stories the model settled, the exclusions that apply and how
-            they took the Patterns they were told; None
+            stories the model settled, the exclusions that apply, how
+            they took the Patterns they were told and how their
+            Predictions went; None
             when the User wrote nothing in their own words, there is no
             Pattern Type or the answer couldn't be read.
         """
@@ -1318,6 +1416,7 @@ class PatternTagger:
                 life_now,
                 ruled_out_topics,
                 told,
+                predictions,
             ),
         )
         if answer is None:
@@ -1369,7 +1468,39 @@ class PatternTagger:
                 list(told.values()),
                 snapshot.user.contested_gathering_enabled,
             ),
+            prediction_outcomes=plan_prediction_outcomes(
+                read_prediction_outcomes_answer(answer), predictions, now
+            ),
         )
+
+    def _open_predictions(
+        self, snapshot: UserSnapshot, told: Mapping[int, CatalogPattern]
+    ) -> dict[int, Prediction]:
+        """Number the Predictions the User may still say the outcome of.
+
+        Args:
+            snapshot: The User.
+            told: The Patterns Zeph has told them, by number.
+
+        Returns:
+            The open Predictions of their shared Patterns, oldest first,
+            by number from 1; none read when no Pattern is shared.
+        """
+        shared_ids = {
+            pattern.id
+            for pattern in told.values()
+            if pattern.state == PatternState.SHARED
+        }
+        if not shared_ids:
+            return {}
+        still_open = [
+            prediction
+            for prediction in self._repositories.patterns.list_predictions(
+                snapshot.user.id
+            )
+            if prediction.pattern_id in shared_ids and prediction.is_open
+        ]
+        return dict(enumerate(still_open, start=1))
 
     def _patterns_told(
         self, snapshot: UserSnapshot, pattern_types: Sequence[PatternType]

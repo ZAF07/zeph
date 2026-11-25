@@ -11,6 +11,7 @@ from companion.core.models import MessageToAnswer, ShareVia, UserSnapshot
 from companion.core.move_outcomes import MoveOutcomeFinder
 from companion.core.pattern_sharing import PatternSharing
 from companion.core.patterns import PatternReminder
+from companion.core.predictions import PredictionKeeper
 from companion.core.recent_messages import RecentMessagesReader
 from companion.core.reply_attempt import ReplyAttempt
 from companion.core.reply_gate import ReplyGate, Stopped
@@ -70,6 +71,7 @@ class ReplyService:
         pattern_reminder: PatternReminder,
         agenda: AgendaReader,
         pattern_sharing: PatternSharing,
+        prediction_keeper: PredictionKeeper,
         model_call_log: ModelCallLog,
     ) -> None:
         """Set up the service.
@@ -98,6 +100,8 @@ class ReplyService:
             agenda: Reads the User's Agenda for the Reply Plan.
             pattern_sharing: Offers a ready Pattern to share and records
                 when it was.
+            prediction_keeper: Keeps the new Prediction a reply gave a
+                shared Pattern.
             model_call_log: Records whether the Pattern was shared, on the
                 Reply Plan's shape.
         """
@@ -116,6 +120,7 @@ class ReplyService:
         self._pattern_reminder = pattern_reminder
         self._agenda = agenda
         self._pattern_sharing = pattern_sharing
+        self._prediction_keeper = prediction_keeper
         self._model_call_log = model_call_log
 
     def handle(
@@ -245,6 +250,9 @@ class ReplyService:
         self._thread_reminder.mark_raised(message.conversation_id, plan.bring_up)
         self._curiosity_raiser.record_reaction(due, plan.curiosity_taken)
         self._curiosity_raiser.mark_raised(message.conversation_id, plan.curiosities)
+        self._prediction_keeper.record_given(
+            snapshot, [item.curiosity_id for item in plan.curiosities], reply.texts
+        )
         if planned.pattern_to_share is not None and planned.shape is not None:
             shared = self._pattern_sharing.record_if_shared(
                 snapshot,

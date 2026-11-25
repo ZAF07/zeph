@@ -91,6 +91,7 @@ from companion.core.ports import (
     WebSearch,
 )
 from companion.core.post_conversation import PostConversationProcessor
+from companion.core.predictions import PredictionKeeper
 from companion.core.ready_gate import ReadyGate, ReadyKeeper
 from companion.core.recent_messages import RecentMessagesReader
 from companion.core.reply_gate import ReplyGate
@@ -235,6 +236,12 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         chat_model,
         dependencies.clock,
     )
+    prediction_keeper = PredictionKeeper(
+        dependencies.repositories,
+        pattern_catalog_service,
+        chat_model,
+        dependencies.clock,
+    )
     user_snapshots = UserSnapshotLoader(dependencies.repositories, dependencies.clock)
     check_in_service = CheckInService(
         repositories=dependencies.repositories,
@@ -245,6 +252,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         chat_channel=typing_keeper,
         clock=dependencies.clock,
         pattern_sharing=pattern_sharing,
+        prediction_keeper=prediction_keeper,
     )
     user_service = UserService(
         dependencies.repositories.users,
@@ -321,6 +329,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             dependencies.repositories, pattern_catalog_service, dependencies.clock
         ),
         pattern_sharing=pattern_sharing,
+        prediction_keeper=prediction_keeper,
         model_call_log=model_call_log,
         move_outcome_finder=MoveOutcomeFinder(
             repositories=dependencies.repositories, embedder=dependencies.embedder
@@ -402,6 +411,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     portrait_writer = PortraitWriter(
         repositories=dependencies.repositories,
         user_snapshots=user_snapshots,
+        pattern_catalog=pattern_catalog_service,
         chat_model=chat_model,
         clock=dependencies.clock,
     )
@@ -432,6 +442,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             pattern_scorer=pattern_scorer,
             ready_gate=ready_gate,
             pattern_sharing=pattern_sharing,
+            prediction_keeper=prediction_keeper,
             pattern_keeper=PatternKeeper(
                 repositories=dependencies.repositories,
                 pattern_catalog=pattern_catalog_service,
