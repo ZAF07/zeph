@@ -1,6 +1,6 @@
 # 33 — Understanding Eval cases that fail for old reasons
 
-Status: ready-for-agent
+Status: completed
 Track: shared
 Blocked by: none
 
@@ -34,9 +34,9 @@ Two more cases were only flaky and are left alone: `knowledge-for-a-reflective-q
 
 ## Acceptance criteria
 
-- [ ] The owner decided 1, 2 and 3
-- [ ] Each of the six passes at least 3 of 4 tries, or is recorded as left as it is, with why
-- [ ] Eval Run IDs and costs are in Comments
+- [x] The owner decided 1, 2 and 3
+- [x] Each of the six passes at least 3 of 4 tries, or is recorded as left as it is, with why
+- [x] Eval Run IDs and costs are in Comments
 
 ## Comments
 
@@ -124,3 +124,14 @@ The case `hosting-research` still uses `names_hosts_under_budget` and has the sa
 **Review.** Standards and spec reviews run. Standards: no hard violations. Fixed after: a test name that no longer said what it checked, asserts that copied the case back, a rule name that read as general (`keeps_small_talk_light` → `spilled_coffee_stays_light`), and the first hosting Message, which could hardly fail (rule added). Not changed: faults 4, 5 and 6 still fail on the seed prompts; the owner said to go by production's, and it is flagged above.
 
 **Checks.** ruff clean, ruff format clean, mypy clean (279 files), pytest 2530 passed. No Dashboard code changed, so the web checks were not run.
+
+**Evidence per criterion**
+
+- **The owner decided 1, 2 and 3.** 1 and 2: "change the case" for both, picked on 25 Nov. 3: the owner's answer was to go by production's prompts; on them the Reply Plan never set "ask why" and the reply asked every time, so the case now checks the reply. Flagged above for the owner to overrule.
+- **Each of the six passes at least 3 of 4.** On this worktree's running stack with production's prompts: 1 passed 4 of 4, 2 passed 4 of 4 (as merged), 3 passed 4 of 4, 4 passed 4 of 4, 5 passed 3 of 4, 6 passed 4 of 4. Runs in the table above.
+- **Eval Run IDs and costs are in Comments.** The table above: 16 runs, S$0.63.
+
+## Completion
+
+- Completed: 2026-11-25
+- Commit: <merge commit, filled in after the merge>
