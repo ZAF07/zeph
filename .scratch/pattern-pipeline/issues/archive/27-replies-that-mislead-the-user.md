@@ -114,5 +114,5 @@ Standards and spec reviews were run. Fixed: a reply written twice now drops the 
 ## Completion
 
 - Completed: 2026-11-25
-- Commit: <merge commit, filled in after the merge>
+- Commit: 1ce67a12 (merge of `pattern-27-replies-that-mislead` into main; work commits 322202b5, d4085399, c9783639, bd7ddd04)
 
