@@ -253,6 +253,12 @@ describe("PromptsAndModels", () => {
 
     expect(thinkingSwitch).not.toBeChecked();
     expect(thinkingSwitch).toBeDisabled();
+    expect(thinkingSwitch).toHaveAccessibleDescription(
+      "This model can’t think, so thinking stays off.",
+    );
+    expect(card.getByRole("tooltip")).toHaveTextContent(
+      "This model can’t think, so thinking stays off.",
+    );
     await user.click(card.getByRole("button", { name: "Save" }));
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
       response_prompt: "Reply briefly.",
@@ -264,6 +270,8 @@ describe("PromptsAndModels", () => {
 
     expect(thinkingSwitch).toBeEnabled();
     expect(thinkingSwitch).not.toBeChecked();
+    expect(thinkingSwitch).not.toHaveAccessibleDescription();
+    expect(card.queryByRole("tooltip")).toBeNull();
   });
 
   it("shows thinking off when it is saved on for a model that can't think", async () => {

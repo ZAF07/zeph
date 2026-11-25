@@ -14,6 +14,7 @@ import { FieldSelect } from "@/components/FieldSelect";
 import { FoldingCard } from "@/components/FoldingCard";
 import { FormEditor } from "@/components/FormEditor";
 import { FormSectionHeading } from "@/components/FormSectionHeading";
+import { HoverNote } from "@/components/HoverNote";
 import { SavedNote } from "@/components/SavedNote";
 import { Switch } from "@/components/Switch";
 import type { AdminSettings, CoreService, ExtraPrompt } from "@/lib/api-client";
@@ -31,7 +32,8 @@ import { useSaveAdminSettings } from "@/lib/use-admin-settings";
  * sit in groups that are folded shut until clicked. One save bar saves them
  * together. The prompt is combined with the Persona when the service runs.
  * When the backend refuses a save, the save bar shows its reason. While the
- * chosen model can't think, the thinking switch is off and can't be changed.
+ * chosen model can't think, the thinking switch is off and can't be changed,
+ * and a pop-up says why while the mouse is over it.
  * Choosing such a model switches thinking off, and it stays off until it is
  * switched on again for a model that can think.
  *
@@ -96,6 +98,7 @@ export function CoreServiceCard({
   const idPrefix = `service-${service.prompt_key}`;
   const modelId = `${idPrefix}-model`;
   const promptHintId = `${idPrefix}-prompt-hint`;
+  const thinkingLockedNoteId = `${idPrefix}-thinking-locked`;
   const settingsGroupId = `${idPrefix}-settings`;
   const promptsGroupId = `${idPrefix}-prompts`;
 
@@ -191,15 +194,25 @@ export function CoreServiceCard({
             title="Thinking"
             caption={settings[service.thinking_key]?.hint}
           >
-            <Switch
-              label={`Thinking for ${service.name}`}
-              checked={thinking}
-              disabled={!modelCanThink}
-              onChange={(isOn) => {
-                setThinking(isOn);
-                saveSettings.reset();
-              }}
-            />
+            <HoverNote
+              noteId={thinkingLockedNoteId}
+              note={
+                modelCanThink
+                  ? null
+                  : "This model can’t think, so thinking stays off."
+              }
+            >
+              <Switch
+                label={`Thinking for ${service.name}`}
+                checked={thinking}
+                disabled={!modelCanThink}
+                describedById={modelCanThink ? undefined : thinkingLockedNoteId}
+                onChange={(isOn) => {
+                  setThinking(isOn);
+                  saveSettings.reset();
+                }}
+              />
+            </HoverNote>
           </FieldRow>
           {service.limits.map((limit) => {
             const limitId = `${idPrefix}-${limit.key}`;
