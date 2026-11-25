@@ -14,6 +14,7 @@ from companion.core.models import (
     MoveOutcome,
     Observation,
     PatternMoveCause,
+    PatternState,
     User,
     UserPortrait,
 )
@@ -29,6 +30,10 @@ from companion.core.ready_gate import ReadyKeeper
 from companion.core.told_patterns import ToldPattern, told_patterns, was_told
 
 logger = logging.getLogger(__name__)
+
+STATES_NEVER_NOTED_AGAIN_ONCE_DELETED = frozenset(
+    {PatternState.CONTESTED, PatternState.CLOSED}
+)
 
 
 class MemoryNotFoundError(NotFoundError):
@@ -273,7 +278,9 @@ class UserMemoryService:
 
         The Observations whose first Pattern Type is its own go with it,
         so the quotes it showed never bring it back, and those quotes are
-        never kept again; its Predictions and
+        never kept again. Deleting one they disagreed with, or that
+        didn't hold up, also marks its Pattern Type so it is never noted
+        or shared for them again; its Predictions and
         the User's reactions to it go too. The
         User is locked while it is deleted, as scoring locks them, and
         their other Patterns are scored again at once.
@@ -309,6 +316,10 @@ class UserMemoryService:
             in_transaction.observations.delete_of_pattern_type(
                 user_id, told[0].pattern_type_id
             )
+            if told[0].state in STATES_NEVER_NOTED_AGAIN_ONCE_DELETED:
+                in_transaction.patterns.mark_never_again(
+                    user_id, told[0].pattern_type_id, self._clock.now()
+                )
             in_transaction.patterns.save_moves([], [], [pattern_id], [])
         self._score_patterns_again(user_id)
         self._rewrite_portrait(user_id)

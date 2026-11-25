@@ -109,6 +109,9 @@ class TaggingContext:
             turned off; no Observation naming one is kept.
         deleted_quote_hashes: The hashes of the quotes the User deleted
             from that Conversation; none is kept again.
+        never_again_pattern_type_ids: The Pattern Types of the Patterns
+            the User deleted after disagreeing or after they didn't hold
+            up; no Observation naming one is kept.
     """
 
     user_id: UUID
@@ -123,6 +126,7 @@ class TaggingContext:
     ignored_pattern_type_ids: frozenset[str] = frozenset()
     not_gathered_pattern_type_ids: frozenset[str] = frozenset()
     deleted_quote_hashes: frozenset[str] = frozenset()
+    never_again_pattern_type_ids: frozenset[str] = frozenset()
 
 
 class DropReason(StrEnum):
@@ -137,6 +141,7 @@ class DropReason(StrEnum):
     REPEAT = "repeats one already kept"
     NOT_GATHERED = "a Pattern they disagreed with, with gathering turned off"
     DELETED_BY_USER = "a quote the User deleted"
+    NEVER_AGAIN = "a Pattern they deleted after disagreeing or it didn't hold up"
 
 
 @dataclass(frozen=True)
@@ -923,8 +928,9 @@ def check_observation(entry: Any, context: TaggingContext) -> Observation | Drop
         aren't in the catalog, its quote isn't word for word in the User's
         own texts, a tag or its kind of evidence isn't from its list, or it
         has no context or who it is about, or it names a Pattern Type the
-        User disagreed with while they have gathering turned off, or its
-        quote is one the User deleted. One that
+        User disagreed with while they have gathering turned off, or one
+        of a Pattern they deleted after disagreeing or after it didn't
+        hold up, or its quote is one the User deleted. One that
         names a Thought
         Experiment put to the User in the Conversation is a "what if"
         answer, whatever kind the model wrote. A ruled-out topic is kept
@@ -937,6 +943,11 @@ def check_observation(entry: Any, context: TaggingContext) -> Observation | Drop
     pattern_types = read_named_pattern_types(entry, context.pattern_types)
     if pattern_types is None:
         return DropReason.UNKNOWN_PATTERN_TYPE
+    if any(
+        pattern_type.id in context.never_again_pattern_type_ids
+        for pattern_type in pattern_types
+    ):
+        return DropReason.NEVER_AGAIN
     if any(
         pattern_type.id in context.not_gathered_pattern_type_ids
         for pattern_type in pattern_types
@@ -1511,6 +1522,9 @@ class PatternTagger:
                     self._repositories.observations.list_deleted_quote_hashes(
                         snapshot.user.id, conversation_id
                     )
+                ),
+                never_again_pattern_type_ids=(
+                    self._repositories.patterns.list_never_again(snapshot.user.id)
                 ),
             ),
         )

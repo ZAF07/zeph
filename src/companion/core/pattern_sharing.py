@@ -127,6 +127,33 @@ class SharedCheck:
     prediction: str
 
 
+def is_weighty_evidence_for(observation: Observation, pattern_type_id: str) -> bool:
+    """Say whether an Observation is clear evidence for a Pattern that carries weight.
+
+    Args:
+        observation: The Observation.
+        pattern_type_id: The Pattern's Pattern Type.
+
+    Returns:
+        True for clear evidence for the Pattern from their own life: not
+        said while an exclusion applied, not marked as what anyone would
+        do when it was tagged, and not on a ruled-out topic unless they
+        raised it themselves.
+    """
+    on_topic_not_raised = (
+        observation.ruled_out_topic is not None and not observation.raised_by_user
+    )
+    return (
+        observation.direction == ObservationDirection.FOR
+        and observation.pattern_type_id == pattern_type_id
+        and observation.evidence_kind in EVIDENCE_KINDS_FROM_THEIR_LIFE
+        and not observation.unclear
+        and not observation.excluded
+        and not observation.situational
+        and not on_topic_not_raised
+    )
+
+
 def may_be_quoted(observation: Observation, pattern_type: PatternType) -> bool:
     """Say whether an Observation may be quoted back when its Pattern is shared.
 
@@ -136,22 +163,11 @@ def may_be_quoted(observation: Observation, pattern_type: PatternType) -> bool:
 
     Returns:
         True for clear evidence for the Pattern from their own life that
-        carries weight: not said while an exclusion applied, not where
-        anyone would act the same, and not on a ruled-out topic unless
-        they raised it themselves.
+        carries weight, and not where anyone would act the same by the
+        catalog now.
     """
-    on_topic_not_raised = (
-        observation.ruled_out_topic is not None and not observation.raised_by_user
-    )
-    return (
-        observation.direction == ObservationDirection.FOR
-        and observation.pattern_type_id == pattern_type.id
-        and observation.evidence_kind in EVIDENCE_KINDS_FROM_THEIR_LIFE
-        and not observation.unclear
-        and not observation.excluded
-        and not observation.situational
-        and not is_situational(observation.tags, pattern_type.anyone_would_when)
-        and not on_topic_not_raised
+    return is_weighty_evidence_for(observation, pattern_type.id) and not is_situational(
+        observation.tags, pattern_type.anyone_would_when
     )
 
 
@@ -774,7 +790,11 @@ class PatternSharing:
                 now,
             )
             shared = replace(
-                pattern, state=PatternState.SHARED, updated_at=now, shared_at=now
+                pattern,
+                state=PatternState.SHARED,
+                updated_at=now,
+                shared_at=now,
+                shared_wording=to_share.pattern_type.approved_wording,
             )
             repositories.patterns.save_moves([], [shared], [], [move])
             if check.prediction:

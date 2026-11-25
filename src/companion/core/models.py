@@ -3357,6 +3357,8 @@ class CatalogPattern:
             explanation; None if never asked.
         shared_at: When the Companion first told the User about it; None
             if it never did.
+        shared_wording: The approved wording it was told in; None if it
+            was never told, or was told before the wording was kept.
     """
 
     id: UUID
@@ -3370,6 +3372,7 @@ class CatalogPattern:
     other_side_asked_at: datetime | None = None
     other_side_found_better: bool | None = None
     shared_at: datetime | None = None
+    shared_wording: str | None = None
 
 
 class ShareVia(StrEnum):

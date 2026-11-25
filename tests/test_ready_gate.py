@@ -722,6 +722,9 @@ def test_the_gate_numbers_and_the_other_side_call_are_settings_with_hints(
             "sexual trauma",
             "self-harm or suicide",
             "eating and body image",
+            "addiction",
+            "sexuality and gender",
+            "mental health diagnoses",
         ],
     }
     assert all(settings[key]["hint"] for key in (*GATE_SETTINGS, *OTHER_SIDE_SETTINGS))

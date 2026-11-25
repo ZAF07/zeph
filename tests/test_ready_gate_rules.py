@@ -521,3 +521,26 @@ def test_observations_that_carry_no_weight_never_shape_a_narrowing() -> None:
             tag=NarrowingTag.RELATIONSHIP, holds_with=("friend",), not_with=("partner",)
         ),
     )
+
+
+def test_scoring_starts_no_pattern_for_a_pattern_type_marked_never_again() -> None:
+    unclear = story(second=WORTH)
+    bars = StateBars(
+        suspected_situations=2, suspected_points=100, closed_under_points=-150
+    )
+
+    planned = plan_pattern_moves(
+        uuid4(),
+        [],
+        [unclear],
+        WEIGHING.sign_strengths,
+        WEIGHING.numbers,
+        bars,
+        TODAY,
+        NOW,
+        PatternMoveCause.CONVERSATION_TAGGED,
+        None,
+        never_again=frozenset({BELONG}),
+    )
+
+    assert [pattern.pattern_type_id for pattern in planned.added] == [WORTH]

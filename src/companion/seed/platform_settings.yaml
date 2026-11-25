@@ -893,13 +893,17 @@ predictions_to_close: 2
 predictions_unanswered_to_stop: 2
 pattern_confirm_points_after_sharing: 300
 
-# Topics no Pattern is drawn or shared from unless the User raised them. A
-# first list, for the owner to correct.
+# Topics no Pattern is drawn or shared from unless the User raised them. The
+# owner's list (25 Nov 2026). A topic added later reaches new Observations
+# only.
 pattern_ruled_out_topics:
   - abuse
   - sexual trauma
   - self-harm or suicide
   - eating and body image
+  - addiction
+  - sexuality and gender
+  - mental health diagnoses
 
 # The Agenda, while Pattern exploring works: at most this many Explorations
 # (suspected Patterns Zeph is trying to learn more about) are active at once,

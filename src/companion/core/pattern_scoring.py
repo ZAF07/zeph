@@ -627,6 +627,7 @@ def plan_pattern_moves(
     now: datetime,
     cause: PatternMoveCause,
     conversation_id: UUID | None,
+    never_again: frozenset[str] = frozenset(),
 ) -> PlannedPatternMoves:
     """Score a User's Patterns again from their Observations, and move them.
 
@@ -648,6 +649,9 @@ def plan_pattern_moves(
         now: When it is scored.
         cause: What made it be scored again.
         conversation_id: The Conversation tagged, when that is the cause.
+        never_again: The Pattern Types of the Patterns the User deleted
+            after disagreeing or after they didn't hold up; none gets a
+            Pattern again.
 
     Returns:
         The Patterns added, moved and deleted, and every move for the log.
@@ -669,6 +673,8 @@ def plan_pattern_moves(
             without_narrowing(its_observations), sign_strengths, numbers, today
         )
         pattern = existing.get(pattern_type_id)
+        if pattern is None and pattern_type_id in never_again:
+            continue
         if pattern is None:
             noticed = CatalogPattern(
                 id=uuid4(),
@@ -825,6 +831,7 @@ class PatternScorer:
             now,
             cause,
             conversation_id,
+            repositories.patterns.list_never_again(user.id),
         )
         repositories.patterns.save_moves(
             planned.added, planned.changed, planned.deleted_ids, planned.moves

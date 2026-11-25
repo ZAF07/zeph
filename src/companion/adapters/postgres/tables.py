@@ -583,9 +583,23 @@ patterns = Table(
     Column("other_side_asked_at", DateTime(timezone=True)),
     Column("other_side_found_better", Boolean),
     Column("shared_at", DateTime(timezone=True)),
+    Column("shared_wording", Text),
     UniqueConstraint(
         "user_id", "pattern_type_id", name="uq_patterns_user_id_pattern_type_id"
     ),
+)
+
+patterns_never_again = Table(
+    "patterns_never_again",
+    metadata,
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("pattern_type_id", Text, primary_key=True),
+    Column("marked_at", DateTime(timezone=True), nullable=False),
 )
 
 predictions = Table(

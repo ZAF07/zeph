@@ -63,7 +63,7 @@ def set_up_user_with_every_kind_of_data(
 
     Their User Memory holds a Memory Item, a Day Summary, a Shared
     Photo, two Life Threads, an Observation, a record of a deleted quote,
-    an exclusion flag, a Pattern
+    a "never again" mark, an exclusion flag, a Pattern
     with a Prediction and a reaction to it, a Move Outcome and a User
     Portrait, and they have a Personal Sticker, a Curiosity and an
     Exploration with its aimed Curiosity.
@@ -197,6 +197,7 @@ def set_up_user_with_every_kind_of_data(
     user_id: str = client.get("/api/me", headers=headers).json()["id"]
     add_prediction_and_reaction(client.engine, user_id, clock)
     note_a_deleted_quote(client.engine, user_id, clock)
+    mark_a_pattern_type_never_again(client.engine, user_id, clock)
     return headers, user_id
 
 
@@ -205,6 +206,15 @@ def note_a_deleted_quote(engine: Engine, user_id: str, clock: FakeClock) -> None
     observations = build_postgres_repositories(engine).observations
     observations.note_deleted_quotes(
         deleted_quotes_of(observations.list_for_user(UUID(user_id))[:1], clock.now())
+    )
+
+
+def mark_a_pattern_type_never_again(
+    engine: Engine, user_id: str, clock: FakeClock
+) -> None:
+    """Mark a Pattern Type as never to be noted for a User again."""
+    build_postgres_repositories(engine).patterns.mark_never_again(
+        UUID(user_id), "CONF.AVOID.BELONG", clock.now()
     )
 
 

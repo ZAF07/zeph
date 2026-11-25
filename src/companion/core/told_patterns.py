@@ -13,7 +13,7 @@ from companion.core.models import (
     Power,
     Prediction,
 )
-from companion.core.pattern_sharing import may_be_quoted
+from companion.core.pattern_sharing import is_weighty_evidence_for, may_be_quoted
 
 STATES_SHOWN_IN_ORDER = (
     PatternState.SHARED,
@@ -62,7 +62,8 @@ class ToldPattern:
 
     Attributes:
         pattern: The Pattern.
-        wording: Its Pattern Type's approved wording.
+        wording: The approved wording it was told in; its Pattern Type's
+            wording now for one told before the wording was kept.
         where_it_shows: Where counter-tests showed it holds and doesn't.
         told_at: When the Companion first told the User about it.
         quote_groups: Its quotes by Life Thread, the Thread with the newest
@@ -160,6 +161,56 @@ def group_quotes(
     return tuple(groups)
 
 
+def wording_told(
+    pattern: CatalogPattern, pattern_types: Mapping[str, PatternType]
+) -> str | None:
+    """Find the words a Pattern is shown to the User in.
+
+    Args:
+        pattern: A Pattern the User was told.
+        pattern_types: The Pattern Types in the catalog now, by ID.
+
+    Returns:
+        The wording kept when it was shared; with none, its Pattern Type's
+        approved wording now; None when neither exists.
+    """
+    if pattern.shared_wording:
+        return pattern.shared_wording
+    pattern_type = pattern_types.get(pattern.pattern_type_id)
+    return pattern_type.approved_wording if pattern_type else None
+
+
+def quotes_shown(
+    pattern: CatalogPattern,
+    pattern_types: Mapping[str, PatternType],
+    observations: Sequence[Observation],
+) -> list[Observation]:
+    """Pick the quotes shown with a Pattern the User was told.
+
+    Args:
+        pattern: The Pattern.
+        pattern_types: The Pattern Types in the catalog now, by ID.
+        observations: The User's Observations.
+
+    Returns:
+        The ones that may be quoted back when it is shared; for a Pattern
+        whose Pattern Type left the catalog, its clear evidence for it
+        that carries weight.
+    """
+    pattern_type = pattern_types.get(pattern.pattern_type_id)
+    if pattern_type is None:
+        return [
+            observation
+            for observation in observations
+            if is_weighty_evidence_for(observation, pattern.pattern_type_id)
+        ]
+    return [
+        observation
+        for observation in observations
+        if may_be_quoted(observation, pattern_type)
+    ]
+
+
 def told_patterns(
     patterns: Sequence[CatalogPattern],
     pattern_types: Mapping[str, PatternType],
@@ -181,36 +232,31 @@ def told_patterns(
         threads: The User's Life Threads.
 
     Returns:
-        The Patterns they were told whose Pattern Type is in the catalog:
-        being tested first, then confirmed, disagreed with and closed, the
+        The Patterns they were told that have words to show (the wording
+        kept when shared, or a Pattern Type still in the catalog): being
+        tested first, then confirmed, disagreed with and closed, the
         newest told first within each.
     """
     thread_titles = {thread.id: thread.title for thread in threads}
     told = sorted(
-        (
-            pattern
-            for pattern in patterns
-            if was_told(pattern) and pattern.pattern_type_id in pattern_types
-        ),
+        (pattern for pattern in patterns if was_told(pattern)),
         key=told_at,
         reverse=True,
     )
     told.sort(key=lambda pattern: STATES_SHOWN_IN_ORDER.index(pattern.state))
     shown = []
     for pattern in told:
-        pattern_type = pattern_types[pattern.pattern_type_id]
+        wording = wording_told(pattern, pattern_types)
+        if wording is None:
+            continue
         shown.append(
             ToldPattern(
                 pattern=pattern,
-                wording=pattern_type.approved_wording,
+                wording=wording,
                 where_it_shows=where_it_shows(pattern),
                 told_at=told_at(pattern),
                 quote_groups=group_quotes(
-                    [
-                        observation
-                        for observation in observations
-                        if may_be_quoted(observation, pattern_type)
-                    ],
+                    quotes_shown(pattern, pattern_types, observations),
                     thread_titles,
                 ),
                 predictions=tuple(
