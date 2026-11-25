@@ -3,6 +3,7 @@ import type {
   ExpectedObservation,
   KeptObservation,
   TaggingResult,
+  UnclearStory,
 } from "@/lib/api-client";
 
 /**
@@ -54,11 +55,35 @@ export function describeDropped(dropped: DroppedObservation): string {
 }
 
 /**
+ * Says how an unclear story ended, or was expected to end.
+ *
+ * @param patternType - The Pattern Type it is clear for; null while unclear.
+ * @returns E.g. "Clear for CONF.AVOID.BELONG" or "Unclear".
+ */
+export function describeEnding(patternType: string | null): string {
+  return patternType ? `Clear for ${patternType}` : "Unclear";
+}
+
+/**
+ * Names what an unclear story is now, as a kept Observation is named.
+ *
+ * @param story - The unclear story after tagging.
+ * @returns E.g. "CONF.AVOID.BELONG I2 · for", or its two Pattern Types
+ *   with "unclear" while it stays unclear.
+ */
+export function describeUnclearNow(story: UnclearStory): string {
+  return story.ended_clear_for
+    ? `${[story.ended_clear_for, story.sign].filter(Boolean).join(" ")} · ${story.direction}`
+    : `${story.pattern_types.join(" or ")} · ${story.direction} · unclear`;
+}
+
+/**
  * Says how a Tagging case's result differs from what was expected.
  *
- * @param result - What the case kept, dropped and expected.
+ * @param result - What the case kept, dropped and expected, and how its
+ *   unclear stories ended.
  * @returns The pill's label: "Passed", or e.g. "Failed · 1 not kept · 1
- *   not expected", or "Failed · answer unreadable".
+ *   not expected · 1 unclear story wrong", or "Failed · answer unreadable".
  */
 export function taggingVerdict(result: TaggingResult): string {
   if (!result.answered) {
@@ -66,12 +91,18 @@ export function taggingVerdict(result: TaggingResult): string {
   }
   const notKept = result.expected.filter((item) => !item.matched).length;
   const notExpected = result.kept.filter((item) => !item.expected).length;
-  if (notKept === 0 && notExpected === 0) {
+  const unclearWrong = result.unclear.filter((item) => !item.matched).length;
+  if (notKept === 0 && notExpected === 0 && unclearWrong === 0) {
     return "Passed";
   }
   return [
     "Failed",
     ...(notKept > 0 ? [`${notKept} not kept`] : []),
     ...(notExpected > 0 ? [`${notExpected} not expected`] : []),
+    ...(unclearWrong > 0
+      ? [
+          `${unclearWrong} unclear ${unclearWrong === 1 ? "story" : "stories"} wrong`,
+        ]
+      : []),
   ].join(" · ");
 }

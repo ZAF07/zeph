@@ -1301,12 +1301,25 @@ export type ExpectedObservation = {
   matched: boolean;
 };
 
+/** An unclear story a Tagging case's User already had, and how it ended. */
+export type UnclearStory = {
+  quote: string;
+  pattern_types: string[];
+  direction: string;
+  asked: boolean;
+  ended_clear_for: string | null;
+  sign: string | null;
+  expected_clear_for: string | null;
+  matched: boolean;
+};
+
 /** What a Tagging case's tagging step kept and dropped, and what it expected. */
 export type TaggingResult = {
   answered: boolean;
   kept: KeptObservation[];
   dropped: DroppedObservation[];
   expected: ExpectedObservation[];
+  unclear: UnclearStory[];
 };
 
 /** A Pattern that became ready or was shared in a Whole-pipeline case. */

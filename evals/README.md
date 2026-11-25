@@ -54,6 +54,19 @@ There are ten:
   content in the Model Call Log, and reports the time and tokens of each
   Understanding call. A Variant can override the Understanding prompt, the
   Reply Plan prompt and the Persona's Outlook, among other settings.
+  A case's memory can also hold **suspected Patterns**: each with its
+  Observations and the tries already made at it. The made-up User then has
+  Pattern noticing (told) and Pattern exploring on. Setup saves the
+  Observations as real rows in made-up ended Conversations, runs the real
+  scoring step, saves the tries (worded by the Agenda's own code), then runs
+  the real Agenda step as if the newest of those Conversations just ended.
+  So the Agenda and the aimed Curiosity a case starts with are the ones code
+  writes, never ones typed into the case. A case can also give the only
+  Thought Experiments on the platform. A Message can then expect that the
+  Reply Plan was shown the Agenda, that it brought up the aimed Curiosity
+  (or none), and what that Curiosity aims at, how it asks and which Pattern
+  Type it is for. Judge rules check the reply asks it well and never names
+  the Pattern.
 - **Move Outcome**: each case gives a made-up User a finished Conversation:
   its messages and, for each of the User's messages, the Need, the lead and
   supporting Moves and the mood. They are saved as if they had happened, and
@@ -90,6 +103,13 @@ There are ten:
   who, Life Thread, context) and each one dropped with why. What this Eval
   can and can't show: `docs/pattern-evals/README.md`. A case makes one
   tagging call (two if the first answer can't be read).
+  A case can also give **unclear stories** the made-up User already has:
+  unclear Observations from earlier Conversations. One marked as asked
+  about was asked by an aimed Curiosity in this Conversation, so the real
+  tagging step is shown it, as for a real User, and may settle it. Each
+  story must end as the case says: clear for one of its two Pattern Types,
+  or still unclear. A story not asked about is never shown to the step, so
+  it can only stay unclear.
 - **Whole pipeline**: each case is a made-up User with hidden true Pattern
   Types and a script of several Conversations (the User's texts, and how
   many days after the one before each starts). Pattern noticing, exploring
@@ -256,6 +276,15 @@ time, the Judge's reason for each rule, and for a failed case what happened.
   "Recall · found ... wasn't reminded of" means the Thread didn't reach the
   Reply Plan at all (a closeness bar or names); "Reply Plan · raised ...
   didn't bring up" means it was shown but the model chose not to.
+  For the Agenda: "Reply Plan · agenda shown" says whether something an
+  Exploration still needs to learn was in what the Reply Plan was given
+  (code hides the Agenda while they are struggling, and it is empty once an
+  Exploration rests). "Reply Plan · aimed curiosity" says whether it
+  brought up a Curiosity the Agenda code wrote; "aimed need", "aimed way"
+  and "aimed pattern type" say what that one was for, e.g. `FAIL Reply Plan
+  · aimed need: brought up no aimed Curiosity, expected aimed at an unclear
+  story`. When "agenda shown" passes and "aimed curiosity" fails, the model
+  was offered it and left it; read "It answered" for its reason.
 - **Settings**: each case shows PASS or FAIL with the tools it should have
   called and the tools it did call. A failed case also prints Zeph's reply.
 - **Photo descriptions**: a failed case shows what leaked and the
@@ -266,7 +295,11 @@ time, the Judge's reason for each rule, and for a failed case what happened.
   Expected, Kept by code and Dropped by code. A drop names its reason
   (quote not word for word, sign or Pattern Type not in the catalog, a tag
   off its list, no context or who, a repeat). Many drops for one reason
-  point at the prompt.
+  point at the prompt. A case with unclear stories has one more check per
+  story under "Unclear stories", e.g. `"I said yes to Mei again": ended
+  unclear, expected clear for CONF.AVOID.BELONG`, and the Dashboard shows
+  an "Unclear stories" part after Expected: what it was, whether Zeph asked
+  about it, what it is now and what was expected.
 - **Whole pipeline**: the score line reads "4 of 5 ready Patterns true (80%,
   target 70%); 4 of 7 true Patterns found". Each case lists the Patterns
   that became ready or were shared, PASS for a true one and FAIL for one
@@ -361,6 +394,20 @@ backend rewrites it into the form's shape when it reads it.
   the Reply Plan only when close enough to the Message (the Move Outcome
   closeness bar in Platform Settings), so write their situation and feeling
   near the Message's words.
+  For an Agenda case, add `patterns` to the memory (the file's top lists
+  the fields). A Pattern must come out suspected, or the case is an Error:
+  it needs 100 points in two situations (two Life Threads, or two different
+  people or parts of life), e.g. one strong sign and one more story. Which
+  need the aimed Curiosity gets follows the Agenda's rules: an unclear
+  story first (give an Observation a `second_pattern_type`), then a part of
+  life not seen yet (home, work, with friends), then a counter-test. `tries`
+  move the way on: after a try with nothing the next way is used, and a
+  Thought Experiment comes after "would it differ with someone else". A try
+  waits 3 days after one with nothing, and when a try's day is the newest
+  day in the case no aimed Curiosity is written at all (never two
+  Conversations in a row), so give a newer Observation when the case needs
+  one asked. Each try's made-up Conversation is given a few replies after
+  it, so the pace between Curiosities doesn't hold the next one back.
 - `day_summary.yaml`: add an `id`, the day's `messages` (each `who`, `time`
   and `text`, in order; write times with AM or PM, since YAML reads a bare
   21:10 as a number) and `questions` (each `question` and `expected`).
@@ -371,6 +418,11 @@ backend rewrites it into the form's shape when it reads it.
   there is nothing to tag). Only CONF.AVOID.BELONG can be situational today
   (strangers, or someone above them). The quote must be the User's own
   words, so put the telling line in a User message.
+  Add `unclear` for unclear stories they already have (the file's top lists
+  the fields): `asked: false` for one Zeph didn't ask about, and
+  `ends_clear_for` with one of its two Pattern Types when the answer should
+  settle it. An answer that settles a story is often evidence itself, so
+  also list the Observation it should leave under `observations`.
 
 - `whole_pipeline.yaml`: add an `id`, the `true_pattern_types` (leave out
   when none is true) and the `conversations`, each with `days_later` and the

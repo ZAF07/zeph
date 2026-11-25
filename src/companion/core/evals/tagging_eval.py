@@ -4,12 +4,23 @@ from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
+from companion.core.agenda import OpenNeed, aimed_question
 from companion.core.evals.cases import (
     ExpectedObservation,
     TaggingCase,
     TaggingMessage,
+    UnclearStory,
 )
-from companion.core.evals.made_up_memory import to_thread_to_save
+from companion.core.evals.made_up_memory import (
+    add_ended_conversation,
+    to_thread_to_save,
+)
+from companion.core.evals.made_up_patterns import (
+    catalog_pattern_types,
+    pattern_type_in_catalog,
+    thread_ids_by_title,
+    to_observation,
+)
 from companion.core.evals.models import CaseCheckResult, CaseOutcome, Check
 from companion.core.evals.move_outcome_eval import last_call_facts
 from companion.core.evals.ports import EvalCompanion, EvalSetupError
@@ -20,6 +31,13 @@ from companion.core.evals.understanding_eval import (
 from companion.core.models import (
     Conversation,
     ConversationMessage,
+    Curiosity,
+    CuriosityAim,
+    CuriosityChanges,
+    CuriositySensitivity,
+    CuriosityState,
+    ExplorationNeed,
+    ExplorationWay,
     MessageDirection,
     MessageKind,
     ModelStep,
@@ -32,6 +50,7 @@ MESSAGE_GAP = timedelta(minutes=1)
 ENDED_AFTER = timedelta(hours=1)
 NOT_EXPECTED = "Kept but not expected"
 CONTEXT_LINE_GROUP = "Context lines"
+UNCLEAR_STORIES_GROUP = "Unclear stories"
 GENDERED_WORDS = re.compile(
     r"\b(he|she|him|her|his|hers|himself|herself)\b", re.IGNORECASE
 )
@@ -77,6 +96,140 @@ def save_ended_conversation(
             )
         )
     return conversation.id
+
+
+def save_unclear_stories(
+    repositories: Repositories,
+    user_id: UUID,
+    stories: Sequence[UnclearStory],
+    now: datetime,
+) -> list[Observation]:
+    """Save the unclear Observations the made-up User already has.
+
+    Each is saved in an ended Conversation of its day, as the tagging step
+    would have kept it. A story Zeph asked about gets a waiting aimed
+    Curiosity that goes back to it, worded by the Agenda's own code.
+
+    Args:
+        repositories: Where Observations and Curiosities are stored.
+        user_id: The made-up User's ID; their Life Threads are saved.
+        stories: The unclear stories.
+        now: When the case's Conversation starts.
+
+    Returns:
+        The saved Observations, in the stories' order.
+
+    Raises:
+        EvalSetupError: If a Pattern Type or sign isn't in the catalog.
+    """
+    pattern_types = catalog_pattern_types(repositories)
+    thread_ids = thread_ids_by_title(repositories, user_id)
+    saved: list[Observation] = []
+    asking: list[Curiosity] = []
+    for story in stories:
+        said_at = now - timedelta(days=story.observation.days_ago)
+        pattern_type = pattern_type_in_catalog(pattern_types, story.pattern_type)
+        observation = to_observation(
+            user_id,
+            pattern_type,
+            story.observation,
+            pattern_types,
+            thread_ids,
+            add_ended_conversation(repositories, user_id, said_at),
+            said_at,
+        )
+        saved.append(observation)
+        if story.asked:
+            question, why = aimed_question(
+                OpenNeed(ExplorationNeed.UNCLEAR, observation=observation),
+                ExplorationWay.STORY_FOLLOW_UP,
+                pattern_type,
+            )
+            asking.append(
+                Curiosity(
+                    id=uuid4(),
+                    user_id=user_id,
+                    question=question,
+                    why=why,
+                    not_before=None,
+                    sensitivity=CuriositySensitivity.MEDIUM,
+                    state=CuriosityState.WAITING,
+                    created_at=said_at,
+                    aim=CuriosityAim.EXPLORATION,
+                    source_observation_id=observation.id,
+                )
+            )
+    repositories.observations.add_many(saved)
+    repositories.curiosities.save_changes(
+        CuriosityChanges(added=asking, updated=[], reactions={})
+    )
+    return saved
+
+
+def describe_ending(pattern_type: str | None) -> str:
+    """Say how an unclear story ended, or must end.
+
+    Args:
+        pattern_type: The Pattern Type it is clear for; None while unclear.
+
+    Returns:
+        E.g. "clear for CONF.AVOID.BELONG" or "unclear".
+    """
+    return f"clear for {pattern_type}" if pattern_type else "unclear"
+
+
+def unclear_story_facts(
+    story: UnclearStory, after: Observation | None
+) -> dict[str, Any]:
+    """Write how an unclear story ended, for the result.
+
+    Args:
+        story: The unclear story and how it must end.
+        after: Its Observation after tagging; None if it is gone, which
+            reads as still unclear (the tagging step deletes none).
+
+    Returns:
+        Its quote, its two Pattern Types, whether Zeph asked about it, the
+        Pattern Type and sign it ended clear for (None while unclear), the
+        Pattern Type expected (None to stay unclear) and whether they agree.
+    """
+    settled = after is not None and not after.unclear
+    ended_clear_for = after.pattern_type_id if after and settled else None
+    return {
+        "quote": story.observation.quote,
+        "pattern_types": story.pattern_types,
+        "direction": story.observation.direction.value,
+        "asked": story.asked,
+        "ended_clear_for": ended_clear_for,
+        "sign": after.sign_id if after and settled else None,
+        "expected_clear_for": story.ends_clear_for,
+        "matched": ended_clear_for == story.ends_clear_for,
+    }
+
+
+def check_unclear_stories(facts: Sequence[Mapping[str, Any]]) -> list[Check]:
+    """Check each unclear story ended clear or stayed unclear, as expected.
+
+    Args:
+        facts: How each story ended (see `unclear_story_facts`).
+
+    Returns:
+        One check per story, named by its quote.
+    """
+    return [
+        Check(
+            f'"{story["quote"]}"',
+            story["matched"],
+            f"ended {describe_ending(story['ended_clear_for'])}"
+            + (
+                ""
+                if story["matched"]
+                else f", expected {describe_ending(story['expected_clear_for'])}"
+            ),
+            UNCLEAR_STORIES_GROUP,
+        )
+        for story in facts
+    ]
 
 
 def named_pattern_types(observation: Observation) -> list[str]:
@@ -289,6 +442,7 @@ def tagging_facts(
     planned: PlannedObservations | None,
     expected: Sequence[ExpectedObservation],
     thread_titles: Mapping[UUID, str],
+    unclear: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     """Write what the tagging step kept and dropped, against what was expected.
 
@@ -297,9 +451,11 @@ def tagging_facts(
             couldn't be read.
         expected: The Observations expected.
         thread_titles: The touched Life Threads' titles, by ID.
+        unclear: How each unclear story the User already had ended.
 
     Returns:
-        `answered`, `kept`, `dropped` and `expected` (each with `matched`).
+        `answered`, `kept`, `dropped`, `expected` (each with `matched`) and
+        `unclear`.
     """
     kept = planned.kept if planned else []
     return {
@@ -318,6 +474,7 @@ def tagging_facts(
             }
             for expectation in expected
         ],
+        "unclear": list(unclear),
     }
 
 
@@ -325,17 +482,19 @@ def check_tagging_case(case: TaggingCase, companion: EvalCompanion) -> CaseCheck
     """Tag Observations from an ended Conversation and check those kept.
 
     The made-up User has Pattern noticing on and has been told. Their Life
-    Threads and Conversation are saved as if they had happened, then the
-    real tagging step runs alone an hour after the last message, with the
-    Threads as the ones the Conversation touched.
+    Threads, the unclear stories they already have and the Conversation are
+    saved as if they had happened, with each story Zeph asked about raised
+    in the Conversation by an aimed Curiosity. Then the real tagging step
+    runs alone an hour after the last message, with the Threads as the ones
+    the Conversation touched.
 
     Args:
         case: The ended Conversation and the Observations expected.
         companion: The app on the Eval database.
 
     Returns:
-        A check per expected Observation, per one kept but not expected and
-        per kept context line that says he or she;
+        A check per expected Observation, per one kept but not expected, per
+        kept context line that says he or she and per unclear story;
         a failed "answer read" check alone if the answer couldn't be read.
         Its facts hold what was kept and dropped and the tagging call's
         time and tokens. A failed case notes the Observations and the
@@ -343,7 +502,9 @@ def check_tagging_case(case: TaggingCase, companion: EvalCompanion) -> CaseCheck
 
     Raises:
         EvalSetupError: If the tagging step didn't run at all, e.g. with an
-            empty Pattern Catalog, so the case is an Error, not a Fail.
+            empty Pattern Catalog, or an unclear story names a Pattern Type
+            or sign the catalog doesn't have, so the case is an Error, not
+            a Fail.
     """
     companion.move_clock(case.now - companion.now())
     user_id = companion.connect_user()
@@ -356,7 +517,17 @@ def check_tagging_case(case: TaggingCase, companion: EvalCompanion) -> CaseCheck
     ]
     repositories.life_threads.save_many(added=threads, changed=[])
     touched = [saved.thread for saved in threads]
+    stories = save_unclear_stories(repositories, user_id, case.unclear, now)
     conversation_id = save_ended_conversation(repositories, user_id, case.messages, now)
+    repositories.curiosities.mark_raised(
+        [
+            curiosity.id
+            for curiosity in repositories.curiosities.list_waiting(user_id)
+            if curiosity.aim == CuriosityAim.EXPLORATION
+        ],
+        conversation_id,
+        now,
+    )
     companion.move_clock(MESSAGE_GAP * len(case.messages) + ENDED_AFTER)
     seen_trace_ids: set[UUID] = set()
     calls_in_new_traces(repositories, user_id, seen_trace_ids)
@@ -367,8 +538,18 @@ def check_tagging_case(case: TaggingCase, companion: EvalCompanion) -> CaseCheck
     ):
         raise EvalSetupError("The tagging step didn't run for the made-up User")
 
+    after = {
+        observation.id: observation
+        for observation in repositories.observations.list_for_user(user_id)
+    }
+    unclear = [
+        unclear_story_facts(story, after.get(saved.id))
+        for story, saved in zip(case.unclear, stories, strict=True)
+    ]
     checks = (
-        check_kept(case.observations, planned.kept) + check_context_lines(planned.kept)
+        check_kept(case.observations, planned.kept)
+        + check_context_lines(planned.kept)
+        + check_unclear_stories(unclear)
         if planned is not None
         else [
             Check("answer read", False, "the tagging model's answer couldn't be read")
@@ -376,7 +557,10 @@ def check_tagging_case(case: TaggingCase, companion: EvalCompanion) -> CaseCheck
     )
     passed = all(check.passed for check in checks)
     facts = tagging_facts(
-        planned, case.observations, {thread.id: thread.title for thread in touched}
+        planned,
+        case.observations,
+        {thread.id: thread.title for thread in touched},
+        unclear,
     )
     return CaseCheckResult(
         outcome=CaseOutcome.PASS if passed else CaseOutcome.FAIL,
@@ -397,6 +581,12 @@ def check_tagging_case(case: TaggingCase, companion: EvalCompanion) -> CaseCheck
                 ),
                 "Dropped:",
                 *(f'"{item["quote"]}": {item["reason"]}' for item in facts["dropped"]),
+                *(["Unclear stories:"] if unclear else []),
+                *(
+                    f'"{item["quote"]}": ended '
+                    f"{describe_ending(item['ended_clear_for'])}"
+                    for item in unclear
+                ),
                 "",
                 *(
                     transcript_line(message.from_person, message.text)

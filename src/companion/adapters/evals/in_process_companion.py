@@ -31,6 +31,7 @@ from companion.adapters.postgres.eval_repositories import (
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.adapters.pypdf.text_extractor import PypdfTextExtractor
 from companion.app import AppDependencies, create_app
+from companion.core.agenda import AgendaEntry, AgendaKeeper, AgendaReader
 from companion.core.evals.cases import EvalWebResult
 from companion.core.evals.models import EvalImage, ModelTokens, Replies
 from companion.core.evals.ports import EvalSetupError
@@ -38,6 +39,7 @@ from companion.core.model_call_log import ModelCallLog, start_trace
 from companion.core.models import (
     Feature,
     LifeThread,
+    PatternMoveCause,
     PhotoImage,
     TraceKind,
     UserSnapshot,
@@ -45,6 +47,7 @@ from companion.core.models import (
 from companion.core.move_outcomes import MoveOutcomeKeeper
 from companion.core.observations import PatternTagger, PlannedObservations
 from companion.core.pattern_catalog import PatternCatalogService
+from companion.core.pattern_scoring import PatternScorer
 from companion.core.platform_settings import CONVERSATION_QUIET_GAP
 from companion.core.ports import ChatModel, Embedder, PhotoViewer, Repositories
 from companion.core.post_conversation import DayMemoryWriter
@@ -667,6 +670,18 @@ class InProcessCompanion:
             "Pressing Got it on the Pattern noticing notice",
         )
 
+    def turn_pattern_exploring_on(self) -> None:
+        """Turn Pattern noticing and exploring on for the made-up User.
+
+        An Admin switches each on for them, and they press "Got it" on the
+        Pattern noticing notice. Pattern sharing stays off.
+
+        Raises:
+            EvalSetupError: If no User is connected.
+        """
+        self.turn_pattern_noticing_on()
+        self._switch_feature_on("pattern_exploring")
+
     def turn_pattern_sharing_on(self) -> None:
         """Turn Pattern noticing, exploring and sharing on for the made-up User.
 
@@ -676,17 +691,53 @@ class InProcessCompanion:
         Raises:
             EvalSetupError: If no User is connected.
         """
-        self.turn_pattern_noticing_on()
-        for feature in ("pattern_exploring", "pattern_sharing"):
-            require_status(
-                self._client.put(
-                    f"/api/admin/users/{self._user_id}/features/{feature}",
-                    json={"switch": "on"},
-                    headers=self._admin_headers(),
-                ),
-                200,
-                f"Turning {feature} on",
-            )
+        self.turn_pattern_exploring_on()
+        self._switch_feature_on("pattern_sharing")
+
+    def score_patterns(self) -> None:
+        """Score the made-up User's Patterns from their Observations.
+
+        The scorer is built the way the app builds it for the quiet gap.
+
+        Raises:
+            EvalSetupError: If no User is connected, or User Memory doesn't
+                work for them.
+        """
+        snapshot = self._conversation_end_snapshot()
+        PatternScorer(self._repositories, self._pattern_catalog(), self._clock).score(
+            snapshot.user, snapshot.settings, PatternMoveCause.CONVERSATION_TAGGED
+        )
+
+    def keep_agenda(self, conversation_id: UUID) -> None:
+        """Keep the made-up User's Agenda as if a Conversation just ended.
+
+        The keeper is built the way the app builds it for the quiet gap.
+
+        Args:
+            conversation_id: The Conversation that just ended.
+
+        Raises:
+            EvalSetupError: If no User is connected, or User Memory doesn't
+                work for them.
+        """
+        AgendaKeeper(self._repositories, self._pattern_catalog(), self._clock).keep(
+            self._conversation_end_snapshot(), conversation_id
+        )
+
+    def read_agenda(self) -> list[AgendaEntry]:
+        """Read the made-up User's Agenda as the Reply Plan is given it.
+
+        Returns:
+            Their active Explorations with what each still needs to learn,
+            as for a User who isn't struggling.
+
+        Raises:
+            EvalSetupError: If no User is connected, or User Memory doesn't
+                work for them.
+        """
+        return AgendaReader(
+            self._repositories, self._pattern_catalog(), self._clock
+        ).read(self._conversation_end_snapshot(), struggling=False)
 
     def end_conversation(self) -> None:
         """Let the made-up User's Conversation go quiet and run the scheduled work.
@@ -738,7 +789,7 @@ class InProcessCompanion:
         snapshot = self._conversation_end_snapshot()
         tagger = PatternTagger(
             self._repositories,
-            PatternCatalogService(self._repositories.pattern_catalog),
+            self._pattern_catalog(),
             self._conversation_end_chat_model(),
             ModelCallLog(
                 self._repositories,
@@ -780,6 +831,30 @@ class InProcessCompanion:
         writer.write(
             snapshot, conversation, conversations.list_messages(conversation.id)
         )
+
+    def _switch_feature_on(self, feature: str) -> None:
+        """Switch a Feature on for the made-up User, as an Admin.
+
+        Args:
+            feature: The Feature's key, e.g. "pattern_exploring".
+        """
+        require_status(
+            self._client.put(
+                f"/api/admin/users/{self._user_id}/features/{feature}",
+                json={"switch": "on"},
+                headers=self._admin_headers(),
+            ),
+            200,
+            f"Turning {feature} on",
+        )
+
+    def _pattern_catalog(self) -> PatternCatalogService:
+        """Build the service that reads the Eval database's Pattern Catalog.
+
+        Returns:
+            The service.
+        """
+        return PatternCatalogService(self._repositories.pattern_catalog)
 
     def _conversation_end_snapshot(self) -> UserSnapshot:
         """Read the made-up User as a Conversation-end step reads them.

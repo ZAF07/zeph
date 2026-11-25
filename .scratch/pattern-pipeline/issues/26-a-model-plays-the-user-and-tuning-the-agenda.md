@@ -56,3 +56,12 @@ Tuning the Agenda's prompts:
 To be written after the grill.
 
 ## Comments
+
+**25 Nov 2026, from issue 25's first real run** (12 cases, 9 passed; details in `20-findings-for-the-owner.md`, section 25). For the grill, question 15:
+
+- The reply said the User's words back when asking the aimed question ("You said yes the moment she asked"). `describe_story` gives the reply the context line, not the quote, so the model worked it out. A prompt matter.
+- With two Explorations the Reply Plan asked neither aimed Curiosity, with no reason given. One run only.
+- Two aimed Curiosities are offered in the order written, not the Agenda's rank order, though the prompt says the aimed one "is first". A rule matter, not a prompt one.
+- The Judge rule `never_names_a_pattern` failed a reply that recalled an event. The rule may need narrowing before it is used to judge prompt changes.
+- The cases to run when tuning: `docs/pattern-evals/README.md`, "How to run the Agenda cases".
+

@@ -163,6 +163,25 @@ EDITS: dict[EvalName, dict[str, Any]] = {
 }
 
 
+MADE_UP_OBSERVATION = {
+    "quote": "I said yes to Mei again",
+    "sign": "I2",
+    "direction": "for",
+    "context": "Mei asked for help moving; they said yes though worn out.",
+    "about": "Mei, their sister",
+    "days_ago": 6,
+}
+SUSPECTED_PATTERN = {
+    "pattern_type": "CONF.AVOID.BELONG",
+    "observations": [MADE_UP_OBSERVATION],
+}
+UNCLEAR_STORY = {
+    **MADE_UP_OBSERVATION,
+    "pattern_type": "CONF.AVOID.BELONG",
+    "second_pattern_type": "ACH.WORTH.PERF",
+}
+
+
 def upload_image(
     client: TestClient, admin: dict[str, str], content: bytes = CARD_IMAGE
 ) -> str:
@@ -344,6 +363,90 @@ def test_an_invalid_save_is_refused_with_a_message_per_field(
             {"messages": [{"text": "hi", "expect": {"raised": ["No such thread"]}}]},
             "messages.0.expect.raised",
             "No Life Thread has this title: No such thread",
+        ),
+        (
+            EvalName.UNDERSTANDING,
+            {"messages": [{"text": "hi", "expect": {"aimed_raised": True}}]},
+            "messages.0.expect.aimed_raised",
+            "Needs a suspected Pattern in the made-up User Memory.",
+        ),
+        (
+            EvalName.UNDERSTANDING,
+            {
+                "memory": {"patterns": [SUSPECTED_PATTERN]},
+                "messages": [
+                    {
+                        "text": "hi",
+                        "expect": {"aimed_raised": False, "aimed_need": "unclear"},
+                    }
+                ],
+            },
+            "messages.0.expect.aimed_need",
+            "Expects no aimed Curiosity, so leave this empty.",
+        ),
+        (
+            EvalName.UNDERSTANDING,
+            {
+                "memory": {
+                    "patterns": [
+                        {
+                            **SUSPECTED_PATTERN,
+                            "observations": [{**MADE_UP_OBSERVATION, "thread": "Gone"}],
+                        }
+                    ]
+                },
+                "messages": [{"text": "hi", "expect": {}}],
+            },
+            "memory.patterns.0.observations.0.thread",
+            "No Life Thread has this title: Gone",
+        ),
+        (
+            EvalName.UNDERSTANDING,
+            {
+                "memory": {
+                    "patterns": [
+                        {
+                            **SUSPECTED_PATTERN,
+                            "tries": [
+                                {
+                                    "need": "unclear",
+                                    "way": "thought_experiment",
+                                    "outcome": "vague",
+                                    "days_ago": 3,
+                                }
+                            ],
+                        }
+                    ]
+                }
+            },
+            "memory.patterns.0.tries.0.way",
+            "Pick one of: Story follow-up",
+        ),
+        (
+            EvalName.TAGGING,
+            {
+                "unclear": [
+                    {
+                        **UNCLEAR_STORY,
+                        "asked": False,
+                        "ends_clear_for": "CONF.AVOID.BELONG",
+                    }
+                ]
+            },
+            "unclear.0.ends_clear_for",
+            "Only a story Zeph asked about can end clear.",
+        ),
+        (
+            EvalName.TAGGING,
+            {"unclear": [{**UNCLEAR_STORY, "ends_clear_for": "REL.MOOD.FIX"}]},
+            "unclear.0.ends_clear_for",
+            "Must be one of its two Pattern Types: CONF.AVOID.BELONG or ACH.WORTH.PERF",
+        ),
+        (
+            EvalName.TAGGING,
+            {"unclear": [{**UNCLEAR_STORY, "second_pattern_type": ""}]},
+            "unclear.0.second_pattern_type",
+            "Needs some text.",
         ),
         (
             EvalName.SETTINGS,

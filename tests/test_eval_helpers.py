@@ -51,6 +51,7 @@ from companion.core.evals.models import (
 )
 from companion.core.evals.safeguard_eval import describe_safeguard_case
 from companion.core.evals.settings_eval import SETTINGS_TOOLS, SettingsResult
+from companion.core.evals.understanding_checks import check_aim
 from companion.main import EVAL_CASES_DIR, EVAL_IMAGES_DIR
 from tests.test_settings_via_chat import SETTINGS_TOOLS as OFFERED_SETTINGS_TOOLS
 
@@ -538,3 +539,21 @@ def test_the_report_prints_the_runs_cost_and_models_with_no_price() -> None:
         "Cost: S$0.0500, at the prices the run started with; "
         "deepseek-x has no price set, so its tokens aren't counted"
     ) in unpriced
+
+
+def test_an_aim_check_fails_when_another_aimed_curiosity_was_brought_up_too() -> None:
+    both = check_aim(
+        "aimed pattern type",
+        "for CONF.AVOID.BELONG",
+        ["for CONF.AVOID.BELONG", "for ACH.WORTH.PERF"],
+    )
+    only = check_aim(
+        "aimed pattern type", "for CONF.AVOID.BELONG", ["for CONF.AVOID.BELONG"]
+    )
+
+    assert (both.passed, both.detail) == (
+        False,
+        "for CONF.AVOID.BELONG and for ACH.WORTH.PERF, "
+        "expected only for CONF.AVOID.BELONG",
+    )
+    assert (only.passed, only.detail) == (True, "for CONF.AVOID.BELONG")
