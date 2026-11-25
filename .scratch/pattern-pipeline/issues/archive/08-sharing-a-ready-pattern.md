@@ -99,4 +99,4 @@ Evidence (25 Nov 2026, worktree stack on 3010/8010, real model (`deepseek-v4.1-f
 ## Completion
 
 - Completed: 2026-11-25
-- Commit: <merge commit, filled in after the merge>
+- Commit: d92dd80 (merge of `pattern-08-sharing-a-ready-pattern` into main; work commits 189969b, 293bb75, 7d32884, 40c06e9, 8858909, eda5a1e)
