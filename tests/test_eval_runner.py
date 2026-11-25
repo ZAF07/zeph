@@ -3561,8 +3561,13 @@ def test_each_seeded_agenda_case_starts_with_the_agenda_it_expects(
     runner: EvalRunner,
     case: EvalCase,
 ) -> None:
+    """Which Exploration a picked Curiosity is for is left to the real model.
+
+    Two aimed Curiosities written at the same moment are offered in no fixed
+    order, so the scripted "pick number 1" can't choose between them.
+    """
     [message] = case.content["messages"]
-    expect = {**message["expect"], "rules": []}
+    expect = {**message["expect"], "rules": [], "aimed_pattern_type": ""}
     unjudged = {**case.content, "messages": [{**message, "expect": expect}]}
     add_cases(engine, EvalCase(case.key, case.eval, unjudged))
     admin = owner_headers(client, auth_verifier)
