@@ -81,6 +81,9 @@ AIM_WORDS = {
         "how they would choose in a made-up situation, to start getting to "
         "know them (a starter Thought Experiment)"
     ),
+    CuriosityAim.PREDICTION: (
+        "how a Prediction went, or a new one to give, for a Pattern Zeph told them"
+    ),
 }
 TREATMENT_WORDS = {
     CuriosityTreatment.ASK_BY_DEFAULT: (
@@ -179,13 +182,15 @@ def due_curiosities(
 
     Args:
         waiting: A User's waiting Curiosities.
-        snapshot: The User. Without Pattern exploring, no Curiosity written
-            by code is kept; a starter Thought Experiment is kept only
-            while starters are still offered to them.
+        snapshot: The User. Without Pattern exploring, no Curiosity an
+            Exploration or a starter Thought Experiment wrote is kept; a
+            starter is kept only while starters are still offered to them;
+            one about a Prediction is kept only while Pattern sharing works.
 
     Returns:
-        Those with no "not before" day or whose day has come: the ones code
-        wrote first, then the rest, each in order.
+        Those with no "not before" day or whose day has come, and whose
+        last day, if any, hasn't passed: the ones code wrote first, then
+        the rest, each in order.
     """
     exploring = snapshot.works(Feature.PATTERN_EXPLORING)
     starters = exploring and starters_offered(
@@ -197,11 +202,13 @@ def due_curiosities(
     may_be_asked = {
         CuriosityAim.EXPLORATION: exploring,
         CuriosityAim.STARTER: starters,
+        CuriosityAim.PREDICTION: snapshot.works(Feature.PATTERN_SHARING),
     }
     due = [
         curiosity
         for curiosity in waiting
         if (curiosity.not_before is None or curiosity.not_before <= snapshot.today)
+        and (curiosity.not_after is None or snapshot.today <= curiosity.not_after)
         and may_be_asked.get(curiosity.aim, True)
     ]
     return sorted(due, key=lambda curiosity: curiosity.aim not in AIMS_WRITTEN_BY_CODE)

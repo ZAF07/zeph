@@ -48,6 +48,7 @@ from companion.core.platform_settings import (
     WEB_SEARCH_DAILY_LIMIT,
 )
 from companion.core.ports import ChatTool, Repositories
+from companion.core.predictions import PredictionKeeper
 from companion.core.ready_gate import ReadyKeeper
 from companion.core.recent_messages import RecentMessages
 from companion.core.reply_tools import Attachment, ReplyContext, ReplyOffer
@@ -351,6 +352,9 @@ def build_settings_tools(repositories: Repositories) -> SettingsTools:
         clock=clock,
         pattern_sharing=PatternSharing(
             repositories, ready_keeper, pattern_catalog, chat_model, clock
+        ),
+        prediction_keeper=PredictionKeeper(
+            repositories, pattern_catalog, chat_model, clock
         ),
     )
     users = UserService(

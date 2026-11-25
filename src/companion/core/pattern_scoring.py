@@ -10,10 +10,13 @@ from companion.core.models import (
     ObservationDirection,
     PatternMove,
     PatternMoveCause,
+    PatternMoveReason,
     PatternReaction,
     PatternState,
     PatternType,
     PlatformSettings,
+    Prediction,
+    PredictionOutcome,
     ReactionToPattern,
     ReadyCheck,
     SignStrength,
@@ -220,6 +223,41 @@ def reaction_points(
     return points
 
 
+def prediction_points(
+    predictions: Sequence[Prediction],
+    numbers: ScoringNumbers,
+    today: date,
+    time_zone: str | None,
+) -> float:
+    """Work out what the Predictions given for one Pattern are worth today.
+
+    One that came true counts as one strong sign for the Pattern and one
+    that didn't as one strong sign against it, each halved every half-life
+    since the day the User said so; any other counts nothing.
+
+    Args:
+        predictions: The Predictions given for the Pattern.
+        numbers: The Admin-set numbers.
+        today: The User's day now.
+        time_zone: The User's IANA time zone, for the day of each outcome.
+
+    Returns:
+        The points; negative when more didn't come true than did.
+    """
+    strong = numbers.sign_points[SignStrength.STRONG]
+    worth = {PredictionOutcome.CAME_TRUE: strong, PredictionOutcome.DID_NOT: -strong}
+    points = 0.0
+    for prediction in predictions:
+        if prediction.outcome not in worth or prediction.outcome_at is None:
+            continue
+        day = users_today(time_zone, prediction.outcome_at)
+        age_in_days = max((today - day).days, 0)
+        points += worth[prediction.outcome] * 0.5 ** (
+            age_in_days / numbers.half_life_days
+        )
+    return points
+
+
 def situation_of(observation: Observation) -> Hashable:
     """Say which situation an Observation belongs to.
 
@@ -327,6 +365,19 @@ def score_observations(
     )
 
 
+def is_moved_by_score(pattern: CatalogPattern) -> bool:
+    """Say whether a Pattern's state follows the score of its Observations.
+
+    Args:
+        pattern: The Pattern.
+
+    Returns:
+        True for a noticed, suspected or closed Pattern the User was never
+        told; one closed after it was shared stays closed.
+    """
+    return pattern.state in STATES_MOVED_BY_SCORE and pattern.shared_at is None
+
+
 def state_for(
     current: PatternState, score: PatternScore, bars: StateBars
 ) -> PatternState:
@@ -389,6 +440,7 @@ def logged_move(
     conversation_id: UUID | None,
     now: datetime,
     blocked_by: ReadyCheck | None = None,
+    reason: PatternMoveReason | None = None,
 ) -> PatternMove:
     """Write one move of a Pattern as its log keeps it.
 
@@ -401,6 +453,7 @@ def logged_move(
         conversation_id: The Conversation tagged, when that is the cause.
         now: When it moved.
         blocked_by: The ready check to record, for a move to or from ready.
+        reason: Why a shared Pattern was confirmed or closed.
 
     Returns:
         The move.
@@ -418,6 +471,7 @@ def logged_move(
         situations=score.situations,
         moved_at=now,
         blocked_by=blocked_by,
+        reason=reason,
     )
 
 
@@ -469,7 +523,8 @@ def plan_pattern_moves(
 
     A Pattern Type with Observations and no Pattern gets one, noticed, which
     may move on at once. A noticed, suspected or closed Pattern with no
-    Observations left is deleted; one in any other state is kept.
+    Observations left is deleted; one in any other state is kept, and so
+    is one closed after it was shared, which never moves again.
 
     Args:
         user_id: The User.
@@ -494,8 +549,7 @@ def plan_pattern_moves(
         deleted_ids=[
             pattern.id
             for pattern in patterns
-            if pattern.pattern_type_id not in by_type
-            and pattern.state in STATES_MOVED_BY_SCORE
+            if pattern.pattern_type_id not in by_type and is_moved_by_score(pattern)
         ],
         moves=[],
     )
@@ -519,6 +573,8 @@ def plan_pattern_moves(
             planned.added.append(
                 moved(noticed, score, bars, cause, conversation_id, now, planned)
             )
+            continue
+        if not is_moved_by_score(pattern):
             continue
         after = moved(pattern, score, bars, cause, conversation_id, now, planned)
         if after is not pattern:

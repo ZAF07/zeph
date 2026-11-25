@@ -724,6 +724,7 @@ export type ModelStep =
   | "pattern_tagging"
   | "pattern_other_side"
   | "pattern_shared_check"
+  | "prediction_given_check"
   | "pattern_matching"
   | "patterns"
   | "portrait"

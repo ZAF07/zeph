@@ -879,6 +879,18 @@ pattern_exclusion_summary_days: 7
 patterns_shared_per_week: 1
 pattern_share_wait_days: 5
 
+# Following up a Prediction (while Pattern sharing and Curiosities work):
+# Zeph asks how it went no sooner than this many days after giving it, and a
+# Prediction with no answer after the longer time is dropped. A shared Pattern
+# is confirmed once this many of its Predictions came true, or once the
+# Observations tagged after it was shared reach this score by themselves.
+# Starting values from the pattern-pipeline grill (decision 29); the score is
+# the ready bar, a first guess.
+prediction_follow_up_wait_days: 7
+prediction_follow_up_drop_days: 21
+predictions_to_confirm: 2
+pattern_confirm_points_after_sharing: 300
+
 # Topics no Pattern is drawn or shared from unless the User raised them. A
 # first list, for the owner to correct.
 pattern_ruled_out_topics:
@@ -1431,7 +1443,8 @@ pattern_tagging_prompt: |-
   this Conversation, if any, each with a number; the Thought Experiments
   (made-up situations) Zeph put to them in this Conversation, if any, each
   with a number; their open Life Threads and latest Day Summaries (what is
-  going on in their life now); the ruled-out topics; and the Conversation.
+  going on in their life now); the ruled-out topics; the Patterns Zeph has
+  told them and the Predictions it gave them, if any; and the Conversation.
 
   Write one Observation for each thing the person said that matches a sign
   of a Pattern Type, for it or against it. Only what the person said counts,
@@ -1506,6 +1519,17 @@ pattern_tagging_prompt: |-
   Pattern out when this Conversation doesn't touch it. "reactions" is an
   empty list when there is none.
 
+  You may be given Predictions Zeph gave them, numbered: one thing each to
+  notice in their own life, to test a Pattern. When the person says in this
+  Conversation how one went, put it under "prediction_outcomes" with its
+  number and one of: "came_true" (the moment came and it went as the
+  Prediction said), "did_not" (the moment came and it went differently),
+  "not_come_up" (they say the moment hasn't come yet, or they haven't had
+  the chance to notice). Read only what they said themselves about what
+  happened: agreeing that it sounds likely is not "came_true", and silence
+  is not "not_come_up". Leave a Prediction out when they don't say how it
+  went. "prediction_outcomes" is an empty list when there is none.
+
   Answer with JSON only, in exactly this shape:
   {
     "observations": [
@@ -1525,6 +1549,10 @@ pattern_tagging_prompt: |-
     ],
     "reactions": [
       {"pattern": <number>, "reaction": "agreed" | "pushed_back" | "brushed_off"}
+    ],
+    "prediction_outcomes": [
+      {"prediction": <number>,
+       "outcome": "came_true" | "did_not" | "not_come_up"}
     ]
   }
 

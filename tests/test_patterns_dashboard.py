@@ -307,7 +307,7 @@ def test_with_user_memory_off_a_user_still_sees_and_deletes_patterns(
     assert patterns_shown(client, headers) == []
 
 
-def test_the_portrait_is_written_from_confirmed_patterns_only(
+def test_a_pattern_with_no_pattern_type_never_reaches_the_portrait(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -343,7 +343,8 @@ def test_the_portrait_is_written_from_confirmed_patterns_only(
     )
 
     given = chat_model.portrait_calls[-1].history[0].text
-    assert f"Patterns they agreed with:\n- {GOES_QUIET}" in given
+    assert "Patterns they agreed with:\nNone yet." in given
+    assert GOES_QUIET not in given
     assert HIDDEN not in given
     assert CLOSED not in given
     assert "patterns they agreed with" in seeded_settings["portrait_prompt"].lower()

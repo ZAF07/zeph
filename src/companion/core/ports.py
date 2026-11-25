@@ -1605,10 +1605,19 @@ class PatternRepository(Protocol):
         ...
 
     def add_prediction(self, prediction: Prediction) -> None:
-        """Save the Prediction given with a shared Pattern.
+        """Save a Prediction given for a shared Pattern.
 
         Args:
             prediction: The Prediction.
+        """
+        ...
+
+    def save_prediction_outcomes(self, settled: Sequence[Prediction]) -> None:
+        """Save how some Predictions went.
+
+        Args:
+            settled: The Predictions, each with its outcome and when it
+                was read or set.
         """
         ...
 
@@ -2044,6 +2053,17 @@ class CuriosityRepository(Protocol):
 
         Returns:
             The Curiosities with the starter aim, in any state.
+        """
+        ...
+
+    def list_about_predictions(self, user_id: UUID) -> list[Curiosity]:
+        """List a User's Curiosities about Predictions, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Curiosities with the Prediction aim, in any state.
         """
         ...
 

@@ -85,6 +85,7 @@ from companion.core.ports import (
     MessageRefusedError,
     Repositories,
 )
+from companion.core.predictions import PredictionKeeper
 from companion.core.settings_changes import record_where_changed
 from companion.core.timing import users_today
 from companion.core.usage import UsageLimiter, UsageRecordingChatModel
@@ -556,6 +557,7 @@ class CheckInService:
         chat_channel: ChatChannel,
         clock: Clock,
         pattern_sharing: PatternSharing,
+        prediction_keeper: PredictionKeeper,
     ) -> None:
         """Set up the service.
 
@@ -574,6 +576,8 @@ class CheckInService:
             clock: Tells the current time.
             pattern_sharing: Offers a ready Pattern that waited too long for
                 a moment in chat, and records when a Check-in shared it.
+            prediction_keeper: Keeps the new Prediction a Check-in gave a
+                shared Pattern.
         """
         self._repositories = repositories
         self._features = features
@@ -583,6 +587,7 @@ class CheckInService:
         self._chat_channel = chat_channel
         self._clock = clock
         self._pattern_sharing = pattern_sharing
+        self._prediction_keeper = prediction_keeper
 
     def change_settings(
         self,
@@ -1132,6 +1137,9 @@ class CheckInService:
         )
         if was_sent and curiosity is not None:
             self._repositories.curiosities.mark_raised([curiosity.id], None, now)
+            self._prediction_keeper.record_given(
+                snapshot, [curiosity.id], [decision.message or ""]
+            )
         if was_sent and pattern_to_share is not None and decision.message:
             self._pattern_sharing.record_if_shared(
                 snapshot, pattern_to_share, [decision.message], ShareVia.CHECK_IN, None

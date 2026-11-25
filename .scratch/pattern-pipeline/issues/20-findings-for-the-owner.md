@@ -695,4 +695,65 @@ If there is nothing, the section holds one line: "Nothing found."
 - **Kind:** bug, already known
 - **What:** `compare.cjs` hangs on Clerk's probe requests; a copy that blocks them was used and deleted. With it, `AdminModelCallTrace` and `AdminCheckInKinds` fail on page height only (0.02% and 0.08% of pixels differ), as noted before this work.
 
+## 09 — Prediction follow-up and confirming (2026-11-25)
+
+### One story can count twice: as a Prediction outcome and as an Observation
+
+- **Kind:** risk
+- **What:** in the running app, "Dana changed the plan and I told her straight away I wasn't ok with it" was read as the Prediction's outcome (didn't, one strong sign against) and also tagged as an Observation against the Pattern (another strong sign). The score dropped by about 280 for one event. The same happens for a story that makes a Prediction come true and is tagged as an Observation for.
+- **Impact:** a shared Pattern moves about twice as fast as the numbers suggest, both ways. With the bar for "strong evidence after sharing" at 300, two such stories are close to confirming with one Prediction.
+- **Suggested fix:** decide which should count. Simplest: when a Conversation settles a Prediction, don't count that Conversation's Observations of the same Pattern Type toward "after sharing", or halve them.
+
+### The Reply Plan often picks another Curiosity, and a reply may not ask the one picked
+
+- **Kind:** finding
+- **What:** code puts the Prediction Curiosity first, but the model picks. In the run it twice chose a guess or a next Move instead, and once it picked the offer of a new Prediction but the reply was only a greeting; the check rightly kept nothing. A picked Curiosity counts as asked whether or not the reply asked it (true of every Curiosity). For a follow-up that means it is not asked again in that window, and the Prediction is dropped at its last day if the User doesn't bring it up.
+- **Impact:** some Predictions will go unanswered. Brush-offs of other Curiosities also slow it down (the pace doubles for 3 days after 2 in a row).
+- **Suggested fix:** watch it in real use. If it matters, check after the reply whether the follow-up was asked (as the Woven-in Check-in does) and leave it waiting if not.
+
+### A new Prediction is much the same as the last
+
+- **Kind:** limit
+- **What:** a Pattern Type has one `prediction_wording`. After the first came true, the new one Zeph gave was the same thing in other words ("next time Mei asks… just notice whether you've said yes before you decided").
+- **Impact:** "two Predictions came true" is really the same Prediction twice.
+- **Suggested fix:** give each Pattern Type two or three Prediction wordings and have code pick one not used yet. Catalog work for the owner.
+
+### With the starting numbers a shared Pattern can hardly be closed
+
+- **Kind:** note
+- **What:** a Pattern is ready at 300 points or more and closes under −150. One Prediction that didn't is −140. It would take several failed Predictions and evidence against before it closes, and "didn't" Predictions don't stop it being confirmed by two that came true.
+- **Suggested fix:** the owner may want a second rule, such as "closed when more Predictions didn't than did, after N".
+
+### "Strong evidence after sharing" is a number I chose
+
+- **Kind:** decision for the owner
+- **What:** the issue says "strong evidence after sharing" confirms, with no number. I added `pattern_confirm_points_after_sharing`, starting at 300 (the ready bar): the Observations said on a later day than the share must reach it by themselves. Reactions and Prediction outcomes don't count toward it.
+- **Suggested fix:** confirm or change the number on Platform settings.
+
+### What happens to a Prediction nobody answers
+
+- **Kind:** decision for the owner
+- **What:** the issue says a follow-up not asked in time is closed. I also mark its Prediction "not followed up" (it counts nothing) and Zeph then offers a new one. One asked and never answered ends the same way. If the User asks Zeph to drop it, the Prediction is dropped and Zeph never raises that Pattern's Predictions again; the Pattern stays shared.
+
+### The floor is checked before the Predictions
+
+- **Kind:** note
+- **What:** a shared Pattern under the floor is closed even if two Predictions came true in the same Conversation end.
+
+### Confirmed Patterns reach only the Portrait
+
+- **Kind:** limit
+- **What:** a confirmed Pattern is in the Portrait's input (under the old heading "Patterns they agreed with") and counts for Familiarity. The Reply Plan is still not shown shared or confirmed Patterns, and a confirmed Pattern is never closed or moved again. The Patterns tab is issue 18.
+- **Suggested fix:** a later issue: show the Reply Plan the confirmed Patterns, and rename the Portrait heading (that reloads `portrait_prompt`).
+
+### Migration 0101 reloads the tagging prompt
+
+- **Kind:** note
+- **What:** `pattern_tagging_prompt` reloads from the seed on deploy, so an Admin's edits to it are lost. The friend testing loses nothing: no User data is changed.
+
+### No Eval covers Prediction outcomes
+
+- **Kind:** note
+- **What:** the Tagging Eval hasn't seen the new `prediction_outcomes` part of the prompt, and none was run (Evals cost money).
+
 ## Comments

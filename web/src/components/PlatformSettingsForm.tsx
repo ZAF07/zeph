@@ -294,6 +294,26 @@ const fieldSections: {
         unit: "days",
       },
       {
+        key: "prediction_follow_up_wait_days",
+        label: "Days before Zeph asks how a Prediction went",
+        unit: "days",
+      },
+      {
+        key: "prediction_follow_up_drop_days",
+        label: "Days after which an unasked Prediction is dropped",
+        unit: "days",
+      },
+      {
+        key: "predictions_to_confirm",
+        label: "Predictions that came true to confirm a Pattern",
+        unit: "came true",
+      },
+      {
+        key: "pattern_confirm_points_after_sharing",
+        label: "Score from new evidence that confirms a shared Pattern",
+        unit: "points",
+      },
+      {
         key: "agenda_size",
         label: "Explorations on the Agenda",
         unit: "at once",

@@ -177,6 +177,7 @@ from companion.core.models import (
     PatternEvidence,
     PatternMove,
     PatternMoveCause,
+    PatternMoveReason,
     PatternNarrowing,
     PatternPicked,
     PatternReaction,
@@ -187,6 +188,7 @@ from companion.core.models import (
     PlatformSettings,
     Power,
     Prediction,
+    PredictionOutcome,
     ReactionToPattern,
     ReadyCheck,
     Relationship,
@@ -4086,6 +4088,7 @@ class PostgresPatternRepository:
                             "situations": move.situations,
                             "moved_at": move.moved_at,
                             "blocked_by": _value_or_none(move.blocked_by),
+                            "reason": _value_or_none(move.reason),
                         }
                         for move in moves
                     ],
@@ -4120,6 +4123,7 @@ class PostgresPatternRepository:
                 situations=row.situations,
                 moved_at=row.moved_at,
                 blocked_by=ReadyCheck(row.blocked_by) if row.blocked_by else None,
+                reason=PatternMoveReason(row.reason) if row.reason else None,
             )
             for row in rows
         ]
@@ -4177,7 +4181,7 @@ class PostgresPatternRepository:
         return {row.user_id for row in rows}
 
     def add_prediction(self, prediction: Prediction) -> None:
-        """Save the Prediction given with a shared Pattern.
+        """Save a Prediction given for a shared Pattern.
 
         Args:
             prediction: The Prediction.
@@ -4190,7 +4194,36 @@ class PostgresPatternRepository:
                     pattern_id=prediction.pattern_id,
                     wording=prediction.wording,
                     made_at=prediction.made_at,
+                    outcome=_value_or_none(prediction.outcome),
+                    outcome_at=prediction.outcome_at,
                 )
+            )
+
+    def save_prediction_outcomes(self, settled: Sequence[Prediction]) -> None:
+        """Save how some Predictions went.
+
+        Args:
+            settled: The Predictions, each with its outcome and when it
+                was read or set.
+        """
+        if not settled:
+            return
+        with self._database.begin() as connection:
+            connection.execute(
+                update(predictions)
+                .where(predictions.c.id == bindparam("prediction_id"))
+                .values(
+                    outcome=bindparam("new_outcome"),
+                    outcome_at=bindparam("new_outcome_at"),
+                ),
+                [
+                    {
+                        "prediction_id": prediction.id,
+                        "new_outcome": _value_or_none(prediction.outcome),
+                        "new_outcome_at": prediction.outcome_at,
+                    }
+                    for prediction in settled
+                ],
             )
 
     def list_predictions(self, user_id: UUID) -> list[Prediction]:
@@ -4215,6 +4248,8 @@ class PostgresPatternRepository:
                 pattern_id=row.pattern_id,
                 wording=row.wording,
                 made_at=row.made_at,
+                outcome=PredictionOutcome(row.outcome) if row.outcome else None,
+                outcome_at=row.outcome_at,
             )
             for row in rows
         ]
@@ -5061,6 +5096,9 @@ def _to_curiosity(row: Row[Any]) -> Curiosity:
         exploration_id=row.exploration_id,
         source_observation_id=row.source_observation_id,
         thought_experiment_id=row.thought_experiment_id,
+        not_after=row.not_after,
+        pattern_id=row.pattern_id,
+        prediction_id=row.prediction_id,
     )
 
 
@@ -5151,6 +5189,26 @@ class PostgresCuriosityRepository:
                 .where(
                     curiosities.c.user_id == user_id,
                     curiosities.c.aim == CuriosityAim.STARTER,
+                )
+                .order_by(curiosities.c.position)
+            ).all()
+        return [_to_curiosity(row) for row in rows]
+
+    def list_about_predictions(self, user_id: UUID) -> list[Curiosity]:
+        """List a User's Curiosities about Predictions, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Curiosities with the Prediction aim, in any state.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(curiosities)
+                .where(
+                    curiosities.c.user_id == user_id,
+                    curiosities.c.aim == CuriosityAim.PREDICTION,
                 )
                 .order_by(curiosities.c.position)
             ).all()
