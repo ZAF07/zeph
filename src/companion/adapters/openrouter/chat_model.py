@@ -249,7 +249,7 @@ def build_request(
     model its maker does not serve fails.
 
     A model that always thinks refuses to be told not to, so the caller
-    must ask for thinking on for it (`model_thinks` in the core does).
+    must ask for thinking on for it (`thinking_for_model` in the core does).
 
     Args:
         model: The OpenRouter model name, sent as given.

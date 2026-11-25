@@ -6,7 +6,7 @@ from companion.core.models import PlatformSettings
 from companion.core.platform_settings import (
     RESPONSE_MODEL,
     RESPONSE_THINKING,
-    model_thinks,
+    thinking_for_model,
     thinking_to_use,
 )
 from tests.fakes import FakeAuthVerifier, FakeChatChannel, ScriptedChatModel
@@ -77,7 +77,7 @@ def test_a_call_that_names_its_own_thinking_is_fitted_to_its_model(
 ) -> None:
     settings = settings_with(MODEL_THAT_CAN_THINK_OR_NOT, thinking=False)
 
-    assert model_thinks(settings, model, wanted) is thinks
+    assert thinking_for_model(settings, model, wanted) is thinks
 
 
 def test_core_services_say_which_models_always_think(

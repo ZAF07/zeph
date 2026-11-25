@@ -33,7 +33,7 @@ from companion.core.evals.setting_overrides import (
     variant_settings,
 )
 from companion.core.models import ModelCall, PlatformSettings
-from companion.core.platform_settings import EVAL_RUN_TOKEN_LIMIT, model_thinks
+from companion.core.platform_settings import EVAL_RUN_TOKEN_LIMIT, thinking_for_model
 from companion.core.ports import (
     Clock,
     MoveRepository,
@@ -214,7 +214,7 @@ class EvalRunner:
             judge = JudgeSettings.from_values(snapshot.judge)
             judge = replace(
                 judge,
-                thinking=model_thinks(
+                thinking=thinking_for_model(
                     PlatformSettings(snapshot.settings), judge.model, judge.thinking
                 ),
             )

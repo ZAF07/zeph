@@ -23,6 +23,35 @@ import { lastSavedNote, onOffSetting, textSetting } from "@/lib/settings";
 import { useSaveAdminSettings } from "@/lib/use-admin-settings";
 
 /**
+ * Says how a model locks the thinking switch.
+ *
+ * @param model - The chosen model.
+ * @param modelsThatCannotThink - The models that can't think.
+ * @param modelsThatAlwaysThink - The models that always think.
+ * @returns What thinking is locked to and the note saying why, or null when
+ *   the model can think or not.
+ */
+function lockedThinking(
+  model: string,
+  modelsThatCannotThink: string[],
+  modelsThatAlwaysThink: string[],
+): { thinking: boolean; note: string } | null {
+  if (modelsThatAlwaysThink.includes(model)) {
+    return {
+      thinking: true,
+      note: "This model always thinks, so thinking stays on.",
+    };
+  }
+  if (modelsThatCannotThink.includes(model)) {
+    return {
+      thinking: false,
+      note: "This model can’t think, so thinking stays off.",
+    };
+  }
+  return null;
+}
+
+/**
  * One core service as a folding card of the card list. The folded row shows
  * its name, description and when it runs. Open, it has two groups: "Model &
  * settings", the field rows for which model it uses, whether that model
@@ -64,35 +93,18 @@ export function CoreServiceCard({
   onToggle: () => void;
 }) {
   const saveSettings = useSaveAdminSettings();
-  function thinkingFittedTo(chosenModel: string, wanted: boolean) {
-    if (modelsThatAlwaysThink.includes(chosenModel)) {
-      return true;
-    }
-    if (modelsThatCannotThink.includes(chosenModel)) {
-      return false;
-    }
-    return wanted;
-  }
-
-  function thinkingLockedNoteFor(chosenModel: string) {
-    if (modelsThatAlwaysThink.includes(chosenModel)) {
-      return "This model always thinks, so thinking stays on.";
-    }
-    if (modelsThatCannotThink.includes(chosenModel)) {
-      return "This model can’t think, so thinking stays off.";
-    }
-    return null;
-  }
-
   const savedModel = textSetting(settings, service.model_key);
-  const savedThinking = thinkingFittedTo(
-    savedModel,
-    onOffSetting(settings, service.thinking_key),
-  );
+  const savedThinking =
+    lockedThinking(savedModel, modelsThatCannotThink, modelsThatAlwaysThink)
+      ?.thinking ?? onOffSetting(settings, service.thinking_key);
   const savedPrompt = textSetting(settings, service.prompt_key);
   const [model, setModel] = useState(savedModel);
   const [thinking, setThinking] = useState(savedThinking);
-  const thinkingLockedNote = thinkingLockedNoteFor(model);
+  const thinkingLock = lockedThinking(
+    model,
+    modelsThatCannotThink,
+    modelsThatAlwaysThink,
+  );
   const [prompt, setPrompt] = useState(savedPrompt);
   const allExtraPrompts = [
     ...service.extra_prompts,
@@ -209,7 +221,13 @@ export function CoreServiceCard({
               }))}
               onChange={(choice) => {
                 setModel(choice);
-                setThinking(thinkingFittedTo(choice, thinking));
+                setThinking(
+                  lockedThinking(
+                    choice,
+                    modelsThatCannotThink,
+                    modelsThatAlwaysThink,
+                  )?.thinking ?? thinking,
+                );
                 saveSettings.reset();
               }}
             />
@@ -218,14 +236,15 @@ export function CoreServiceCard({
             title="Thinking"
             caption={settings[service.thinking_key]?.hint}
           >
-            <HoverNote noteId={thinkingLockedNoteId} note={thinkingLockedNote}>
+            <HoverNote
+              noteId={thinkingLockedNoteId}
+              note={thinkingLock?.note ?? null}
+            >
               <Switch
                 label={`Thinking for ${service.name}`}
                 checked={thinking}
-                disabled={thinkingLockedNote !== null}
-                describedById={
-                  thinkingLockedNote ? thinkingLockedNoteId : undefined
-                }
+                disabled={thinkingLock !== null}
+                describedById={thinkingLock ? thinkingLockedNoteId : undefined}
                 onChange={(isOn) => {
                   setThinking(isOn);
                   saveSettings.reset();

@@ -2370,7 +2370,7 @@ def check_waits_fit_under_the_cap(
         )
 
 
-def model_thinks(settings: PlatformSettings, model: str, wanted: bool) -> bool:
+def thinking_for_model(settings: PlatformSettings, model: str, wanted: bool) -> bool:
     """Say whether a call should ask its model to think.
 
     Args:
@@ -2403,7 +2403,7 @@ def thinking_to_use(
         True if the model always thinks, or the switch is on and the model
         can think.
     """
-    return model_thinks(settings, settings.get(model), settings.get(thinking))
+    return thinking_for_model(settings, settings.get(model), settings.get(thinking))
 
 
 def with_thinking_fitted_to_the_models(

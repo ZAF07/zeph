@@ -22,7 +22,7 @@ from companion.core.models import (
 from companion.core.platform_settings import (
     CHECK_IN_GAPS,
     CHECK_IN_MODEL,
-    model_thinks,
+    thinking_for_model,
 )
 from companion.core.ports import Clock, Repositories
 from companion.core.usage import UsageRecordingChatModel
@@ -258,7 +258,7 @@ class WovenCheckIns:
                 snapshot=snapshot,
                 step=ModelStep.CHECK_IN,
                 model=model,
-                thinking=model_thinks(snapshot.settings, model, wanted=False),
+                thinking=thinking_for_model(snapshot.settings, model, wanted=False),
                 instructions=BROUGHT_UP_CHECK_PROMPT,
                 history=[
                     ChatLine(
