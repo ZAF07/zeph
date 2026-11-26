@@ -89,7 +89,7 @@ STATE_APPROACHES = (
     ExplorationApproach.STORY_FOLLOW_UP,
     ExplorationApproach.NOTICE_THIS_WEEK,
 )
-APPROACH_ORDER: Mapping[Directness, tuple[ExplorationApproach, ...]] = {
+APPROACH_ORDER_BY_DIRECTNESS: Mapping[Directness, tuple[ExplorationApproach, ...]] = {
     Directness.GENTLE: (
         ExplorationApproach.STORY_FOLLOW_UP,
         ExplorationApproach.THOUGHT_EXPERIMENT,
@@ -103,12 +103,12 @@ APPROACH_ORDER: Mapping[Directness, tuple[ExplorationApproach, ...]] = {
         ExplorationApproach.NOTICE_THIS_WEEK,
     ),
 }
-EXPLORATION_WAITS: Mapping[Directness, Setting[timedelta]] = {
+EXPLORATION_WAIT_BY_DIRECTNESS: Mapping[Directness, Setting[timedelta]] = {
     Directness.GENTLE: EXPLORATION_WAIT_GENTLE,
     Directness.BALANCED: EXPLORATION_WAIT,
     Directness.DIRECT: EXPLORATION_WAIT_DIRECT,
 }
-EXPLORATION_RESTS_AFTER_TRIES: Mapping[Directness, Setting[int]] = {
+EXPLORATION_REST_AFTER_TRIES_BY_DIRECTNESS: Mapping[Directness, Setting[int]] = {
     Directness.GENTLE: EXPLORATION_REST_AFTER_TRIES_GENTLE,
     Directness.BALANCED: EXPLORATION_REST_AFTER_TRIES,
     Directness.DIRECT: EXPLORATION_REST_AFTER_TRIES_DIRECT,
@@ -267,11 +267,11 @@ class AgendaInput:
         conversation_id: The Conversation that just ended.
         now: When the Agenda is kept.
         time_zone: The User's IANA time zone.
+        directness: How direct they want the Companion to be, which sets
+            the order of Approaches.
         thought_experiments: Every Thought Experiment, archived ones too.
         starters_put: The Thought Experiments already put to them as
             starters, or waiting to be.
-        directness: How direct they want the Companion to be, which sets
-            the order of Approaches.
     """
 
     user_id: UUID
@@ -285,9 +285,9 @@ class AgendaInput:
     conversation_id: UUID
     now: datetime
     time_zone: str | None
+    directness: Directness
     thought_experiments: Sequence[ThoughtExperiment] = ()
     starters_put: Set[UUID] = frozenset()
-    directness: Directness = Directness.BALANCED
 
 
 def observations_of(
@@ -548,7 +548,9 @@ def approaches_for(
     else:
         allowed = CONDITION_APPROACHES
     return tuple(
-        approach for approach in APPROACH_ORDER[directness] if approach in allowed
+        approach
+        for approach in APPROACH_ORDER_BY_DIRECTNESS[directness]
+        if approach in allowed
     )
 
 
@@ -1352,8 +1354,10 @@ def agenda_numbers(settings: PlatformSettings, directness: Directness) -> Agenda
     """
     return AgendaNumbers(
         size=settings.get(AGENDA_SIZE),
-        wait=settings.get(EXPLORATION_WAITS[directness]),
-        rest_after_tries=settings.get(EXPLORATION_RESTS_AFTER_TRIES[directness]),
+        wait=settings.get(EXPLORATION_WAIT_BY_DIRECTNESS[directness]),
+        rest_after_tries=settings.get(
+            EXPLORATION_REST_AFTER_TRIES_BY_DIRECTNESS[directness]
+        ),
         thought_experiments_per_week=settings.get(
             THOUGHT_EXPERIMENTS_PER_PATTERN_PER_WEEK
         ),

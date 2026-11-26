@@ -3686,9 +3686,10 @@ class ExplorationNeed(StrEnum):
 
 
 class ExplorationApproach(StrEnum):
-    """An Approach: how an aimed Curiosity asks, least pushy first.
+    """An Approach: how an aimed Curiosity asks.
 
-    The order they are tried in follows the User's directness.
+    Listed least pushy first; the order they are tried in follows the
+    User's directness.
     """
 
     STORY_FOLLOW_UP = "story_follow_up"

@@ -132,12 +132,12 @@ FORGET_PARAMETERS: dict[str, Any] = {
 DIRECTNESS_WORDS = {
     Directness.GENTLE: (
         "gentle: you wait for a good moment to give your view and put it "
-        "softly, and you ask your own questions less often and less pointedly"
+        "softly, and you ask your own questions less often"
     ),
     Directness.BALANCED: "balanced: you give your view when there is room for it",
     Directness.DIRECT: (
         "direct: you give your view sooner and in plain words, and you ask "
-        "your own questions sooner and more to the point"
+        "your own questions sooner and more often"
     ),
 }
 DIRECTNESS_PARAMETERS: dict[str, Any] = {

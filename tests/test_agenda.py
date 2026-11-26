@@ -1340,12 +1340,9 @@ def test_a_gentle_users_unclear_story_gets_a_thought_experiment_second() -> None
     )
 
 
-@pytest.mark.parametrize(
-    ("outcome", "approach"),
-    [(TryOutcome.USEFUL, EXPERIMENT), (TryOutcome.VAGUE, EXPERIMENT)],
-)
+@pytest.mark.parametrize("outcome", [TryOutcome.USEFUL, TryOutcome.VAGUE])
 def test_a_would_it_differ_try_from_before_they_chose_gentle_is_not_repeated(
-    outcome: TryOutcome, approach: ExplorationApproach
+    outcome: TryOutcome,
 ) -> None:
     its = exploration(pattern())
     curiosity, earlier = asked(its, approach=WOULD, outcome=outcome)
@@ -1357,7 +1354,7 @@ def test_a_would_it_differ_try_from_before_they_chose_gentle_is_not_repeated(
         Directness.GENTLE,
     )
 
-    assert chosen == approach
+    assert chosen == EXPERIMENT
 
 
 def test_a_waiting_aimed_curiosity_stays_when_the_user_changes_directness() -> None:
@@ -1408,45 +1405,94 @@ def test_directness_sets_the_wait_and_the_tries_before_resting(
 
 
 @pytest.mark.parametrize(
-    ("directness", "not_before", "rests_after_three"),
+    ("directness", "not_before"),
     [
-        (Directness.GENTLE, date(2026, 11, 28), True),
-        (Directness.DIRECT, date(2026, 11, 25), False),
+        (Directness.GENTLE, date(2026, 11, 28)),
+        (Directness.BALANCED, date(2026, 11, 26)),
+        (Directness.DIRECT, date(2026, 11, 25)),
     ],
 )
-def test_a_gentle_user_waits_longer_and_rests_sooner_than_a_direct_one(
-    directness: Directness, not_before: date, rests_after_three: bool
+def test_the_next_try_waits_as_long_as_their_directness_says(
+    directness: Directness, not_before: date
 ) -> None:
     numbers = agenda_numbers(settings_with_directness_numbers(), directness)
     suspected = pattern()
     its = exploration(suspected)
-    one_try = [asked(its, days_ago=1)]
-    three_tries = [asked(its, days_ago=days_ago) for days_ago in (9, 6, 3)]
 
-    after_one = keep(
+    planned = keep(
         [suspected],
         [observation()],
         [its],
-        one_try,
-        numbers=numbers,
-        directness=directness,
-    )
-    after_three = keep(
-        [suspected],
-        [observation()],
-        [its],
-        three_tries,
+        [asked(its, days_ago=1)],
         numbers=numbers,
         directness=directness,
     )
 
-    assert [curiosity.not_before for curiosity in after_one.new_curiosities] == [
+    assert [curiosity.not_before for curiosity in planned.new_curiosities] == [
         not_before
     ]
-    rested = [
-        changed.state == ExplorationState.RESTING for changed in after_three.changed
+
+
+@pytest.mark.parametrize(
+    ("directness", "tries_before_resting"),
+    [(Directness.GENTLE, 3), (Directness.BALANCED, 4), (Directness.DIRECT, 5)],
+)
+def test_it_rests_after_as_many_tries_with_nothing_as_their_directness_says(
+    directness: Directness, tries_before_resting: int
+) -> None:
+    numbers = agenda_numbers(settings_with_directness_numbers(), directness)
+    suspected = pattern()
+    its = exploration(suspected)
+    tries = [
+        asked(its, days_ago=days_ago) for days_ago in range(tries_before_resting, 0, -1)
     ]
-    assert rested == ([True] if rests_after_three else [])
+
+    def states_after(tried: list[tuple[Curiosity, ExplorationTry]]) -> list[str]:
+        planned = keep(
+            [suspected],
+            [observation()],
+            [its],
+            tried,
+            numbers=numbers,
+            directness=directness,
+        )
+        return [changed.state for changed in planned.changed]
+
+    assert states_after(tries[1:]) == []
+    assert states_after(tries) == [ExplorationState.RESTING]
+
+
+@pytest.mark.parametrize("directness", list(Directness))
+def test_no_directness_is_asked_two_conversations_in_a_row(
+    directness: Directness,
+) -> None:
+    suspected = pattern()
+    its = exploration(suspected)
+    just_asked = asked(its, conversation_id=ENDED, days_ago=0, outcome=None)
+
+    planned = keep(
+        [suspected], [observation()], [its], [just_asked], directness=directness
+    )
+
+    assert planned.new_curiosities == []
+
+
+def test_after_they_turn_direct_the_next_try_steps_on_in_the_direct_order() -> None:
+    suspected = pattern()
+    its = exploration(suspected)
+    as_balanced = asked(its, approach=STORY, days_ago=4)
+
+    planned = keep(
+        [suspected],
+        [observation()],
+        [its],
+        [as_balanced],
+        thought_experiments=[thought_experiment()],
+        directness=Directness.DIRECT,
+    )
+
+    [attempt] = planned.new_tries
+    assert attempt.approach == NOTICE
 
 
 def test_asked_to_drop_rests_it_at_once_whatever_the_directness() -> None:
