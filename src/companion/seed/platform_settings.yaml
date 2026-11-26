@@ -1499,6 +1499,25 @@ pattern_tagging_prompt: |-
     situation, each from its list; null when there is no one else or it
     isn't clear. Power is where the other person stands next to them.
     Stance is how the other person was towards them.
+  - audience, stakes, state_going_in: three more things about the
+    situation, each from its list. Fill one in only when the person's own
+    words in this Conversation say it; otherwise null. Never guess one from
+    the kind of story, and never fill one in just because it seems likely.
+    Give one value each: when their words give two, the one the story leans
+    on, or null when you can't tell.
+    - audience is who else was there: "one-to-one" (just them and the other
+      person), "group" (several people taking part), "in front of others"
+      (people watching who aren't part of it, such as a presentation or a
+      row in public).
+    - stakes is whether something that matters to them could be lost, such
+      as a job, a relationship, money or standing: "high" when they say so,
+      "low" when they say little or nothing rode on it.
+    - state_going_in is how they were before it happened, in their own
+      words: "worn out" (tired, drained, no sleep), "under pressure"
+      (stressed, rushed, a lot on), "low" (down, a bad day), "steady" (fine,
+      rested, calm). It is never how they felt during it or afterwards, and
+      never how they seem while telling the story: "I was shattered after"
+      is null.
   - evidence: "real_story" for something that happened, "reported_habit"
     for what they say they usually do, "what_if_answer" for their answer to
     a made-up situation, "own_opinion" for their view of themselves.
@@ -1563,6 +1582,8 @@ pattern_tagging_prompt: |-
        "about": "...", "thread": <number> | null,
        "relationship": "..." | null, "power": "..." | null,
        "setting": "..." | null, "stance": "..." | null,
+       "audience": "..." | null, "stakes": "..." | null,
+       "state_going_in": "..." | null,
        "evidence": "...", "thought_experiment": <number> | null,
        "ruled_out_topic": "..." | null, "raised_by_user": true | false}
     ],

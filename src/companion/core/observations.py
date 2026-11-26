@@ -16,6 +16,7 @@ from companion.core.model_call_log import ModelCallLog
 from companion.core.models import (
     AIMS_WRITTEN_BY_CODE,
     OUTCOMES_READ_BY_THE_MODEL,
+    Audience,
     CatalogPattern,
     ChatLine,
     ChatRole,
@@ -45,7 +46,9 @@ from companion.core.models import (
     SituationMatch,
     SituationSetting,
     SituationTags,
+    Stakes,
     Stance,
+    StateGoingIn,
     TaggingShape,
     UserSnapshot,
 )
@@ -70,6 +73,15 @@ EVENED_OUT_CHARACTERS = str.maketrans({"’": "'", "‘": "'", "“": '"', "”"
 WHITESPACE_RUNS = re.compile(r"\s+")
 STATES_OF_A_PATTERN_TOLD = frozenset(
     {PatternState.SHARED, PatternState.CONFIRMED, PatternState.CONTESTED}
+)
+CONDITION_LISTS: tuple[tuple[str, type[StrEnum]], ...] = (
+    ("relationship", Relationship),
+    ("power", Power),
+    ("setting", SituationSetting),
+    ("stance", Stance),
+    ("audience", Audience),
+    ("stakes", Stakes),
+    ("state_going_in", StateGoingIn),
 )
 
 
@@ -112,6 +124,8 @@ class TaggingContext:
         never_again_pattern_type_ids: The Pattern Types of the Patterns
             the User deleted after disagreeing or after they didn't hold
             up; no Observation naming one is kept.
+        had_safeguard_event: Whether that Conversation had a Safeguard
+            Event; no Observation from it keeps a state going in.
     """
 
     user_id: UUID
@@ -127,6 +141,7 @@ class TaggingContext:
     not_gathered_pattern_type_ids: frozenset[str] = frozenset()
     deleted_quotes: Sequence[DeletedQuote] = ()
     never_again_pattern_type_ids: frozenset[str] = frozenset()
+    had_safeguard_event: bool = False
 
 
 class DropReason(StrEnum):
@@ -782,25 +797,19 @@ def read_choice[Choice: StrEnum](
 
 
 def read_tags(entry: dict[str, Any]) -> SituationTags | None:
-    """Read the situation tags of one Observation the model wrote.
+    """Read the Conditions of one Observation the model wrote.
 
-    A tag may be left empty when there is no one else or it isn't clear.
+    A Condition may be left empty when the story doesn't say it.
 
     Args:
         entry: The Observation, as the model wrote it.
 
     Returns:
-        The tags; None if any of them is given but not from its list.
+        The Conditions; None if any of them is given but not from its list.
     """
-    tag_lists: tuple[tuple[str, type[StrEnum]], ...] = (
-        ("relationship", Relationship),
-        ("power", Power),
-        ("setting", SituationSetting),
-        ("stance", Stance),
-    )
     if any(
         entry.get(key) is not None and read_choice(entry, key, tags) is None
-        for key, tags in tag_lists
+        for key, tags in CONDITION_LISTS
     ):
         return None
     return SituationTags(
@@ -808,6 +817,9 @@ def read_tags(entry: dict[str, Any]) -> SituationTags | None:
         power=read_choice(entry, "power", Power),
         setting=read_choice(entry, "setting", SituationSetting),
         stance=read_choice(entry, "stance", Stance),
+        audience=read_choice(entry, "audience", Audience),
+        stakes=read_choice(entry, "stakes", Stakes),
+        state_going_in=read_choice(entry, "state_going_in", StateGoingIn),
     )
 
 
@@ -996,7 +1008,8 @@ def check_observation(entry: Any, context: TaggingContext) -> Observation | Drop
         answer, whatever kind the model wrote. A ruled-out topic is kept
         only when it is on the Admin-set list. It is excluded when an
         exclusion whose evidence is ignored applies to one of its Pattern
-        Types now.
+        Types now. Its state going in is left empty when the Conversation
+        had a Safeguard Event, whatever the model wrote.
     """
     if not isinstance(entry, dict):
         return DropReason.NOT_AN_OBSERVATION
@@ -1026,6 +1039,8 @@ def check_observation(entry: Any, context: TaggingContext) -> Observation | Drop
     evidence_kind = read_choice(entry, "evidence", EvidenceKind)
     if tags is None or evidence_kind is None:
         return DropReason.TAG_OFF_ITS_LIST
+    if context.had_safeguard_event:
+        tags = replace(tags, state_going_in=None)
     context_line = read_text(entry, "context")
     about = read_text(entry, "about")
     if context_line is None or about is None:
@@ -1209,18 +1224,12 @@ def describe_life_now(life_now: LifeNow, time_zone: str | None) -> str:
 
 
 def describe_tag_lists() -> str:
-    """Write the fixed lists each tag must come from.
+    """Write the fixed lists each Condition and the kind of evidence come from.
 
     Returns:
-        One line per tag, e.g. "power: above, equal, below".
+        One line per list, e.g. "power: above, equal, below".
     """
-    lists = (
-        ("relationship", Relationship),
-        ("power", Power),
-        ("setting", SituationSetting),
-        ("stance", Stance),
-        ("evidence", EvidenceKind),
-    )
+    lists = (*CONDITION_LISTS, ("evidence", EvidenceKind))
     return "\n".join(
         f"{name}: {', '.join(tag.value for tag in tags)}" for name, tags in lists
     )
@@ -1494,7 +1503,9 @@ class PatternTagger:
         """Ask the model for a Conversation's Observations and check them.
 
         Nothing is saved but how many were tagged and dropped, in the Model
-        Call Log.
+        Call Log. When the User had a Safeguard Event since the
+        Conversation's first message, no Observation keeps a state going
+        in: a crisis is not a Condition.
 
         Args:
             snapshot: The User whose Conversation it was.
@@ -1583,6 +1594,9 @@ class PatternTagger:
                 ),
                 never_again_pattern_type_ids=(
                     self._repositories.patterns.list_never_again(snapshot.user.id)
+                ),
+                had_safeguard_event=self._repositories.safeguard_events.happened_from(
+                    snapshot.user.id, messages[0].sent_at
                 ),
             ),
         )
