@@ -84,6 +84,15 @@ Discussed 24 Nov 2026, deliberately left out of this work as too big.
 - First set of Thought Experiments drafted for the owner, plus a short guide: where to source content, how to write and manage them.
 - CONTEXT.md terms and ADRs once the design settles.
 
+## Extended by a later grill (25 Nov 2026, issue 23)
+
+`issues/23-situations-vary-on-more-than-people.md` and ADR-0031 extend these decisions; the reasons are there.
+
+- Decision 7 (directness): it will also set where an Exploration starts and how long it waits (issue 40). It still never touches the gate.
+- Decisions 9 and 10 (situations and tags): tags are now called Conditions and gain audience, stakes and state going in. A situation is still one Life Thread; Conditions never add situations or points.
+- Decision 14 (Explorations): "way" is renamed Approach. "Missing part of life" becomes a "missing Condition" need, worked out by code from a coverage table, and the counter-test moves ahead of it.
+- Decision 16 (ready): narrowing uses any Condition, needs 2 clear stories on the side that holds, and at most 2 narrow one Pattern.
+
 ## Still open
 
 Nothing from the grill. Next: `/to-prd`.
