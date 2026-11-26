@@ -107,7 +107,7 @@ describe("TaggingResultPanel", () => {
               direction: "for",
               unclear: false,
               situational: false,
-              conditions: { audience: "group", state_going_in: "empty" },
+              conditions: { state_going_in: "empty", audience: "group" },
               matched: false,
             },
           ],

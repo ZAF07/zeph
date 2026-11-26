@@ -1508,10 +1508,14 @@ pattern_tagging_prompt: |-
     - audience is who else was there: "one-to-one" (just them and the other
       person), "group" (several people taking part), "in front of others"
       (people watching who aren't part of it, such as a presentation or a
-      row in public).
+      row in public). A story with one other person in it is not
+      "one-to-one" unless they say no one else was there ("just the two of
+      us", "on the phone").
     - stakes is whether something that matters to them could be lost, such
-      as a job, a relationship, money or standing: "high" when they say so,
-      "low" when they say little or nothing rode on it.
+      as a job, a relationship, money or standing: "high" when they say
+      what could be lost, "low" when they say little or nothing rode on it.
+      A small matter is not "low" and an awkward one is not "high" unless
+      they say so.
     - state_going_in is how they were before it happened, in their own
       words: "worn out" (tired, drained, no sleep), "under pressure"
       (stressed, rushed, a lot on), "low" (down, a bad day), "steady" (fine,

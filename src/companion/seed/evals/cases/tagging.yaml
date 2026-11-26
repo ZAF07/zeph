@@ -1242,8 +1242,9 @@ cases:
       - who: person
         text: >-
           I'd been up since 4 with the baby and was completely drained before
-          my sister even rang. She asked me to host Christmas and I said yes
-          straight away. Now I'm annoyed that I didn't say what I wanted.
+          my sister even rang. She said we should do Christmas at hers again.
+          I think it's my turn but I said "sure, sounds good". Now I'm annoyed
+          that I didn't say what I wanted.
       - who: zeph
         text: You were running on empty before the call even started.
     observations:
@@ -1285,15 +1286,16 @@ cases:
 
   # They say how they felt after, which is not their state going in.
 
-  - id: cond-felt-after-covering-shift
+  - id: cond-felt-after-splitting-tips
     messages:
       - who: person
         text: >-
-          My coworker Jo asked me to cover the Saturday shift again and I said
-          yes on the spot. Afterwards I was exhausted and low all weekend,
-          kicking myself for not saying no.
+          My coworker Jo wanted to split the tips evenly again and I said
+          "fine by me" even though I think it's unfair. Afterwards I was
+          exhausted and low all weekend, kicking myself for not saying what I
+          think.
       - who: zeph
-        text: That's a heavy weekend to carry. What stopped the no?
+        text: That's a heavy weekend to carry. What stopped you saying it?
     observations:
       - pattern_type: CONF.AVOID.BELONG
         direction: for

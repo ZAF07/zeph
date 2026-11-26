@@ -6,17 +6,21 @@ import type {
   UnclearStory,
 } from "@/lib/api-client";
 
+const conditionNames = ["audience", "stakes", "state_going_in"];
+
 /**
- * Writes Conditions by name, as the Case Result's checks do.
+ * Writes Conditions by name, in the order the Case Result's checks do.
  *
  * @param conditions - Each Condition's value by its name; null for one
  *   left empty.
  * @returns E.g. ["audience: group", "state going in: empty"].
  */
 function conditionParts(conditions: Record<string, string | null>): string[] {
-  return Object.entries(conditions).map(
-    ([name, value]) => `${name.replaceAll("_", " ")}: ${value ?? "empty"}`,
-  );
+  return conditionNames
+    .filter((name) => name in conditions)
+    .map(
+      (name) => `${name.replaceAll("_", " ")}: ${conditions[name] ?? "empty"}`,
+    );
 }
 
 /**
