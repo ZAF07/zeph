@@ -3078,9 +3078,33 @@ class Stance(StrEnum):
     HOSTILE = "hostile"
 
 
+class Audience(StrEnum):
+    """Who else was there in what an Observation is about."""
+
+    ONE_TO_ONE = "one-to-one"
+    GROUP = "group"
+    IN_FRONT_OF_OTHERS = "in front of others"
+
+
+class Stakes(StrEnum):
+    """Whether something that matters to the User could be lost."""
+
+    LOW = "low"
+    HIGH = "high"
+
+
+class StateGoingIn(StrEnum):
+    """How the User was before what an Observation is about happened."""
+
+    WORN_OUT = "worn out"
+    UNDER_PRESSURE = "under pressure"
+    LOW = "low"
+    STEADY = "steady"
+
+
 @dataclass(frozen=True)
 class SituationTags:
-    """The situation an Observation is about, as tags from the fixed lists.
+    """The Conditions an Observation happened under, as tags from the fixed lists.
 
     Attributes:
         relationship: Who the other person is to the User; None if there is
@@ -3088,12 +3112,21 @@ class SituationTags:
         power: Where they stand next to the User; None if it isn't clear.
         setting: Where it happened; None if it isn't clear.
         stance: How they were towards the User; None if it isn't clear.
+        audience: Who else was there; None if the User's story doesn't say.
+        stakes: Whether something that matters to the User could be lost;
+            None if their story doesn't say.
+        state_going_in: How the User was before it happened, in their own
+            words; None if their story doesn't say, and always None from a
+            Conversation with a Safeguard Event.
     """
 
     relationship: Relationship | None
     power: Power | None
     setting: SituationSetting | None
     stance: Stance | None
+    audience: Audience | None = None
+    stakes: Stakes | None = None
+    state_going_in: StateGoingIn | None = None
 
 
 @dataclass(frozen=True)

@@ -95,6 +95,56 @@ describe("TaggingResultPanel", () => {
     expect(screen.getByText("Nothing was dropped.")).toBeInTheDocument();
   });
 
+  it("shows the Conditions a case expects and those kept", () => {
+    render(
+      <TaggingResultPanel
+        caseKey="case"
+        result={{
+          answered: true,
+          expected: [
+            {
+              pattern_type: "CONF.AVOID.BELONG",
+              direction: "for",
+              unclear: false,
+              situational: false,
+              conditions: { state_going_in: "empty", audience: "group" },
+              matched: false,
+            },
+          ],
+          kept: [
+            {
+              ...result.kept[0],
+              conditions: {
+                audience: "group",
+                stakes: null,
+                state_going_in: "low",
+              },
+              expected: false,
+            },
+          ],
+          dropped: [],
+          unclear: [],
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        "CONF.AVOID.BELONG · for · audience: group · state going in: empty",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Conditions")).toBeInTheDocument();
+    expect(
+      screen.getByText("audience: group · stakes: empty · state going in: low"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no Conditions when the case expects none and none was kept", () => {
+    render(<TaggingResultPanel caseKey="case" result={result} />);
+
+    expect(screen.queryByText("Conditions")).not.toBeInTheDocument();
+  });
+
   it("says when nothing was expected and the answer couldn't be read", () => {
     render(
       <TaggingResultPanel

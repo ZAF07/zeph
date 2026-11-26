@@ -7,6 +7,7 @@ import pytest
 
 from companion.adapters.pattern_catalog_seed import read_pattern_catalog_seed
 from companion.core.models import (
+    Audience,
     ChannelPhoto,
     ConversationMessage,
     EvidenceKind,
@@ -20,13 +21,16 @@ from companion.core.models import (
     SituationMatch,
     SituationSetting,
     SituationTags,
+    Stakes,
     Stance,
+    StateGoingIn,
 )
 from companion.core.observations import (
     DroppedEntry,
     DropReason,
     TaggingContext,
     deleted_quotes_of,
+    describe_tag_lists,
     ignored_pattern_types,
     is_situational,
     plan_exclusion_flags,
@@ -588,3 +592,72 @@ def test_only_exclusions_the_catalog_lists_are_flagged_once_each() -> None:
     ] == [("CONF.AVOID.BELONG", "Grief", ExcludedEvidence.IGNORED, SENT_AT)]
     assert ignored_pattern_types(flags) == frozenset({"CONF.AVOID.BELONG"})
     assert read_exclusions_answer('{"observations": []}') == []
+
+
+def test_an_observation_holds_the_conditions_the_story_says_and_none_it_does_not() -> (
+    None
+):
+    said, unsaid = plan_observations(
+        [
+            entry(
+                audience="in front of others",
+                stakes="high",
+                state_going_in="worn out",
+            ),
+            entry(
+                quote="and then I stewed on it all night",
+                audience=None,
+                stakes="",
+            ),
+        ],
+        context(),
+    ).kept
+
+    assert (said.tags.audience, said.tags.stakes, said.tags.state_going_in) == (
+        Audience.IN_FRONT_OF_OTHERS,
+        Stakes.HIGH,
+        StateGoingIn.WORN_OUT,
+    )
+    assert (unsaid.tags.audience, unsaid.tags.stakes, unsaid.tags.state_going_in) == (
+        None,
+        None,
+        None,
+    )
+
+
+@pytest.mark.parametrize(
+    "off_its_list",
+    [
+        {"audience": "crowd"},
+        {"stakes": "medium"},
+        {"state_going_in": "tired"},
+        {"state_going_in": ["worn out", "low"]},
+    ],
+)
+def test_an_observation_with_a_condition_off_its_list_is_dropped_and_counted(
+    off_its_list: dict[str, Any],
+) -> None:
+    planned = plan_observations([entry(**off_its_list)], context())
+
+    assert planned.kept == []
+    assert planned.dropped == 1
+    assert planned.dropped_entries[0].reason == DropReason.TAG_OFF_ITS_LIST
+
+
+def test_no_state_is_kept_from_a_conversation_with_a_safeguard_event() -> None:
+    in_crisis = replace(context(), had_safeguard_event=True)
+
+    [kept] = plan_observations(
+        [entry(audience="group", stakes="high", state_going_in="low")], in_crisis
+    ).kept
+
+    assert kept.tags.state_going_in is None
+    assert (kept.tags.audience, kept.tags.stakes) == (Audience.GROUP, Stakes.HIGH)
+
+
+def test_the_tagging_model_is_given_the_lists_of_the_three_conditions() -> None:
+    lists = describe_tag_lists()
+
+    assert "audience: one-to-one, group, in front of others" in lists
+    assert "stakes: low, high" in lists
+    assert "state_going_in: worn out, under pressure, low, steady" in lists

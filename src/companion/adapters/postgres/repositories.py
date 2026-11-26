@@ -85,6 +85,7 @@ from companion.adapters.postgres.tables import (
 from companion.core.features import feature_details
 from companion.core.models import (
     AgendaChanges,
+    Audience,
     BringUpWay,
     CatalogPattern,
     ChannelPhoto,
@@ -207,7 +208,9 @@ from companion.core.models import (
     SharedPhoto,
     SituationSetting,
     SituationTags,
+    Stakes,
     Stance,
+    StateGoingIn,
     StoredSetting,
     TaggingShape,
     TelegramConnection,
@@ -2222,6 +2225,27 @@ class PostgresSafeguardEventRepository:
             ).first()
         return found is not None
 
+    def happened_from(self, user_id: UUID, start: datetime) -> bool:
+        """Say whether a User had a Safeguard Event at a time or after it.
+
+        Args:
+            user_id: The User's ID.
+            start: The time; events before it are left out.
+
+        Returns:
+            True when there is one.
+        """
+        with self._database.connect() as connection:
+            found = connection.execute(
+                select(safeguard_events.c.id)
+                .where(
+                    safeguard_events.c.user_id == user_id,
+                    safeguard_events.c.created_at >= start,
+                )
+                .limit(1)
+            ).first()
+        return found is not None
+
     def list_overviews(
         self, since: datetime | None, risk_type: RiskType | None
     ) -> list[SafeguardEventOverview]:
@@ -3396,6 +3420,11 @@ def to_observation(row: Row[Any]) -> Observation:
             power=Power(row.power) if row.power else None,
             setting=SituationSetting(row.setting) if row.setting else None,
             stance=Stance(row.stance) if row.stance else None,
+            audience=Audience(row.audience) if row.audience else None,
+            stakes=Stakes(row.stakes) if row.stakes else None,
+            state_going_in=(
+                StateGoingIn(row.state_going_in) if row.state_going_in else None
+            ),
         ),
         evidence_kind=EvidenceKind(row.evidence_kind),
         second_pattern_type_id=row.second_pattern_type_id,
@@ -3448,6 +3477,11 @@ class PostgresObservationRepository:
                         "power": _value_or_none(observation.tags.power),
                         "setting": _value_or_none(observation.tags.setting),
                         "stance": _value_or_none(observation.tags.stance),
+                        "audience": _value_or_none(observation.tags.audience),
+                        "stakes": _value_or_none(observation.tags.stakes),
+                        "state_going_in": _value_or_none(
+                            observation.tags.state_going_in
+                        ),
                         "evidence_kind": observation.evidence_kind.value,
                         "second_pattern_type_id": observation.second_pattern_type_id,
                         "second_pattern_type_version": (

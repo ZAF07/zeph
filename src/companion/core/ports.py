@@ -2587,6 +2587,18 @@ class SafeguardEventRepository(Protocol):
         """
         ...
 
+    def happened_from(self, user_id: UUID, start: datetime) -> bool:
+        """Say whether a User had a Safeguard Event at a time or after it.
+
+        Args:
+            user_id: The User's ID.
+            start: The time; events before it are left out.
+
+        Returns:
+            True when there is one.
+        """
+        ...
+
     def list_overviews(
         self, since: datetime | None, risk_type: RiskType | None
     ) -> list[SafeguardEventOverview]:

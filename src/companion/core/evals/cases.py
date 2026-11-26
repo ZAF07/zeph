@@ -1648,25 +1648,50 @@ class ExpectedObservation:
         direction: Whether it counts for or against.
         unclear: Whether it names two Pattern Types it can't tell apart.
         situational: Whether anyone would have acted the same there.
+        audience: The audience it must hold, or "empty" when it must hold
+            none; None when the case doesn't say.
+        stakes: The stakes it must hold, likewise.
+        state_going_in: The state going in it must hold, likewise.
     """
 
     pattern_type: str
     direction: ObservationDirection
     unclear: bool
     situational: bool
+    audience: str | None = None
+    stakes: str | None = None
+    state_going_in: str | None = None
+
+    @property
+    def conditions(self) -> dict[str, str]:
+        """List the Conditions the case states for it.
+
+        Returns:
+            Each stated Condition's value, or "empty", by its name.
+        """
+        stated = {
+            "audience": self.audience,
+            "stakes": self.stakes,
+            "state_going_in": self.state_going_in,
+        }
+        return {name: value for name, value in stated.items() if value is not None}
 
     @property
     def label(self) -> str:
         """Name it as the Case Result groups its checks.
 
         Returns:
-            E.g. "CONF.AVOID.BELONG · for · unclear".
+            E.g. "CONF.AVOID.BELONG · for · unclear · audience: group".
         """
         parts = [self.pattern_type, self.direction.value]
         if self.unclear:
             parts.append("unclear")
         if self.situational:
             parts.append("situational")
+        parts += [
+            f"{name.replace('_', ' ')}: {value}"
+            for name, value in self.conditions.items()
+        ]
         return " · ".join(parts)
 
 
@@ -1782,8 +1807,10 @@ def read_tagging_case(key: str, content: dict[str, Any]) -> TaggingCase:
         key: The case's key.
         content: `now`, `threads` (each `{title, story, people}`),
             `messages` (each `{who, text}`), `observations` (each
-            `{pattern_type, direction, unclear, situational}`) and
-            optionally `unclear` (see `to_unclear_story`).
+            `{pattern_type, direction, unclear, situational}`, and
+            optionally `audience`, `stakes` and `state_going_in`, each a
+            value from its list or "empty") and optionally `unclear` (see
+            `to_unclear_story`).
 
     Returns:
         The case.
@@ -1807,6 +1834,9 @@ def read_tagging_case(key: str, content: dict[str, Any]) -> TaggingCase:
                 direction=ObservationDirection(entry["direction"]),
                 unclear=bool(entry.get("unclear")),
                 situational=bool(entry.get("situational")),
+                audience=entry.get("audience") or None,
+                stakes=entry.get("stakes") or None,
+                state_going_in=entry.get("state_going_in") or None,
             )
             for entry in content.get("observations") or []
         ],

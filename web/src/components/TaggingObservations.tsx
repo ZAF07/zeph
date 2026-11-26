@@ -6,7 +6,9 @@ import {
   describeEnding,
   describeExpected,
   describeKept,
+  describeKeptConditions,
   describeUnclearNow,
+  showsConditions,
 } from "@/lib/tagging-results";
 
 const matchPill = "bg-cream text-ink";
@@ -17,7 +19,8 @@ const droppedPill = "border border-line-strong text-soft";
  * What a Tagging case's tagging step did: each Observation expected and
  * whether one like it was kept, each one code kept with its quote, Pattern
  * Type and sign, who it is about, its Life Thread and context line, and
- * each one code dropped with why. When the made-up User already had
+ * each one code dropped with why. The Conditions kept are shown when the
+ * case expects any or any was kept. When the made-up User already had
  * unclear stories, a part after Expected shows how each one ended.
  *
  * @param props - `result` is what the case kept, dropped and expected, and
@@ -25,6 +28,7 @@ const droppedPill = "border border-line-strong text-soft";
  * @returns The parts, or a note when the answer couldn't be read.
  */
 export function TaggingObservations({ result }: { result: TaggingResult }) {
+  const withConditions = showsConditions(result);
   return (
     <>
       {result.answered ? null : (
@@ -91,6 +95,14 @@ export function TaggingObservations({ result }: { result: TaggingResult }) {
               { label: "Pattern Type and sign", value: describeKept(kept) },
               { label: "Who it’s about", value: kept.about },
               { label: "Life Thread", value: kept.thread ?? "None" },
+              ...(withConditions
+                ? [
+                    {
+                      label: "Conditions",
+                      value: describeKeptConditions(kept),
+                    },
+                  ]
+                : []),
             ]}
             note={
               <>

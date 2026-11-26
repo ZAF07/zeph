@@ -8,10 +8,13 @@ from sqlalchemy import Engine, text
 
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.core.models import (
+    Audience,
     EvidenceKind,
     Observation,
     ObservationDirection,
     Relationship,
+    Stakes,
+    StateGoingIn,
 )
 from tests.fakes import (
     FakeAuthVerifier,
@@ -20,7 +23,13 @@ from tests.fakes import (
     FakeScheduler,
     ScriptedChatModel,
 )
-from tests.telegram_helpers import auth_headers, connect_telegram, owner_headers
+from tests.telegram_helpers import (
+    auth_headers,
+    connect_telegram,
+    owner_headers,
+    send_to_webhook,
+    telegram_text_update,
+)
 from tests.test_features import maya_id, switch_for_everyone, switch_for_user
 from tests.test_life_threads import end_conversation, new_thread
 from tests.test_message_retention import message_contents, retention
@@ -571,3 +580,85 @@ def test_the_tagging_prompt_model_and_thinking_are_settings_in_core_services(
         "pattern_tagging_thinking",
     ):
         assert settings[key]["hint"]
+
+
+def test_the_conditions_a_story_says_are_stored_with_its_observation_and_others_empty(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    user_id = turn_noticing_on(client, auth_verifier)
+
+    end_tagged_conversation(
+        client,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+        observation_entry(
+            audience="group", stakes="high", state_going_in="under pressure"
+        ),
+        observation_entry(quote="Then I stewed on it all night", audience=None),
+        observation_entry(quote="it's fine honestly", stakes="huge"),
+    )
+
+    said, unsaid = observations_of(client.engine, user_id)
+    assert (said.tags.audience, said.tags.stakes, said.tags.state_going_in) == (
+        Audience.GROUP,
+        Stakes.HIGH,
+        StateGoingIn.UNDER_PRESSURE,
+    )
+    assert (unsaid.tags.audience, unsaid.tags.stakes, unsaid.tags.state_going_in) == (
+        None,
+        None,
+        None,
+    )
+    [call] = chat_model.pattern_tagging_calls
+    assert "state_going_in: worn out, under pressure, low, steady" in (
+        call.history[0].text
+    )
+
+
+def test_a_conversation_with_a_safeguard_event_keeps_observations_without_a_state(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    user_id = turn_noticing_on(client, auth_verifier)
+    chat_model.script_safeguard("suicide_or_self_harm")
+    send_to_webhook(client, telegram_text_update("i don't want to be here anymore"))
+
+    end_tagged_conversation(
+        client,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+        observation_entry(audience="one-to-one", state_going_in="low"),
+    )
+
+    [observation] = observations_of(client.engine, user_id)
+    assert observation.tags.state_going_in is None
+    assert observation.tags.audience == Audience.ONE_TO_ONE
+
+
+def test_the_seeded_tagging_prompt_says_to_leave_an_unsaid_condition_empty(
+    seeded_settings: dict[str, Any],
+) -> None:
+    prompt = " ".join(seeded_settings["pattern_tagging_prompt"].split())
+
+    assert "audience is who else was there" in prompt
+    assert "stakes is whether something that matters to them could be lost" in prompt
+    assert "state_going_in is how they were before it happened" in prompt
+    assert "only when the person's own words in this Conversation say it" in prompt
+    assert "never how they felt during it or afterwards" in prompt

@@ -2649,6 +2649,7 @@ def test_a_tagging_case_runs_the_real_tagging_step_and_shows_kept_and_dropped(
         "context": "Agreed to help Mei move again, then resented it.",
         "about": "Mei, their sister",
         "thread": "Helping Mei move",
+        "conditions": {"audience": None, "stakes": None, "state_going_in": None},
         "expected": True,
     }
     [dropped] = tagging["dropped"]
@@ -2660,6 +2661,7 @@ def test_a_tagging_case_runs_the_real_tagging_step_and_shows_kept_and_dropped(
             "direction": "for",
             "unclear": False,
             "situational": False,
+            "conditions": {},
             "matched": True,
         }
     ]
@@ -2801,6 +2803,83 @@ def test_a_nothing_to_tag_case_passes_only_when_nothing_is_kept(
     stranger = results["stranger"]
     assert stranger["outcome"] == "pass", stranger
     assert stranger["tagging"]["kept"][0]["situational"] is True
+
+
+def conditions_case(key: str, **conditions: str) -> EvalCase:
+    """A Tagging case about Mei that expects the given Conditions."""
+    return EvalCase(
+        key=key,
+        eval=EvalName.TAGGING,
+        content={
+            **MEI_TAGGING_CASE.content,
+            "observations": [
+                {
+                    "pattern_type": "CONF.AVOID.BELONG",
+                    "direction": "for",
+                    "unclear": False,
+                    "situational": False,
+                    **conditions,
+                }
+            ],
+        },
+    )
+
+
+def test_a_tagging_case_that_expects_conditions_passes_only_when_they_match(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(
+        engine,
+        conditions_case("said", audience="group", state_going_in="empty"),
+        conditions_case("wrong-value", audience="one-to-one"),
+        conditions_case("guessed", state_going_in="empty"),
+        conditions_case("not-stated"),
+    )
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.TAGGING)
+    chat_model.script_pattern_tagging(
+        tagging_answer(tagged_entry(audience="group", stakes="high")),
+        tagging_answer(tagged_entry(audience="group")),
+        tagging_answer(tagged_entry(state_going_in="low")),
+        tagging_answer(tagged_entry(audience="group", state_going_in="low")),
+    )
+
+    runner.work_next_run()
+
+    results = results_by_key(open_run(client, admin, run["id"]))
+    said = results["said"]
+    assert said["outcome"] == "pass", said
+    assert [(c["group"], c["name"], c["passed"]) for c in said["checks"]] == [
+        (
+            "CONF.AVOID.BELONG · for · audience: group · state going in: empty",
+            "kept",
+            True,
+        )
+    ]
+    assert said["tagging"]["expected"][0]["conditions"] == {
+        "audience": "group",
+        "state_going_in": "empty",
+    }
+    assert said["tagging"]["kept"][0]["conditions"] == {
+        "audience": "group",
+        "stakes": "high",
+        "state_going_in": None,
+    }
+    wrong = results["wrong-value"]
+    assert wrong["outcome"] == "fail"
+    assert [(c["group"], c["name"], c["passed"]) for c in wrong["checks"]] == [
+        ("CONF.AVOID.BELONG · for · audience: one-to-one", "kept", False),
+        ("Kept but not expected", "CONF.AVOID.BELONG · for", False),
+    ]
+    assert wrong["tagging"]["kept"][0]["conditions"]["audience"] == "group"
+    assert results["guessed"]["outcome"] == "fail"
+    not_stated = results["not-stated"]
+    assert not_stated["outcome"] == "pass", not_stated
+    assert not_stated["tagging"]["expected"][0]["conditions"] == {}
 
 
 def test_an_unreadable_tagging_answer_fails_the_case(

@@ -1,6 +1,6 @@
 # Correcting and adding Tagging cases
 
-How to turn the 44 drafted Tagging cases into your own labels, and add new ones. Do it **after the whole pattern-pipeline PRD is built**; until then the drafts are the defaults.
+How to turn the drafted Tagging cases (81 in the seed, ten of them about Conditions) into your own labels, and add new ones. Do it **after the whole pattern-pipeline PRD is built**; until then the drafts are the defaults.
 
 ## Before you start
 
@@ -9,13 +9,13 @@ How to turn the 44 drafted Tagging cases into your own labels, and add new ones.
 | Edit cases on the Dashboard of your **main local stack** (Admin → Evals → Cases → Tagging). | Evals only run there (not in production), and a saved case is used by the next run straight away. |
 | When done, ask an agent to copy your cases into `src/companion/seed/evals/cases/tagging.yaml`. | The seed only fills new databases and never changes a case already saved, so editing the file alone does nothing to your stack. |
 | Never paste a real User's words. Write a made-up version with made-up names. | The platform has real Users; their words must not end up in test data. |
-| Check the estimate before each run (one case ≈ S$0.003, all 44 ≈ S$0.15). | Every run calls the real model and costs money. |
+| Check the estimate before each run. On the live model one case cost about S$0.007 on 26 Nov 2026, so all of them about S$0.60; the estimate has come out at about half the real cost. | Every run calls the real model and costs money. |
 
 ## The parts of a case
 
 | Part | What to put | Why |
 |---|---|---|
-| Key | Starts with the kind: `conf-`, `ach-`, `ctrl-`, `unclear-`, `nothing-`, `two-types-`. | It can't change later, and runs and the terminal pick cases by it. |
+| Key | Starts with the kind: `conf-`, `ach-`, `ctrl-`, `unclear-`, `nothing-`, `two-types-`, `cond-` (about Conditions). | It can't change later, and runs and the terminal pick cases by it. |
 | Life Threads | Only if the moment belongs to an ongoing story. | The tagging step is shown them and links Observations to them. |
 | Conversation | 2–4 messages; the telling line in a **User** message. | Code keeps only quotes that are word for word in the User's own texts. |
 | Observations to expect | What a careful reader would tag. Empty when there's nothing to tag. | The case passes only when what code keeps is exactly this. |
@@ -25,6 +25,7 @@ For each expected Observation:
 - **Pattern Type:** its ID from Admin → Pattern Catalog, because the check compares IDs.
 - **For or against:** "for" if it matches a sign, "against" if it matches a sign against, because the two count opposite ways in the score.
 - **Unclear:** on when two look-alike Pattern Types both fit; put either one. That's how the step should say it can't tell, instead of guessing.
+- **Audience, Stakes, State going in:** leave empty to not check one. Pick a value when the User's words say it, or "Must be empty" when they don't and the step must not guess. State going in is how they were before it happened: a feeling afterwards is "Must be empty". The case fails when a kept Observation holds something else, and the result's Conditions line shows what was kept.
 - **Anyone would:** on when the other person is a **stranger or someone above the User** (boss, director), for or against. Code decides this from those tags, and today only CONF.AVOID.BELONG has them.
 
 ## Correct a drafted case

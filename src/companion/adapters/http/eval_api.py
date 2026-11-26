@@ -198,6 +198,7 @@ class KeptObservationResponse(BaseModel):
     context: str
     about: str
     thread: str | None
+    conditions: dict[str, str | None] = {}
     expected: bool
 
 
@@ -218,6 +219,7 @@ class ExpectedObservationResponse(BaseModel):
     direction: str
     unclear: bool
     situational: bool
+    conditions: dict[str, str] = {}
     matched: bool
 
 

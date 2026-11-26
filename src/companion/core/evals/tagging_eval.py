@@ -5,6 +5,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from companion.core.agenda import OpenNeed, aimed_question
+from companion.core.evals.case_shapes import MUST_BE_EMPTY
 from companion.core.evals.cases import (
     ExpectedObservation,
     TaggingCase,
@@ -262,6 +263,43 @@ def observation_label(observation: Observation) -> str:
     ).label
 
 
+def kept_conditions(observation: Observation) -> dict[str, str | None]:
+    """List the Conditions a kept Observation holds that a case can expect.
+
+    Args:
+        observation: The kept Observation.
+
+    Returns:
+        Its audience, stakes and state going in, by name; None for one
+        left empty.
+    """
+    tags = observation.tags
+    return {
+        "audience": tags.audience.value if tags.audience else None,
+        "stakes": tags.stakes.value if tags.stakes else None,
+        "state_going_in": tags.state_going_in.value if tags.state_going_in else None,
+    }
+
+
+def conditions_match(expected: ExpectedObservation, observation: Observation) -> bool:
+    """Say whether a kept Observation holds the Conditions a case states.
+
+    Args:
+        expected: The Observation expected.
+        observation: One kept.
+
+    Returns:
+        True when every Condition the case states is the one kept, or is
+        empty where the case says it must be; one it doesn't state may
+        hold anything.
+    """
+    kept = kept_conditions(observation)
+    return all(
+        kept[name] == (None if value == MUST_BE_EMPTY else value)
+        for name, value in expected.conditions.items()
+    )
+
+
 def matches(expected: ExpectedObservation, observation: Observation) -> bool:
     """Say whether a kept Observation is the one expected.
 
@@ -270,15 +308,16 @@ def matches(expected: ExpectedObservation, observation: Observation) -> bool:
         observation: One kept.
 
     Returns:
-        True when they agree on for or against, unclear and situational, and
+        True when they agree on for or against, unclear and situational,
         the expected Pattern Type is the one kept, or, when unclear, either
-        of its two.
+        of its two, and it holds the Conditions the case states.
     """
     return (
         expected.pattern_type in named_pattern_types(observation)
         and expected.direction == observation.direction
         and expected.unclear == observation.unclear
         and expected.situational == observation.situational
+        and conditions_match(expected, observation)
     )
 
 
@@ -381,8 +420,9 @@ def kept_facts(
 
     Returns:
         Its Pattern Types, sign, direction, unclear, situational, quote,
-        context, who it is about, its Thread's title (None for none) and
-        whether it matches one expected.
+        context, who it is about, its Thread's title (None for none), its
+        audience, stakes and state going in, and whether it matches one
+        expected.
     """
     return {
         "pattern_types": named_pattern_types(observation),
@@ -396,6 +436,7 @@ def kept_facts(
         "thread": (
             thread_titles.get(observation.thread_id) if observation.thread_id else None
         ),
+        "conditions": kept_conditions(observation),
         "expected": any(matches(expectation, observation) for expectation in expected),
     }
 
@@ -470,6 +511,7 @@ def tagging_facts(
                 "direction": expectation.direction.value,
                 "unclear": expectation.unclear,
                 "situational": expectation.situational,
+                "conditions": expectation.conditions,
                 "matched": any(matches(expectation, item) for item in kept),
             }
             for expectation in expected

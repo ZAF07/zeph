@@ -33,12 +33,16 @@ Everything downstream trusts the tagging step, so it has its own Eval kind
 (`tagging`, in `evals/README.md`). A case is a made-up ended Conversation,
 the Life Threads it touched, and the Observations expected: Pattern Type,
 for or against, unclear (two look-alikes) or not, anyone-would-do-it
-(situational) or not. The real tagging step runs on it with the whole
+(situational) or not, and optionally the Conditions it must hold (audience,
+stakes, state going in: a value, or "must be empty"; one not stated isn't
+checked). The real tagging step runs on it with the whole
 Pattern Catalog, code checks what it wrote, and the case passes only when
 the Observations kept are exactly the ones expected. The seed has 68 cases:
 44 over the first three Pattern Types (clear, against, unclear, nothing to
 tag and anyone-would-do-it), and one for and one against each of the twelve
-added later.
+added later. Ten more (`cond-…`, issue 41) are about Conditions: one said
+so tagged, none said so all empty, a feeling afterwards that is not a state
+going in, one person inside a group, and high stakes said plainly.
 
 - **Shows:** whether the step finds the Pattern Type a careful reader would,
   says for or against right, says "unclear" when two look-alikes fit, keeps
@@ -53,12 +57,30 @@ added later.
     and more on-topic than real ones; real people hint, joke and contradict
     themselves.
   - Anything about Pattern Types not in the catalog yet, or about how tags
-    other than "anyone would" are filled in (relationship, power, setting,
-    stance and kind of evidence are only checked against their lists).
+    other than "anyone would" and the Conditions a case states are filled
+    in (relationship, power, setting, stance and kind of evidence are only
+    checked against their lists).
   - "Anyone would" for ACH.WORTH.PERF and CTRL.UNCERT.PLAN: their "anyone
     would" (high stakes, a real crisis) can't be written as tags, so code
     never marks theirs situational. Those cases expect the step to say
     nothing, or a sign against.
+
+#### Conditions: first results (26 Nov 2026)
+
+The ten `cond-` cases, one try each.
+
+| Run | Tagging model | Passed | Cost |
+|---|---|---|---|
+| `7f09461a` | deepseek-v4.1-flash (live), first prompt | 7 of 10 | S$0.078 (estimate S$0.04) |
+| `bd350ed4` A | deepseek-v4.1-flash (live) | 9 of 10 | about S$0.06 |
+| `bd350ed4` B | claude-opus-5.5 | 9 of 10 | about S$0.81 |
+| `bd350ed4` C | claude-haiku-5.5 | 10 of 10 | about S$0.02 |
+
+- **State going in** was right in all 40 results: tagged when said, empty for a feeling afterwards.
+- **First run:** the model filled audience "one-to-one" whenever the story had one other person, and stakes "low" or "high" unsaid, in 4 cases. The prompt now says not to. Two drafts also drew a look-alike (APPR.GIVE.NEEDED) and were rewritten.
+- **Second run:** no Condition was wrong on any of the three models. The two fails were not about Conditions: flash wrote "hers" in a context line (`cond-state-worn-out-before-call`), and Opus called `cond-high-stakes-visa-interview` unclear between ACH.WORTH.PERF and CTRL.UNCERT.PLAN.
+- The run's estimate (S$0.22) priced every Variant at the live model; the real total was about S$0.90.
+- Ten cases, one try: a first look, not a score. The owner still corrects the drafts.
 
 #### Unclear stories an aimed Curiosity asked about
 

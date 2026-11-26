@@ -26,6 +26,14 @@
 #                                      the Observation's tags fit one of its
 #                                      Pattern Type's `anyone_would_when`, for
 #                                      or against
+#     audience: one-to-one | group | in front of others | empty
+#     stakes: low | high | empty
+#     state_going_in: worn out | under pressure | low | steady | empty
+#                                      the Conditions it must hold (issue 41).
+#                                      Each is optional: left out, it isn't
+#                                      checked; a value must be the one kept;
+#                                      `empty` means none may be kept, because
+#                                      the story doesn't say it
 #
 # unclear: unclear Observations the made-up User already has, from earlier
 # Conversations (issue 25). One with `asked` on was asked about in this
@@ -1191,3 +1199,170 @@ cases:
           were you hoping for when you said yes?
       - who: person
         text: ugh can we not do the Mei thing right now. Did you see the match last night?
+
+  # Conditions (issue 41): audience, stakes and state going in are tagged only
+  # when the story says them. Drafted by Claude for the owner to correct.
+
+  # Each new Condition said, so tagged.
+
+  - id: cond-audience-in-front-of-class
+    messages:
+      - who: person
+        text: >-
+          My friend Sam corrected me in front of the whole class while I was
+          presenting, everyone was watching. I just said "oh yes, sorry, you're
+          right" even though I wasn't wrong. It's been bugging me all week.
+      - who: zeph
+        text: That's a hard spot to be put in. What's been bugging you most?
+    observations:
+      - pattern_type: CONF.AVOID.BELONG
+        direction: for
+        audience: in front of others
+
+  - id: cond-stakes-friend-owes-deposit
+    messages:
+      - who: person
+        text: >-
+          My friend Dan still owes me the two grand I lent him. If I don't get
+          it back I can't pay my own rent next month.
+      - who: zeph
+        text: That's a lot riding on it. Have you been able to raise it with Dan?
+      - who: person
+        text: >-
+          When it was just the two of us at lunch I started to bring it up, then
+          said "no rush, it's fine". It's not fine, I've been lying awake over it.
+    observations:
+      - pattern_type: CONF.AVOID.BELONG
+        direction: for
+        audience: one-to-one
+        stakes: high
+
+  - id: cond-state-worn-out-before-call
+    messages:
+      - who: person
+        text: >-
+          I'd been up since 4 with the baby and was completely drained before
+          my sister even rang. She said we should do Christmas at hers again.
+          I think it's my turn but I said "sure, sounds good". Now I'm annoyed
+          that I didn't say what I wanted.
+      - who: zeph
+        text: You were running on empty before the call even started.
+    observations:
+      - pattern_type: CONF.AVOID.BELONG
+        direction: for
+        state_going_in: worn out
+
+  # Nothing said about them, so all three stay empty.
+
+  - id: cond-nothing-said-brother-restaurant
+    messages:
+      - who: person
+        text: >-
+          I told my brother the restaurant he picked was fine even though I
+          wanted the other one. I've been grumbling about it to myself all day.
+      - who: zeph
+        text: Sounds like it mattered more than you let on.
+    observations:
+      - pattern_type: CONF.AVOID.BELONG
+        direction: for
+        audience: empty
+        stakes: empty
+        state_going_in: empty
+
+  - id: cond-nothing-said-quiz-score
+    messages:
+      - who: person
+        text: >-
+          Got seven out of ten on the practice quiz. So basically I'm stupid.
+          That's just what I am.
+      - who: zeph
+        text: That's a harsh thing to say about yourself over one quiz.
+    observations:
+      - pattern_type: ACH.WORTH.PERF
+        direction: for
+        audience: empty
+        stakes: empty
+        state_going_in: empty
+
+  # They say how they felt after, which is not their state going in.
+
+  - id: cond-felt-after-splitting-tips
+    messages:
+      - who: person
+        text: >-
+          My coworker Jo wanted to split the tips evenly again and I said
+          "fine by me" even though I think it's unfair. Afterwards I was
+          exhausted and low all weekend, kicking myself for not saying what I
+          think.
+      - who: zeph
+        text: That's a heavy weekend to carry. What stopped you saying it?
+    observations:
+      - pattern_type: CONF.AVOID.BELONG
+        direction: for
+        state_going_in: empty
+
+  - id: cond-felt-after-wrong-answer
+    messages:
+      - who: person
+        text: >-
+          I got one answer wrong at the pub quiz and our team lost by a point.
+          I'm such an idiot. I felt flat and drained for the rest of the night
+          after that.
+      - who: zeph
+        text: One answer, and it took the whole night with it.
+    observations:
+      - pattern_type: ACH.WORTH.PERF
+        direction: for
+        state_going_in: empty
+
+  # One other person inside a group: the relationship is that person's, the
+  # audience is the group.
+
+  - id: cond-group-dinner-partners-sister
+    messages:
+      - who: person
+        text: >-
+          We were at dinner with my partner's whole family, eight of us round
+          the table. My partner's sister said we should all go on holiday
+          together and I just smiled and said "sounds great". I don't want to
+          go at all and I've been fuming about it since.
+      - who: zeph
+        text: Hard to say otherwise with the whole table listening.
+    observations:
+      - pattern_type: CONF.AVOID.BELONG
+        direction: for
+        audience: group
+
+  # High stakes said plainly. Issue 42 turns these two into "anyone would"
+  # cases; until then they count like any other.
+
+  - id: cond-high-stakes-visa-interview
+    messages:
+      - who: person
+        text: >-
+          Final-round interview is on Thursday. If I don't get this job we lose
+          the visa and have to leave the country. I've rewritten my
+          presentation six times and I still can't send it, it's not good
+          enough yet.
+      - who: zeph
+        text: That is a huge amount resting on one Thursday.
+    observations:
+      - pattern_type: ACH.WORTH.PERF
+        direction: for
+        stakes: high
+
+  - id: cond-high-stakes-mortgage-decision
+    messages:
+      - who: person
+        text: >-
+          The bank decides on our mortgage this week. If it falls through we
+          lose the house and the deposit with it. I've checked my email about
+          fifty times today.
+      - who: zeph
+        text: With that much on the line, of course you keep looking.
+      - who: person
+        text: Honestly the waiting is worse than a no would be.
+    observations:
+      - pattern_type: CTRL.UNCERT.PLAN
+        direction: for
+        stakes: high
