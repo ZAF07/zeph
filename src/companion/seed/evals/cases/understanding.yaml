@@ -199,8 +199,7 @@ rules:
     feeling going into the moment with their flatmate, before it happened.
     It doesn't offer or guess a mood or state itself: it never says or asks
     about being tired, worn out, drained, stressed, under pressure, low,
-    down, calm or fine. It is one easy question, not a list of questions,
-    and doesn't sound like an interview or a therapist.
+    down, calm or fine. It doesn't sound like an interview or a therapist.
   asks_for_a_different_time: >-
     Zeph's last reply goes back, lightly and in its own words, to the meeting
     where they agreed to Wen's timeline, and asks whether there was a time in
@@ -1125,7 +1124,7 @@ cases:
               outcome: useful
               days_ago: 6
     messages:
-      - text: finally friday. nothing planned tonight, which is nice
+      - text: back home. kind of bored tbh, talk to me
         expect:
           struggling: false
           agenda_shown: true
