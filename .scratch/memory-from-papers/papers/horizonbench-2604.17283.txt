@@ -1,0 +1,1503 @@
+
+=== PAGE 1 ===
+HorizonBench: Long-Horizon Personalization
+with Evolving Preferences
+Shuyue Stella Li1,2, Bhargavi Paranjape2, Kerem Oktar2, Zhongyao Ma3, Gelin Zhou2, Lin Guan2, Na Zhang2,
+Sem Park2, Lin Chen2, Diyi Yang4, Yulia Tsvetkov1, Asli Celikyilmaz1,2
+1University of Washington, 2Meta Superintelligence Labs, 3OpenAI, 4Stanford University
+Personal assistants now talk with the same user for months, and users’ preferences change as their
+lives change; an assistant that keeps serving a preference the user has outgrown fails that user. Real
+conversations do not record when or why a preference changed, and existing benchmarks either hold
+preferences fixed or have the user state the change, so they cannot tell whether a model forgot what
+the user said or failed to update its belief about the user. We introduce HorizonBench and its data
+generator, which samples how a user’s preferences change and generates six months of conversation
+from that sequence; each change follows a life event that the user mentions without stating the new
+preference. A human longitudinal preference dataset that we collect and release, 83,024 ratings from
+160 people over 13 weeks, sets how often and how much life events change preferences. HorizonBench
+contains 4,245 questions from 360 users, and when a preference has changed, its earlier value is one
+of the answer options. All 25 frontier models we evaluate choose the outdated preference more often
+than evenly spread errors would predict, and the best reaches 52.8% accuracy. Two of the newest
+models score no higher when given only the relevant conversations than with the full history, yet one
+added sentence stating the change raises their accuracy by 11 to 22 points, and retrieval and memory
+methods do not recover the lost accuracy. Remembering what a user said and knowing what the
+user prefers now are therefore separate capabilities, and HorizonBench, its generator, and the human
+dataset support research on both.
+Date: November 19, 2026
+Correspondence: stelli@cs.washington.edu
+Code: https://github.com/stellalisy/HorizonBench
+Data: https://huggingface.co/datasets/stellalisy/HorizonBench
+1 Introduction
+People increasingly interact with AI assistants over months of conversation (Zhang et al., 2025), and their
+preferences change during that time. Consider the user in Figure 1, who prefers Socratic philosophical
+discussion but, after becoming a chief executive, prefers direct frameworks without restating the preference.
+When she later asks whether it is better to be respected or liked, an assistant that answers in the Socratic
+style has retrieved her stated preference correctly but has not updated its belief about her. We call the task of
+identifying a user’s current preference from a history in which later life events supersede earlier statements
+long-horizon personalization. State variation can dominate stable trait differences in some user-behavior
+settings (Harry et al., 2026), yet models and benchmarks commonly represent preferences as fixed traits.
+Long-horizon personalization is difficult to measure, because natural conversations do not reveal a user’s
+underlying preferences, so the time and cause of a change are unknown. Existing benchmarks test static
+preferences (Zhao et al., 2025a; Li et al., 2025b) or include changing information without an outcome that
+identifies reliance on a superseded preference (Jiang et al., 2025b; Tan et al., 2025a; Maharana et al., 2024; Wu
+et al., 2025), and synthetic user simulations do not record why preferences change (Wang et al., 2024; Chang
+et al., 2025). Concurrent work models preferences that emerge across event-driven dialogues (Liu et al., 2026),
+repeated memory updates (Uddin et al., 2026), and implicit invalidation of earlier user states (Chao et al.,
+2026); Table 1 compares these designs.
+We introduce HorizonBench and its data generator, the first resource that explicitly links a user’s latent
+1
+arXiv:2604.17283v2  [cs.CL]  17 Nov 2026
+=== PAGE 2 ===
+User Persona
+Feb 25 Sep 24June 30
+User: my COO keeps telling me 
+I'm too hard on the team 
+Assistant: Is this coming up 
+because of a specific situation? 
+User: not really, I just wonder is it 
+better to be respected or liked?
+A [correct, direct]: When respected: 
+better execution, easier to course-
+correct. When liked: higher morale, 
+people go the extra mile. Most leaders 
+find respect is the foundation and 
+warmth builds on top.
+B [distractor, Socratic]: Let’s think 
+about it openly. What do you think 
+you'd lose if your team liked you but 
+didn't quite respect you?
+Event
+Past events
+Colleague 
+feedback(+ other 
+preferences)
+Philosophical 
+engagement style: 
+Socratic
+Mental State Graph Mental State Instance
+Preferences
+Social 
+Graph
+Preference 
+Expressing Event
+Preference 
+Evolution Event
+Expressed preferencesEvolved preference 
+(not directly expressed)
+User: is free will real? 
+Assistant: What's your intuition  
+— does it feel real when you're 
+making a decision? 
+User: Nice point. don't give me  
+the answer, just more to think abt
+User: I became the CEO 
+need to sign lots of 
+contracts, what are some 
+good ways to migrate our 
+legacy systems to the cloud?  
+Assistant: […]
+Philosophical 
+engagement style: 
+Direct framework
+(need clarity and 
+urgency as CEO )↓
+Leadership 
+advice
+Intent Preferences
+Emotional 
+support: low
+Philosophical 
+engagement style: 
+Direct framework
+(+ other 
+preferences)
+C [hedging]: It really depends on 
+your leadership style and the culture 
+you're building.
+D [empathetic]: Sounds like the 
+feedback is weighing on you. What 
+does your gut say?
+E [survey]: Leadership research favors 
+respect as the foundation, though they 
+aren't mutually exclusive. [citations]
+Conversation Episode 
+Generation1 2 3 4 5Mental State Graph Construction & Updating HorizonBench Counterfactual Generation & Filtering
+Philosophical 
+brainstormingevent
+Corporate 
+tech updatesevent
+Including: pref. values, 
+expression timestamps, 
+change dependency, 
+etc.
+(updated after every event)
+Figure 1 HorizonBench pipeline overview. (1) The generator produces conversations from a structured mental state
+graph and records the preference state behind each conversation. (2) Preferences are established in conversations,
+then (3) changed by generated life events, which later conversations mention without stating the new values. (4) Later
+conversations are generated from the updated state and may express the new values. (5) The earlier values serve as
+pre-evolution distractors in HorizonBench. See Appendix B for a complete benchmark item.
+preference state to months of conversation and records the life event behind every preference change. The
+generator inverts the inference problem: it samples a sequence of user states from a structured mental
+state graph, in which typed dependency edges let one life event change several related preferences, and
+generates conversations from that sequence, so the preference behind every response and the event behind
+every change are known by construction. It also separates when a preference changes from when the user
+expresses it. A life event changes a preference without restating it, so the most recent explicit statement of a
+preference can be outdated when the question is asked, and the earlier value becomes a response option, the
+pre-evolution distractor,whoseselectionidentifiesafailuretoupdate. Togetherwithashort-horizoncondition
+and controlled rewrites of how explicitly preferences are expressed, this design separates failures to update a
+belief about the user from failures to retrieve what the user said. Research on preference construction and
+life-course change shows that preferences shift with experience and major life events (Slovic, 1995; Fleeson,
+2001;Spechtetal.,2011). Tomeasurehowlikelyalifeeventistochangepreferencesandbyhowmuch,weran
+a 13-week longitudinal study in which 160 participants rated preferences related to a planned life event before
+the event and again two weeks later; after 17.5% of completed or ongoing events, two to five of the six related
+preferences moved by at least three points on a seven-point scale, and the generator sets the probability and
+size of a preference change after a life event within these estimates (§3.2).
+HorizonBench contains 4,245 five-option questions from 360 simulated users, each with a six-month history
+averaging ∼4,300 turns and ∼163K tokens (§4). A filter keeps only questions that five models answer
+incorrectlywithoutthefullhistory. All25frontiermodelsweevaluateselectthepre-evolutiondistractormore
+often than the 25% expected under evenly spread errors, 23 of them significantly, and all 25 are less accurate
+on changed preferences than on unchanged ones. The best of the 25 models, Claude-opus-4.5, reaches 52.8%,
+and ten models score below the 20% random-guess rate. The pattern holds across context length, expression
+explicitness, and filter strictness, including when the preference was expressed 0–14 days before the question
+(§5). Replacing the history with turns selected by BM25, dense retrieval, or recency lowers accuracy for every
+model, and Mem0 matches the full history without improving on it, because the conversation containing the
+life event never names the new preference (§5.4). Remembering what a user said and knowing what the user
+prefers now are therefore separate capabilities, and current models and memory methods lack the second.
+We release the generator, the benchmark, the mental state graphs, and the human longitudinal dataset. Our
+contributions are:
+1. Belief-update failure, a failure mode in which a model answers with a user’s superseded preference,
+observed in all 25 frontier models we evaluate (§5).
+2. HorizonBench, 4,245 questions with pre-evolution distractors and controlled variants of context length,
+expression explicitness, and filter strictness (§4).
+3. A data generator that constructs conversations from a structured mental state graph, records the life event
+2
+=== PAGE 3 ===
+Table 1 Comparison with related benchmarks. Long Context: 100K+ tokens. Mental State Graph: preferences with
+dependency edges. Event-Driven Evo.: preferences change through events. Controlled Dims.: difficulty factors varied
+independently. Old-Value Distract.: thepreviousvalueisaresponseoption. Human Calib.: humandatacalibrategeneration.
+G#=partial.
+Method Long Context Mental State Graph Event-Driven Evo. Controlled Dims. Old-Value Distract. Human Calib.
+PrefEval (Zhao et al., 2025a) ✓ ✗ ✗ ✗ ✗ ✗
+PersonaMem (Jiang et al., 2025a) ✓ ✗ G# ✗ ✗ ✗
+PersonaMem-v2 (Jiang et al., 2025b) ✓ ✗ ✗ ✗ ✗ ✗
+ImplexConv (Li et al., 2025b) ✗ ✗ ✗ ✗ ✗ ✗
+LoCoMo (Maharana et al., 2024) G# G# ✗ ✗ ✗ ✗
+MemBench (Tan et al., 2025a) G# ✗ ✗ ✗ ✗ ✗
+PERMA (Liu et al., 2026) ✓ ✗ ✓ ✓ ✗ ✗
+Memora (Uddin et al., 2026) G# ✗ G# ✓ ✗ ✗
+STALE (Chao et al., 2026) ✓ G# G# ✓ ✗ ✗
+HorizonBench ✓ ✓ ✓ ✓ ✓ ✓
+behind every preference change, separates when a preference changes from when it is expressed, and
+calibrates the probability and magnitude of event-linked change against longitudinal human ratings (§3).
+4. A human longitudinal preference dataset of 83,024 ratings from 160 participants across seven surveys over 13
+weeks, recordingpreferencestiedtoplannedlifeeventsbeforeandaftereachevent, togetherwithforecasts
+and written explanations of change (§3.2, Appendix C).
+2 Problem Formulation
+Latent user state. A user’s preferences are described by 𝐾 preference dimensions, each a typed attribute of
+a preference domain (e.g., response_structure for emotional support), and dimension 𝑘 takes values in a
+finite set𝒱𝑘. The user’s latent state at conversation 𝑡∈{1,...,𝑇}is 𝑢𝑡 =(𝑣𝑡,1 ,...,𝑣𝑡,𝐾). The state is piecewise
+constant: a life eventℓ𝑡 may update a subset 𝑆𝑡 ⊆{1,...,𝐾}of dimensions, 𝑢𝑡 = 𝑓evo(𝑢𝑡−1 ,ℓ𝑡), and otherwise
+𝑢𝑡 =𝑢𝑡−1. Eachconversation 𝐶𝑡 isgeneratedfrom𝑢𝑡,andamodelobservesonlythehistory 𝐻𝑡 =(𝐶1 ,...,𝐶𝑡),
+never𝑢𝑡 or which dimensions changed.
+User-conditioned reward. Givenaconversationalcontext𝑥 inconversation𝑡,theuser’srewardforanassistant
+response 𝑟 is 𝑅(𝑥,𝑟;𝑢𝑡), which measures how well 𝑟 fits the user’s current state. The true reward depends on
+thehistoryonlythrough𝑢𝑡. Amodelactingasarewardmodelassignsascore 𝑠(𝑟|𝐻𝑡,𝑥)withoutaccessto𝑢𝑡,
+so it must infer the relevant part of 𝑢𝑡 from 𝐻𝑡. When a dimension has changed, a score that still conditions
+on its earlier value ranks responses by a reward the user no longer holds.
+Evaluation. Each item queries one dimension 𝑘 at a test turn with context 𝑥 and offers five candidate
+responses. The correct response 𝑟∗ realizes the current value 𝑣∗ = 𝑣𝑡,𝑘, and four alternatives 𝑟1 ,...,𝑟4 are
+written to differ from it only in realizing other values 𝑣1 ,...,𝑣4 ∈𝒱𝑘, so 𝑅(𝑥,· ;𝑢𝑡) ranks 𝑟∗ highest. A model
+is correct when it does the same, 𝑠(𝑟∗| 𝐻𝑡,𝑥) > 𝑠(𝑟𝑗 | 𝐻𝑡,𝑥) for all 𝑗; for a generative model that selects a
+response directly, the selection is the argmax of its implicit scores. This is the listwise form of reward-model
+evaluation (Lambert et al., 2024), conditioned on a user state the model must infer. An item is evolved if the
+preference has changed since the user first expressed it, and static otherwise. On evolved items whose earlier
+valuewasexpressedinthehistory, onealternativerealizesthatvalue,𝑣old; wecallitthepre-evolutiondistractor.
+Besides accuracy, we report two measures of belief-update failure. The distractor rate is the share of wrong
+answers that select the pre-evolution distractor; if errors were spread evenly over the four wrong options, it
+wouldbe25%,theuniform-errorreference. Theevolved–staticgapisaccuracyonevolveditemsminusaccuracy
+on static items.
+Generating histories from states. Because 𝑢𝑡 is never observed in natural conversation, the same history can
+be consistent with several sequences of user states, so neither 𝑅 nor the correct response can be established
+fromrealdata. Weinvertthis“inferringstatefromhistory”probleminthedatagenerator(§3),whichsamples
+3
+=== PAGE 4 ===
+a sequence of user states 𝑢1:𝑇 and produces 𝐻𝑇 from it. Therefore, the reward labels of every item and the life
+event behind every change are known by construction, and each change has one designated current value.
+3 HorizonBench Data Generator
+The generator models both the user and the assistant as stateful agents. Its user state augments the preference
+state 𝑢𝑡 of §2 with a persona profile, and the assistant state 𝑎𝑡 likewise comprises a persona profile and typed
+preference attributes. The generator’s central data structure is a mental state graph 𝒢 that maintains each
+agent’s persona, social connections, life events, and preferences. Preferences are linked by typed dependency
+edges (e.g., dietary preferences → restaurant choices → social outing plans), and life events alter preference
+values with changes propagating through these edges. The generator records the life event behind every
+change and tracks when each preference changes separately from when it is expressed. A preference that has
+notbeenexpressedforasetnumberofdaysbecomesstale,andthegeneratorcanthenrecallitbyplacingalater
+turn whose response must reflect the preference’s current value; each such turn is a candidate benchmark
+question(§3.4). Thegeneratorconditionseverycallon𝒢,whichkeepseachagentconsistentacrosssixmonths
+of conversation.
+3.1 Event Sampling
+Eachconversation𝐶𝑡 isorganizedaroundanepisodeevent 𝑒𝑡,theoccasionfortheinteraction(e.g.,rehearsing
+for a debate), which is distinct from the life events ℓ𝑡 that change preferences (§3.2). Episode events
+are sampled conditional on both agent states and event history, 𝑒𝑡 ∼ 𝑝(𝑒| 𝑢𝑡−1 ,𝑎𝑡−1 ,𝑒1:𝑡−1; β), preventing
+unrealistic repetition from independent draws. Category weights β follow empirical AI-chatbot interaction
+distributions(Zhangetal.,2025)(emotionalsupport26%,collaborativestorytelling26%,romanticinteractions
+22%). When a stale preference is selected for temporal recall, the sampled event is constrained to that
+preference domain, ensuring the recall turn arises in natural conversational context.
+3.2 Preference Evolution
+Preferences do not change in isolation. A career change may jointly affect work preferences, commute habits,
+andfinancialpriorities. Typeddependencyedgesin𝒢 representsuchrelationships,𝑢𝑡 = 𝑓evo(𝑢𝑡−1 ,ℓ𝑡,𝒢; ϕevo),
+where ϕevo collects the evolution parameters described below. Each life event changes the user’s preferences
+with probability 𝑝evo = 0.15 and otherwise leaves 𝑢𝑡 unchanged. When a change occurs, a connected set of
+2–5 preferences is selected, and an LLM jointly constructs the event and a qualitatively distinct new value for
+each preference, conditioned on the user’s current state, and the generator records the event with the change.
+A short conversation then mentions the event without stating the new values.
+Human longitudinal preference dataset. Setting how often a life event changes a person’s preferences, and by
+how much, requires measuring the same people’s preferences before and after events in their lives. Studies
+of life-course change follow broad personality traits across years (Specht et al., 2011) and do not record the
+everyday preferences an assistant serves around specific events, so we collect a longitudinal dataset and
+release it with the benchmark (Appendix C). The study tracks 52 everyday preferences in 13 categories: six
+of concrete preferences, such as food, activity, and daily rhythms, and seven of value-based preferences,
+such as risk, planning, and work style. The items draw on economic theories of preference (Lancaster, 1966;
+Falk et al., 2018) and on personality psychology (Becker et al., 2012) (Appendix D). Over 13 weeks, 160
+participants completed seven surveys about two weeks apart. At every survey, they rated the 52 preferences
+on a seven-point scale and predicted their ratings at each later survey. They also described a new experience
+they had planned for the next two weeks and listed and rated six of their preferences that it might affect. At
+the next survey, they reported whether the planned event had happened and rated the same six preferences
+again. The dataset contains 83,024 ratings, 960 reports of whether a planned event happened, participants’
+written explanations of change, and a final survey on perceived change and preference-aware AI (Table 5).
+Beyond calibrating the generator, it supports research on preference stability, people’s forecasts of their own
+preferences, and change around life events.
+Calibration. We use the dataset to set two parameters of the generator: the probability 𝑝evo that a life event
+4
+=== PAGE 5 ===
+Table 2 Human estimates (95% CIs) and the corresponding generator settings.
+Quantity Human estimate Generator setting Definition in human data
+Share of events that change preferences 0.175 [0.132, 0.219] 𝑝evo = 0.15 2–5 of 6 ratings move≥ 3 points
+Size of a change 3.64 [3.51, 3.77] points Qualitatively different value Mean move of those ratings
+changes the user’s preferences, and the size of each change. A change in the generator moves two to five
+related preferences to clearly different values, and we measure how often the same pattern occurs in people.
+For each planned event that happened, we compare the six preferences the participant tied to it, rated before
+the event and again two weeks later, and count the event as changing preferences when two to five of the six
+ratings moved by at least three points on the seven-point scale. Of the 470 events that happened or were
+underwayandhadallsixratingsatbothsurveys,17.5%changedpreferencesinthissense(95%CI13.2–21.9%,
+resampling participants), and the ratings that moved changed by 3.64 points on average (95% CI 3.51–3.77).
+We set 𝑝evo = 0.15, within this interval, and each change moves a preference to a qualitatively different value,
+matching the large size of the observed changes (Table 2).
+The evolution event itself does not refresh a preference’s expression timestamp. A preference updated on
+day 45 remains stale from its previous expression on day 10 and may become immediately eligible for recall.
+Later conversations can express the updated value and refresh its timestamp, so evolved items vary in how
+much post-evolution evidence precedes the test. This design keeps the pre-evolution value available as a
+response option and lets us measure how expression frequency affects model choices (§5.3).
+3.3 Conversation Generation
+An outline is generated first, specifying which preferences appear, in what order, and with what expression
+style, enforcing structural constraints such as placing temporal recall turns in contextually appropriate
+positions. Content is then generated turn by turn conditional on the outline, 𝑚𝑢 𝑡,𝑛 ∼𝑝𝑢(𝑚|𝑢𝑡,𝑒𝑡,𝐻𝑡,𝑛−1)and
+𝑚𝑎 𝑡,𝑛 ∼𝑝𝑎(𝑚| 𝑎𝑡,𝑚𝑢 𝑡,𝑛,𝐻𝑡,𝑛−1), where 𝑚𝑢 𝑡,𝑛 and 𝑚𝑎 𝑡,𝑛 are the user and assistant messages of turn 𝑛 in 𝐶𝑡, and
+𝐻𝑡,𝑛−1 is 𝐻𝑡−1 followed by the first 𝑛− 1 turns of 𝐶𝑡. The assistant persona is generated per-event to match
+the interaction context (e.g., a career counselor for a job change). To control how explicitly preferences are
+expressed,weproducevariantsoftheoriginal(neutral)conversationsbyrewritingonlypreference-expressing
+user turns and the immediately following assistant turns. In the explicit variant, preferences are stated
+with clear, varied phrasing while preserving the original register and structure. In the implicit variant,
+preferences are conveyed only through tangential remarks and contextual cues. Because the conversation
+content, preference structure, sequence of preference changes, and benchmark items remain identical across
+variants, only the expression of preferences varies (§5.3).
+3.4 Expression Tracking and Temporal Recall
+Tracking when each preference was expressed lets the benchmark tell apart a model that never saw the
+preference, one that retrieved it incorrectly, and one that failed to update it. Conversations are placed on
+a six-month calendar, with 𝑑𝑡 the day of conversation 𝑡. Each preference 𝑖 maintains the day 𝜏𝑖 of its last
+conversational expression, refreshed after each conversation, and preferences whose staleness 𝑑𝑡 −𝜏𝑖 exceeds
+a threshold (default 30 days) become eligible for temporal recall, sampled proportionally to staleness and
+optionally weighted toward evolved preferences.
+Every recalled preference has been expressed in the complete benchmark history. When the preference
+has evolved, its originally expressed value is injected as a distractor (§4.1), and the associated life event
+appears in a dedicated conversation; some histories also contain later expressions of the updated value. All
+generator parameters (timeline length, expression explicitness, evolution probability, staleness threshold,
+user demographics) are configurable.
+4 HorizonBench Benchmark
+HorizonBench is one instantiation of the data generator. Each benchmark item is a 5-option multiple-choice
+question embedded within a conversation history. Given the full history, the model must identify which
+5
+=== PAGE 6 ===
+assistant response best aligns with the user’s current preferences, the response ranked highest by the
+user-conditioned reward𝑅(𝑥,· ;𝑢𝑡) of §2.
+4.1 Counterfactual Evaluation and History Filtering
+For each temporal recall turn, one attribute 𝑘 of the recalled preference is sampled uniformly, and its current
+value 𝑣∗=𝑣𝑡,𝑘 defines the correct response. An LLM proposes four maximally contrasting alternative values
+{𝑣1 ,...,𝑣4}for 𝑘. If the value of 𝑘 has changed since the user first expressed it, the originally expressed value
+𝑣old replacesoneofthemasthepre-evolutiondistractor. Foreachalternative𝑣𝑗,anLLMrewritestheassistant
+turn into a contextually appropriate response𝑟𝑗 that fits𝑣𝑗.
+Items are then passed through a 5-LLM consensus history filter. Each candidate is presented to five validation
+models (GPT-4.1, Gemini-3-flash, o4-mini, Claude-haiku-4.5, Claude-opus-4.6) without the full conversation
+history and passes only if all five answer incorrectly. This removes items that the validators can answer
+without the conversation history. The filter threshold is tunable. Strict consensus (5/5) retains the hardest
+items, while majority (≥3/5) admits items that are easier to answer without the history, so the threshold sets
+item difficulty (§5.3).
+4.2 Dataset Statistics
+HorizonBench is produced by three frontier generators (Claude-sonnet-4.5 with 1,052 items from 120 users, o3
+with 981 items from 120 users, and Gemini-3-flash with 2,212 items from 120 users), which allows results to
+be compared across generators (§4.3). The pipeline generates 57,390 conversations totaling 1.6M turns across
+360 users, with six-month timelines averaging 142–168 conversations and 3,600–5,000 turns per user across 30
+preference domains. Of 45,006 candidates, 4,245 pass the strict 5-LLM filter (9.4% pass rate), of which 59%
+involve evolved preferences and 41% static. Appendix B shows a complete item.
+4.3 Benchmark Validation
+Results are consistent across generators. Claude models score −4.8 pp on Claude-sonnet-4.5-generated items
+relative to the other generators, and OpenAI models−2.6pp on o3-generated items.
+Items are answerable. An item’s answer is correct when the new value follows from the life event and the
+correct option expresses that value; we test each condition directly. Given the earlier value and the user’s
+turns in the life-event conversation, the majority of three annotators chose the designated value among the
+item’s five values on 86.7% of 60 items (all three on 70.0%, Fleiss𝜅= 0.79). Reading one option alone with
+no history, gpt-6-astra and gemini-4-argon named its recorded value for 81.6% and 82.0% of 5,000 options.
+Details and results on the items all three annotators answered correctly are in Appendix H.
+Response quality checks. For 4,235 items with three annotations each, individual positive ratings were 99.7%
+for situational fit, 99.7% for conversation-flow realism, and 99.4% for assistant-persona consistency; every
+item received a positive majority rating on all three dimensions (Appendix G).
+5 Experiments
+We use HorizonBench to answer three questions:
+RQ1. Do models update what they know about a user when a life event changes a preference?
+RQ2. How does the failure change with context length, expression frequency, expression explicitness, and
+item difficulty?
+RQ3. Do retrieval and memory methods recover the lost accuracy?
+5.1 Experimental Setup
+We evaluate 25 models spanning three families, including 8 OpenAI models (gpt-4o, gpt-4.1, gpt-5, gpt-
+5-mini, o1, o3, o3-mini, o4-mini), 9 Gemini models (2.0-flash-lite through 3.1-pro), and 8 Claude models
+6
+=== PAGE 7 ===
+Claude-opus-4.5Claude-3.7-sonnet Claude-opus-4 Claude-sonnet-4.5Claude-3.5-haikuClaude-sonnet-4
+Claude-3.5-sonnet-v1
+Claude-haiku-4.5Gemini-3.1-proGemini-3-proGemini-3-flashGemini-2.0-flashGemini-2.5-pro
+Gemini-2.0-flash-liteGemini-2.5-flash-lite
+Gemini-2.5-flash
+Gemini-3.1-flash-lite
+GPT-4oGPT-4.1
+o3 o1
+o4-minio3-miniGPT-5
+GPT-5-mini
+0
+10
+20
+30
+40
+50Accuracy (%)
+chance (20%)
+Model family
+Claude Gemini OpenAI
+Figure 2 Per-model accuracy on HorizonBench (4,245 items). Bars are colored by model family with bootstrap 95% CIs
+(𝐵=10,000). Dashed line marks the 20% random-guess rate.
+(3.5-haiku through opus-4.5). Each model receives the full conversation history spanning six months (∼4,300
+turns, averaging ∼163K tokens per prompt with some exceeding 250K) and selects which of five assistant
+responses best aligns with the user’s demonstrated preferences. We report results on the combined multi-
+generator dataset (4,245 items from 360 users across three generators). Items exceeding a model’s context
+window are truncated by removing earlier conversation turns. The short-horizon condition (§5.3) provides a
+complementary test on shorter histories. Sign and Wilcoxon tests are computed over the 25 per-model values;
+we also report user-clustered bootstrap intervals over the 346 users with items. All confidence intervals are
+95% percentile bootstrap CIs with𝐵=10,000 resamples.
+5.2 RQ1: Models Answer with Superseded Preferences
+Figure 2 reports per-model accuracy on the 4,245 items (full results in Table 8). The best model, Claude-
+opus-4.5, achieves 52.8%. Ten of 25 models score below the 20% random-guess rate, including seven of eight
+OpenAI models and three Gemini models. Position-debiased accuracy is within 1pp of raw accuracy for
+every model. Because the filter keeps only items that five validators answer incorrectly without the history,
+which removes items whose response options alone point to the correct answer, accuracy can fall below the
+20% random-guess rate, on static items as well (gpt-5-mini 13.3%, gpt-5 15.4%). The distractor rate and the
+evolved–static gap therefore measure the update failure relative to each model’s own accuracy.
+We additionally evaluate five open-weight models from the Llama, OLMo, and Qwen families on 1,011 items
+from the Claude-sonnet-4.5-generated subset, with left truncation for items exceeding their context windows
+(Table 9). All five score below 20% (11.6–17.1%) and have lower accuracy on evolved than static items, so the
+evolved–static gap also appears in open-weight models.
+Claude-opus-4.5Claude-3.7-sonnet Claude-opus-4 Claude-sonnet-4.5Claude-3.5-haikuClaude-sonnet-4
+Claude-3.5-sonnet-v1
+Claude-haiku-4.5Gemini-3.1-proGemini-3-proGemini-3-flashGemini-2.0-flashGemini-2.5-pro
+Gemini-2.0-flash-liteGemini-2.5-flash-lite
+Gemini-2.5-flash
+Gemini-3.1-flash-lite
+GPT-4oGPT-4.1
+o3 o1
+o4-minio3-miniGPT-5
+GPT-5-mini
+0
+10
+20
+30
+40
+50Pre-evo distractor selection rate (%)
+uniform error (25%)
+Model family
+Claude Gemini OpenAI
+Figure 3 Distractor rate by model. The dashed line marks
+the 25% uniform-error reference (1 of 4 wrong options); all
+25 models exceed it.
+Claude-opus-4.5Claude-3.7-sonnet Claude-opus-4 Claude-sonnet-4.5Claude-3.5-haikuClaude-sonnet-4
+Claude-3.5-sonnet-v1
+Claude-haiku-4.5Gemini-3.1-proGemini-3-proGemini-3-flashGemini-2.0-flashGemini-2.5-pro
+Gemini-2.0-flash-liteGemini-2.5-flash-lite
+Gemini-2.5-flash
+Gemini-3.1-flash-lite
+GPT-4oGPT-4.1
+o3 o1
+o4-minio3-miniGPT-5
+GPT-5-mini
+0
+10
+20
+30
+40
+50
+60
+70Accuracy (%)
+Evolved
+Static
+Figure 4 Accuracy on evolved (dark) vs. static (light) pref-
+erences with 95% bootstrap CIs on the combined dataset
+(4,245 items). All 25 models perform worse on evolved
+items (sign test𝑝 < 0.001).
+Distractor rate. All 25 models exceed the 25% uniform-error reference (Figure 3), with a mean distractor rate
+of29.2%(user-clustered95%CI26.9–31.4%)andamaximumof37.8%. Twenty-threeofthe25areindividually
+7
+=== PAGE 8 ===
+Table 3 Belief-update metrics across controlled conditions, averaged over the 25 models. Neutral, explicit, and implicit
+rows use the 981 o3-generated items; the short-horizon and relaxed-filter rows use their own item sets (per-model results
+in Appendix K). EvoΔ: evolved–static gap. Dist.%: distractor rate (uniform-error reference 25%). The two count columns
+give how many models show each pattern.
+Condition Overall Static Evolved Evo𝚫 Evo𝚫<0 Dist.% Dist.>25%
+Neutral (unmodified) 27.0 28.9 26.0 −2.9 22/25 38.2 25/25
+Short horizon 30.6↑ 31.4↑ 25.7↓ −5.7 25/25 47.7 25/25
+Explicit rewrite 27.9↑ 29.0↑ 27.2↑ −1.8 16/25 49.7 25/25
+Implicit rewrite 26.4↓ 28.6↓ 25.0↓ −3.6 20/25 58.8 25/25
+Relaxed filter 38.9↑ 40.3↑ 37.9↑ −2.5 22/25 54.3 25/25
+significant under a one-sided binomial test (𝑝 < 0.05). Claude-opus-4.5, the most accurate model, selects it on
+31.1% of its wrong answers. Within the OpenAI family, reasoning and non-reasoning models show similar
+mean distractor rates (28.7% vs. 29.9%), so inference-time reasoning alone does not resolve the failure.
+Evolved–static gap. All 25 models perform worse on evolved preferences than static ones (−2.7pp average,
+user-clustered95%CI−4.2to−1.1,signtest25/25negative, 𝑝 < 0.001,Figure4). ThegapislargestforGemini
+models (−3.5pp) and smallest for OpenAI (−2.1pp). Static accuracy also stays low, so retrieval is a separate
+source of difficulty.
+5.3 RQ2: The Failure Persists across Controlled Conditions
+The generator’s controls let us vary context length, expression frequency, expression explicitness, and item
+difficulty one at a time while holding the preference changes fixed. Table 3 reports the evolved–static gap
+and the distractor rate under each condition. The neutral, explicit, and implicit conditions use the 981
+o3-generated items, whose distractor rate (38.2%) is the highest of the three generators (29.2% on the full
+benchmark; Table 14).
+Context length. Because the generator tracks when each preference was last expressed, we can regenerate
+historieswiththestaleness threshold (§3.4)relaxed, so apreference is tested 0–14 days afterits last expression
+instead of at least 30 days later (∼95K tokens per history, 120 users, 1,778 items). Static accuracy rises
+slightly (31.4% vs. 28.9%), consistent with an easier retrieval task in shorter context, yet the gap widens to
+−5.7pp (25/25 models negative, Wilcoxon 𝑝 < 10−7) and the distractor rate rises to 47.7% (25/25 above the
+uniform-error reference, Wilcoxon𝑝 < 10−7).
+Expression frequency. The underlying state graph of HorizonBench also allows us to investigate the effect
+of preference expression frequency on the model’s final choice. We count the conversations expressing the
+pre- and post-evolution values in each model-visible history. The new value is expressed more often in most
+histories (65.7–69.2% of expressions of either value, and the more frequent one in 65.6–70.5% of matched
+histories; Table 10), yet model accuracy does not follow it. Averaged over the 25 models, accuracy when the
+new value is more frequent is 21.5% for Claude-sonnet-4.5-generated histories and 20.8% for o3-generated
+ones, against 29.2% and 34.4% when the old value is more frequent; for Gemini-3-flash it is 25.5% against
+22.3%. Model choices are largely independent of how often each value is expressed.
+Expression explicitness. Prior work identifies implicit preference expression as a main source of difficulty (Li
+et al., 2025b; Jiang et al., 2025b). Starting from the neutral conversations, we evaluate the explicit and implicit
+rewrites of §3, which follow the methodology of Li et al. (2025b). Overall accuracy decreases monotonically
+(27.9% explicit, 27.0% neutral, 26.4% implicit). The evolved–static gap widens from −1.8pp (explicit) to
+−2.9pp (neutral) to−3.6pp (implicit), and the distractor rate rises from 49.7% (explicit) to 58.8% (implicit).
+Both rewrites raise the distractor rate above the neutral 38.2%: explicit wording makes the earlier value as
+salient as the new one, and implicit wording leaves the new value harder to infer even though it is expressed
+more often (§5.3).
+Filter strictness. Relaxingthe5-LLMfilter(§4.1)fromstrictconsensus(5/5)tomajority(≥3/5)raisesaverage
+accuracy by +11.9pp (every model positive, paired Wilcoxon 𝑝 < 10−7). The evolved–static gap is −2.5pp
+(22/25 models negative, Wilcoxon 𝑝 < 10−4), and every model has a distractor rate above the uniform-error
+reference (54.3%, 25/25). The filter sets item difficulty, and the belief-update pattern holds at both thresholds.
+8
+=== PAGE 9 ===
+Table 4 Accuracy (%) on the 2,484 evolved items when a retrieval method replaces the full history.
+Model Full history BM25 Recency Dense 384d Dense 1536d
+Claude-opus-4.5 52.1 42.2 42.8 40.3 40.6
+Claude-sonnet-4.5 33.3 27.5 26.4 24.8 25.6
+GPT-4o 24.1 17.5 15.5 17.8 18.0
+Claude-haiku-4.5 20.5 16.3 13.0 15.2 15.3
+GPT-4.1 19.3 18.0 14.1 17.6 17.5
+Matched evidence. For 200 items, we use the generator’s records to keep only the conversations expressing
+the earlier value, the life-event conversation, and later expressions of the new value (median 5.3K tokens),
+with the same test conversation, question, and options (Appendix I). gpt-6-astra and gemini-4-argon score
+27.0% and 58.0%, no higher than with the full history(28.5% and 63.5%). One added user sentence stating the
+change raises accuracy by 22.0 [14.5, 29.5] and 11.0 [3.0, 19.0] points, and a paraphrase that never names the
+value is within 3.6 points of it. With every relevant conversation in context, the models fail to infer the change.
+5.4 RQ3: Retrieval Cannot Surface the Evidence of a Change
+Long-horizon personalization is commonly treated as a memory problem, so we replace the full history
+with a smaller context while holding fixed the model that answers the question (the reader) and the scoring.
+BM25 (Robertson and Zaragoza, 2009), dense retrieval with a locally run 384-dimensional encoder, and
+dense retrieval with text-embedding-3-small each return the ten highest-scoring turns in timestamp order,
+following Wu et al. (2025), and a recency baseline returns the ten most recent turns. All four run on the 2,484
+evolved items.
+Every retrieval condition falls below the full history for every model, and the strongest model loses the most:
+Claude-opus-4.5 drops 9.9pp under BM25 and up to 11.8pp under dense retrieval (Table 4). The distractor
+rate reaches 37–47%, against 29.7–31.1% for the same readers with the full history. Mem0 (Chhikara et al.,
+2025), which builds memories with a language model as conversations arrive and never sees the question,
+reaches 19.9% with gpt-4.1 as the reader (1,492 items with a pre-evolution distractor), against 19.3% for
+the same reader on the full history. A note-taking agent built on gpt-6-astra and gemini-4-argon, which
+writes notes from the matched-evidence conversations with an instruction to record changed preferences
+and then answers from them, scores 21.5% and 42.0%, below reading those conversations (27.0% and 58.0%;
+Appendix I).
+The generator’s records explain this. Because the generator stores the conversation in which each life event
+changed a preference, retrieval can be scored against it: BM25 retrieves that conversation on 18.5% of items,
+against 22.1% for a random draw of the same size, and a statement of the current value on 35.9%, against
+31.4%. The two dense encoders select largely different turns (21.1% mean Jaccard overlap) yet differ by at
+most 0.8pp, so which turns reach the model barely matters. An event turn describes a career change or a
+diagnosis without naming a preference value, so similarity to a question about that preference does not
+surface it, and no selection from the history can supply evidence that the history states only implicitly.
+6 Related Work
+Personalization and long-term memory benchmarks. Existing benchmarks test whether models retrieve stated
+preferencesandfactsfromlonghistories(Zhaoetal.,2025a;Jiangetal.,2025a;Maharanaetal.,2024;Tanetal.,
+2025a;Wuetal.,2025;Liuetal.,2024), oftentreatingimplicitexpressionasthemainsourceofdifficulty(Jiang
+et al., 2025b; Li et al., 2025b; Guo et al., 2026). Those that include changing information have no outcome
+that identifies continued reliance on a superseded preference, so a retrieval failure and an update failure
+produce the same error. Concurrent work models evolving user state through emerging preferences (Liu
+et al., 2026), repeated memory updates (Uddin et al., 2026), and implicit state invalidation (Chao et al., 2026).
+ICF-Bench tests whether models follow an explicit update that reverses an earlier preference (Qian et al.,
+2026), and memory agents learn to update stored notes (Xu et al., 2026) or search raw chat logs repeatedly (Li
+et al., 2026a). HorizonBench differs in three ways: the earlier value appears among the response options, so
+selecting it measures the update failure directly; every change is tied to a recorded life event; and context
+9
+=== PAGE 10 ===
+length and expression vary while the transition is held fixed (Table 1). The resulting error pattern connects to
+findings that models favor prior evidence over newer context (Xu et al., 2024).
+Preference change. Psychological research shows that preferences are partly constructed in context and
+shift with experience, roles, and life events (Slovic, 1995; Schwarz, 2007; Fleeson, 2001; Elder, 1998; Hitlin
+and Piliavin, 2004; Specht et al., 2011), which motivates the generator’s event-linked evolution; our human
+longitudinal dataset calibrates its parameters and is released for direct study of preference change (§3.2).
+Temporal recommender systems model preference drift from timestamped behavior (Koren, 2009; Rafailidis
+and Nanopoulos, 2016; Rabiu et al., 2020). HorizonBench targets the conversational case, in which an event
+implies a new preference before the user states it.
+User simulation. The generator builds on LLM agent simulation (Park et al., 2023) and synthetic life-long
+personalization data (Wang et al., 2024; Chang et al., 2025), which lack structured preference transitions with
+known causes. Structured models of how preferences co-vary support inferring a user’s preferences from
+few interactions (Bose et al.), and evidence that state variation can dominate stable trait differences in some
+user-behavior settings (Harry et al., 2026) motivates modeling preferences as changing states. Appendix A
+extends this discussion.
+7 Conclusion
+We introduced HorizonBench and its generator, the first resource that explicitly links a user’s latent state
+to months of conversation and records the cause of every preference change, which provides supervision
+that natural conversation data cannot. All 25 frontier models choose the user’s superseded preference more
+often than chance errors would predict, across context lengths, expression styles, and filter thresholds, and
+including when the preference was expressed shortly before the test. Retrieval and memory methods do not
+recover the lost accuracy, because the evidence of a change is a life event that the history never states as a
+preference. Remembering what a user said and knowing what the user wants now are therefore separate
+capabilities, and the models and memory methods we evaluate lack the second. The generator supplies
+ground truth forevaluating methods that trackthis change, andfor training them infuture work. The human
+longitudinal dataset records how 160 people’s preferences moved around planned life events over 13 weeks,
+and can calibrate other user simulators or test models of preference change directly. Because a user’s reward
+changes as the user’s preferences change, tracking the user’s state is a prerequisite for personalized reward
+modeling and for aligning assistants to individual users over long horizons.
+Reproducibility Statement
+The generator, benchmark, mental state graphs, and evaluation code are publicly released. §3 specifies
+the generation pipeline and §4.1 the counterfactual construction and 5-LLM history filter, with the full
+prompts in Appendix J and generation statistics in Appendix F. §5 gives the evaluation protocol, including
+the models, truncation rule, and bootstrap settings; per-model results appear in Appendix E and per-model
+controlled-condition results in Appendix K. The calibration estimates in §3.2 are reproduced by the analysis
+script accompanying the human data release, whose inclusion rules and formulas are given in Appendix C.
+Ethics Statement
+The benchmark conversations, personas, and evaluation items are generated by LLMs and do not represent
+study participants. We acknowledge that LLM-generated conversations may encode biases present in the
+underlying models. Preference evolution scenarios such as health and career events are synthetic evaluation
+constructs and should not be interpreted as clinical or counseling models.
+Acknowledgments
+This research was developed in part with funding from the Defense Advanced Research Projects Agency’s
+(DARPA) SciFy program (Agreement No. HR00112520300). The views expressed are those of the author
+10
+=== PAGE 11 ===
+and do not reflect the official policy or position of the Department of Defense or the U.S. Government. This
+materialisbasedinpartuponworksupportedbytheDefenseAdvancedResearchProjectsAgencyandtheAir
+Force Research Laboratory, contract number(s): FA8650-23-C-7316. Any opinions, findings and conclusions,
+or recommendations expressed in this material are those of the author(s) and do not necessarily reflect the
+views of AFRL or DARPA. This research was supported by Coefficient Giving, the University of Washington
+Population Health Initiative, Amazon Health, the UW+Amazon Science Hub, and the Meta AIM program.
+References
+Saleh Afzoon, Zahra Jamali, Usman Naseem, and Amin Beheshti. PersoBench: Benchmarking personalized response
+generation in large language models. arXiv preprint arXiv:2410.03198, 2024. https://arxiv.org/abs/2410.03198.
+George A. Akerlof and Rachel E. Kranton. Economics and identity. The Quarterly Journal of Economics, 115(3):715–753, 2000.
+doi: 10.1162/003355300554881.
+Lize Alberts, Benjamin Ellis, Andrei Lupu, and Jakob Foerster. CURATe: Benchmarking personalised alignment of
+conversational AI assistants. arXiv preprint arXiv:2410.21159, 2024. https://arxiv.org/abs/2410.21159.
+Anke Becker, Thomas Deckers, Thomas Dohmen, Armin Falk, and Fabian Kosse. The relationship between economic
+preferences and psychological personality measures. Annual Review of Economics, 4:453–478, 2012. doi: 10.1146/
+annurev-economics-080511-110922.
+Gary S. Becker. A theory of the allocation of time. The Economic Journal, 75(299):493–517, 1965. doi: 10.2307/2228949.
+Roland Bénabou and Jean Tirole. Incentives and prosocial behavior. The American Economic Review, 96(5):1652–1678, 2006.
+doi: 10.1257/aer.96.5.1652.
+Avinandan Bose, Shuyue Stella Li, Faeze Brahman, Pang Wei Koh, Simon Shaolei Du, Yulia Tsvetkov, Maryam Fazel, Lin
+Xiao, and Asli Celikyilmaz. Cold-start personalization via bayesian adaptive questioning. In Forty-third International
+Conference on Machine Learning. https://arxiv.org/abs/2602.15012.
+Serina Chang, Ashton Anderson, and Jake M. Hofman. ChatBench: From static benchmarks to human-AI evaluation.
+In Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers),
+pages 26009–26038. Association for Computational Linguistics, 2025. doi: 10.18653/v1/2025.acl-long.1262. https:
+//aclanthology.org/2025.acl-long.1262/.
+Hanxiang Chao, Yihan Bai, Rui Sheng, Tianle Li, and Yushi Sun. STALE: Can LLM agents know when their memories are
+no longer valid? arXiv preprint arXiv:2605.06527, 2026. https://arxiv.org/abs/2605.06527.
+Prateek Chhikara, Dev Khant, Saket Aryan, Taranjeet Singh, and Deshraj Yadav. Mem0: Building production-ready AI
+agents with scalable long-term memory. In ECAI 2025, Frontiers in Artificial Intelligence and Applications, pages
+2993–3000. IOS Press, 2025. doi: 10.3233/FAIA251160. https://doi.org/10.3233/FAIA251160.
+Glen H. Elder, Jr. The life course as developmental theory. Child Development, 69(1):1–12, 1998. doi: 10.1111/j.1467-8624.
+1998.tb06128.x. https://doi.org/10.1111/j.1467-8624.1998.tb06128.x.
+Armin Falk, Anke Becker, Thomas Dohmen, Benjamin Enke, David Huffman, and Uwe Sunde. Global evidence on
+economic preferences. The Quarterly Journal of Economics, 133(4):1645–1692, 2018. doi: 10.1093/qje/qjy013.
+Armin Falk, Anke Becker, Thomas Dohmen, David Huffman, and Uwe Sunde. The preference survey module: A
+validated instrument for measuring risk, time, and social preferences. Management Science, 69(4):1935–1950, 2023. doi:
+10.1287/mnsc.2022.4455.
+William Fleeson. Toward a structure- and process-integrated view of personality: Traits as density distributions
+of states. Journal of Personality and Social Psychology, 80(6):1011–1027, 2001. doi: 10.1037/0022-3514.80.6.1011.
+https://doi.org/10.1037/0022-3514.80.6.1011.
+RussellGolman,GeorgeLoewenstein,AndrasMolnar,andSilviaSaccardo. Thedemandfor,andavoidanceof,information.
+Management Science, 68(9):6454–6476, 2022. doi: 10.1287/mnsc.2021.4244.
+Qianyun Guo, Yibo Li, Yue Liu, and Bryan Hooi. Towards natural personalization: Evaluating long-horizon preference
+following in personalized user-LLM interactions. arXiv preprint arXiv:2603.04191, 2026. https://arxiv.org/abs/2603.
+04191.
+11
+=== PAGE 12 ===
+Tamunotonye Harry, Ivoline C. Ngong, Chima Nweke, Yuanyuan Feng, and Joseph Near. Beyond fixed psychological
+personas: Statebeatstrait,butlanguagemodelsarestate-blind. InFindingsoftheAssociationforComputationalLinguistics:
+ACL2026,pages26440–26468.AssociationforComputationalLinguistics,2026.doi: 10.18653/v1/2026.findings-acl.1316.
+https://aclanthology.org/2026.findings-acl.1316/.
+Steven Hitlin and Jane Allyn Piliavin. Values: Reviving a dormant concept. Annual Review of Sociology, 30(1):359–393,
+2004. doi: 10.1146/annurev.soc.30.012703.110640. https://doi.org/10.1146/annurev.soc.30.012703.110640.
+Bowen Jiang, Zhuoqun Hao, Young-Min Cho, Bryan Li, Yuan Yuan, Sihao Chen, Lyle Ungar, Camillo J. Taylor, and Dan
+Roth. Know me, respond to me: Benchmarking LLMs for dynamic user profiling and personalized responses at scale.
+In Second Conference on Language Modeling, 2025a. https://arxiv.org/abs/2504.14225.
+Bowen Jiang, Yuan Yuan, Maohao Shen, Zhuoqun Hao, Zhangchen Xu, Zichen Chen, Ziyi Liu, Anvesh Rao Vĳjini, Jiashu
+He, Hanchao Yu, Radha Poovendran, Gregory W. Wornell, Lyle Ungar, Dan Roth, Sihao Chen, and Camillo Jose Taylor.
+PersonaMem-v2: Towards personalized intelligence via learning implicit user personas and agentic memory. arXiv
+preprint arXiv:2512.06688, 2025b. https://arxiv.org/abs/2512.06688.
+Yehuda Koren. Collaborative filtering with temporal dynamics. In Proceedings of the 15th ACM SIGKDD International
+Conference on Knowledge Discovery and Data Mining, pages 447–456. Association for Computing Machinery, 2009. doi:
+10.1145/1557019.1557072. https://doi.org/10.1145/1557019.1557072.
+Ishita Kumar, Snigdha Viswanathan, Sushrita Yerra, Alireza Salemi, Ryan A. Rossi, Franck Dernoncourt, Hanieh
+Deilamsalehy,XiangChen,RuiyiZhang,ShubhamAgarwal,NedimLipka,ChienVanNguyen,ThienHuuNguyen,and
+HamedZamani. LongLaMP:Abenchmarkforpersonalizedlong-formtextgeneration. arXivpreprintarXiv:2407.11016,
+2024. https://arxiv.org/abs/2407.11016.
+Nathan Lambert, Valentina Pyatkin, Jacob Morrison, LJ Miranda, Bill Yuchen Lin, Khyathi Chandu, Nouha Dziri, Sachin
+Kumar, Tom Zick, Yejin Choi, Noah A. Smith, and Hannaneh Hajishirzi. RewardBench: Evaluating reward models for
+language modeling. arXiv preprint arXiv:2403.13787, 2024. https://aclanthology.org/2025.findings-naacl.96/.
+Kelvin J. Lancaster. A new approach to consumer theory. Journal of Political Economy, 74(2):132–157, 1966. doi:
+10.1086/259131.
+Ruizhe Li, Licheng Zhang, Benfeng Xu, Mingxuan Du, Zheren Fu, and Weidong Chen. When your agent opens the chat
+app: Agent-controlled search over raw chat logs rivals structured memory. arXiv preprint arXiv:2608.12888, 2026a.
+Shuyue Stella Li, Melanie Sclar, Hunter Lang, Ansong Ni, Jacqueline He, Puxin Xu, Andrew Cohen, Chan Young Park,
+Yulia Tsvetkov, and Asli Celikyilmaz. PrefPalette: Personalized preference modeling with latent attributes. In The
+Second Conference on Language Modeling, 2025a. https://openreview.net/forum?id=p4ujQsKmPV.
+Shuyue Stella Li, Avinandan Bose, Faeze Brahman, Simon Shaolei Du, Pang Wei Koh, Maryam Fazel, and Yulia
+Tsvetkov. PrefDisco: Benchmarking proactive personalized reasoning. In The Fourteenth International Conference
+on Learning Representations, pages 80844–80908, 2026b. https://proceedings.iclr.cc/paper_files/paper/2026/hash/
+82d50077a0e140b524a18f380c95d55a-Abstract-Conference.html.
+Xintong Li, Jalend Bantupalli, Ria Dharmani, Yuwei Zhang, and Jingbo Shang. Toward multi-session personalized
+conversation: A large-scale dataset and hierarchical tree framework for implicit reasoning. In Proceedings of the 2025
+Conference on Empirical Methods in Natural Language Processing, pages 11493–11506. Association for Computational
+Linguistics, 2025b. doi: 10.18653/v1/2025.emnlp-main.580. https://aclanthology.org/2025.emnlp-main.580/.
+Nelson F. Liu, Kevin Lin, John Hewitt, Ashwin Paranjape, Michele Bevilacqua, Fabio Petroni, and Percy Liang. Lost in the
+middle: How language models use long contexts. Transactions of the Association for Computational Linguistics, 12:157–173,
+2024. doi: 10.1162/tacl_a_00638. https://aclanthology.org/2024.tacl-1.9/.
+ShuochenLiu,JunyiZhu,LongShu,JundaLin,YuhaoChen,HaotianZhang,ChaoZhang,DerongXu,JiaLi,BoTang,Zhiyu
+Li, Feiyu Xiong, Enhong Chen, and Tong Xu. PERMA: Benchmarking personalized memory agents via event-driven
+preference and realistic task environments. arXiv preprint arXiv:2603.23231, 2026. https://arxiv.org/abs/2603.23231.
+George Loewenstein, Ted O’Donoghue, and Matthew Rabin. Projection bias in predicting future utility. The Quarterly
+Journal of Economics, 118(4):1209–1248, 2003. doi: 10.1162/003355303322552784.
+Adyasha Maharana, Dong-Ho Lee, Sergey Tulyakov, Mohit Bansal, Francesco Barbieri, and Yuwei Fang. Evaluating
+very long-term conversational memory of LLM agents. In Proceedings of the 62nd Annual Meeting of the Association for
+Computational Linguistics (Volume 1: Long Papers), pages 13851–13870. Association for Computational Linguistics, 2024.
+doi: 10.18653/v1/2024.acl-long.747. https://aclanthology.org/2024.acl-long.747/.
+12
+=== PAGE 13 ===
+Muriel Niederle and Lise Vesterlund. Do women shy away from competition? Do men compete too much? The Quarterly
+Journal of Economics, 122(3):1067–1101, 2007. doi: 10.1162/qjec.122.3.1067.
+JoonSungPark,JosephO’Brien,CarrieJunCai,MeredithRingelMorris,PercyLiang,andMichaelS.Bernstein. Generative
+agents: Interactive simulacra of human behavior. In Proceedings of the 36th Annual ACM Symposium on User Interface
+Software and Technology, pages 1–22. Association for Computing Machinery, 2023. doi: 10.1145/3586183.3606763.
+https://doi.org/10.1145/3586183.3606763.
+Yuli Qian, Zechuan Yang, Wenbiao Ding, Hongzhi Li, and Yutao Xie. Do LLMs forget what they should? evaluating
+in-context forgetting in large language models. In The Fourteenth International Conference on Learning Representations,
+2026. https://openreview.net/forum?id=hcJywRYc3n.
+Idris Rabiu, Naomie Salim, Aminu Da’u, and Akram Osman. Recommender system based on temporal models:
+A systematic review. Applied Sciences, 10(7):2204, 2020. doi: 10.3390/app10072204. https://doi.org/10.3390/
+app10072204.
+Dimitrios Rafailidis and Alexandros Nanopoulos. Modeling users preference dynamics and side information in
+recommender systems. IEEE Transactions on Systems, Man, and Cybernetics: Systems, 46(6):782–792, 2016. doi:
+10.1109/TSMC.2015.2460691. https://doi.org/10.1109/TSMC.2015.2460691.
+Stephen Robertson and Hugo Zaragoza. The probabilistic relevance framework: BM25 and beyond. Foundations and
+Trends in Information Retrieval, 4(1–2):1–174, 2009. doi: 10.1561/1500000019. https://doi.org/10.1561/1500000019.
+Alireza Salemi, Sheshera Mysore, Michael Bendersky, and Hamed Zamani. LaMP: When large language models meet
+personalization. In Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1:
+Long Papers), pages 7370–7392, Bangkok, Thailand, August 2024. Association for Computational Linguistics. doi:
+10.18653/v1/2024.acl-long.399. https://aclanthology.org/2024.acl-long.399/.
+Norbert Schwarz. Attitude construction: Evaluation in context. Social Cognition, 25(5):638–656, 2007. doi: 10.1521/soco.
+2007.25.5.638. https://doi.org/10.1521/soco.2007.25.5.638.
+Tibor Scitovsky. The Joyless Economy: An Inquiry into Human Satisfaction and Consumer Dissatisfaction. Oxford University
+Press, New York, 1976.
+Ivan Sekulic, Silvia Terragni, Victor Guimarães, Nghia Khau, Bruna Guedes, Modestas Filipavicius, Andre Ferreira
+Manso, and Roland Mathis. Reliable LLM-based user simulator for task-oriented dialogue systems. In Proceedings of the
+1st Workshop on Simulating Conversational Intelligence in Chat (SCI-CHAT 2024), pages 19–35, St. Julians, Malta, March
+2024. Association for Computational Linguistics. doi: 10.18653/v1/2024.scichat-1.3. https://aclanthology.org/2024.
+scichat-1.3/.
+Paul Slovic. The construction of preference. American Psychologist, 50(5):364–371, 1995. doi: 10.1037/0003-066X.50.5.364.
+https://doi.org/10.1037/0003-066X.50.5.364.
+Jule Specht, Boris Egloff, and Stefan C. Schmukle. Stability and change of personality across the life course: The impact
+of age and major life events on mean-level and rank-order stability of the Big Five. Journal of Personality and Social
+Psychology, 101(4):862–882, 2011. doi: 10.1037/a0024950. https://doi.org/10.1037/a0024950.
+George J. Stigler and Gary S. Becker. De gustibus non est disputandum. The American Economic Review, 67(2):76–90, 1977.
+HaoranTan,ZeyuZhang,ChenMa,XuChen,QuanyuDai,andZhenhuaDong. MemBench: Towardsmorecomprehensive
+evaluation on the memory of LLM-based agents. In Findings of the Association for Computational Linguistics: ACL
+2025, pages 19336–19352. Association for Computational Linguistics, 2025a. doi: 10.18653/v1/2025.findings-acl.989.
+https://aclanthology.org/2025.findings-acl.989/.
+Juntao Tan, Liangwei Yang, Zuxin Liu, Zhiwei Liu, Rithesh R N, Tulika Manoj Awalgaonkar, Jianguo Zhang, Weiran
+Yao, Ming Zhu, Shirley Kokane, Silvio Savarese, Huan Wang, Caiming Xiong, and Shelby Heinecke. PersonaBench:
+Evaluating AI models on understanding personal information through accessing (synthetic) private user data.
+In Findings of the Association for Computational Linguistics: ACL 2025, pages 878–893, Vienna, Austria, July 2025b.
+Association for Computational Linguistics. ISBN 979-8-89176-256-5. doi: 10.18653/v1/2025.findings-acl.49. https:
+//aclanthology.org/2025.findings-acl.49/.
+Meiling Tao, Chenghao Zhu, Dongyi Ding, Tiannan Wang, Yuchen Eleanor Jiang, and Wangchunshu Zhou. Person-
+aFeedback: A large-scale human-annotated benchmark for personalization. arXiv preprint arXiv:2506.12915, 2025.
+https://arxiv.org/abs/2506.12915.
+Md Nayem Uddin, Kumar Shubham, Eduardo Blanco, Chitta Baral, and Gengyu Wang. From recall to forgetting:
+Benchmarking long-term memory for personalized agents. In Findings of the Association for Computational Linguistics:
+13
+=== PAGE 14 ===
+ACL2026,pages26814–26841.AssociationforComputationalLinguistics,2026.doi: 10.18653/v1/2026.findings-acl.1337.
+https://aclanthology.org/2026.findings-acl.1337/.
+Tiannan Wang, Meiling Tao, Ruoyu Fang, Huilin Wang, Shuai Wang, Yuchen Eleanor Jiang, and Wangchunshu
+Zhou. AI PERSONA: Towards life-long personalization of LLMs. arXiv preprint arXiv:2412.13103, 2024. https:
+//arxiv.org/abs/2412.13103.
+Di Wu, Hongwei Wang, Wenhao Yu, Yuwei Zhang, Kai-Wei Chang, and Dong Yu. LongMemEval: Bench-
+marking chat assistants on long-term interactive memory. In The Thirteenth International Conference on
+Learning Representations, pages 86809–86836, 2025. https://proceedings.iclr.cc/paper_files/paper/2025/hash/
+d813d324dbf0598bbdc9c8e79740ed01-Abstract-Conference.html.
+Derong Xu, Shuochen Liu, Pengfei Luo, Pengyue Jia, Yingyi Zhang, Yi Wen, Yimin Deng, Wenlin Zhang, Enhong Chen,
+Xiangyu Zhao, et al. Learning how and what to memorize: Cognition-inspired two-stage optimization for evolving
+memory. In Proceedings of the 64th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers),
+pages 44987–45011, 2026.
+Rongwu Xu, Zehan Qi, Zhĳiang Guo, Cunxiang Wang, Hongru Wang, Yue Zhang, and Wei Xu. Knowledge conflicts
+for LLMs: A survey. In Proceedings of the 2024 Conference on Empirical Methods in Natural Language Processing,
+pages 8541–8565. Association for Computational Linguistics, 2024. doi: 10.18653/v1/2024.emnlp-main.486. https:
+//aclanthology.org/2024.emnlp-main.486/.
+Sangyeon Yoon, Sunkyoung Kim, Hyesoo Hong, Wonje Jeung, Yongil Kim, Wooseok Seo, Heuiyeen Yeen, and Albert No.
+BenchPreS: A benchmark for context-aware personalized preference selectivity of persistent-memory LLMs. arXiv
+preprint arXiv:2603.16557, 2026. https://arxiv.org/abs/2603.16557.
+Se-eun Yoon, Zhankui He, Jessica Echterhoff, and Julian McAuley. Evaluating large language models as generative user
+simulators for conversational recommendation. In Proceedings of the 2024 Conference of the North American Chapter of
+the Association for Computational Linguistics: Human Language Technologies (Volume 1: Long Papers), pages 1490–1504,
+Mexico City, Mexico, June 2024. Association for Computational Linguistics. doi: 10.18653/v1/2024.naacl-long.83.
+https://aclanthology.org/2024.naacl-long.83/.
+YutongZhang,DoraZhao,JeffreyT.Hancock,RobertKraut,andDiyiYang. TheriseofAIcompanions: InteractionwithAI
+companions and psychological well-being. arXiv preprint arXiv:2506.12605, 2025. https://arxiv.org/abs/2506.12605.
+Siyan Zhao, Mingyi Hong, Yang Liu, Devamanyu Hazarika, and Kaixiang Lin. Do LLMs recognize your pref-
+erences? evaluating personalized preference following in LLMs. In The Thirteenth International Conference on
+Learning Representations, pages 15888–15931, 2025a. https://proceedings.iclr.cc/paper_files/paper/2025/hash/
+28a46044775d97a4efcbcf14e7f13209-Abstract-Conference.html.
+Zheng Zhao, Clara Vania, Subhradeep Kayal, Naila Khan, Shay B. Cohen, and Emine Yilmaz. PersonaLens: A benchmark
+for personalization evaluation in conversational AI assistants. In Findings of the Association for Computational Linguistics:
+ACL2025,pages18023–18055.AssociationforComputationalLinguistics,2025b.doi: 10.18653/v1/2025.findings-acl.927.
+https://aclanthology.org/2025.findings-acl.927/.
+LixiZhu,XiaowenHuang,andJitaoSang. ALLM-basedcontrollable,scalable,human-involvedusersimulatorframework
+forconversationalrecommendersystems. InProceedingsoftheACMonWebConference2025,WWW’25,pages4653–4661,
+New York, NY, USA, 2025. Association for Computing Machinery. ISBN 9798400712746. doi: 10.1145/3696410.3714858.
+https://doi.org/10.1145/3696410.3714858.
+Thomas P. Zollo, Andrew Wei Tung Siah, Naimeng Ye, Ang Li, and Hongseok Namkoong. Person-
+alLLM: Tailoring LLMs to individual preferences. In The Thirteenth International Conference on Learn-
+ing Representations, pages 66949–66971, 2025. https://proceedings.iclr.cc/paper_files/paper/2025/hash/
+a730abbcd6cf4a371ca9545db5922442-Abstract-Conference.html.
+14
+=== PAGE 15 ===
+Appendix
+A Extended Related Work
+Personalization benchmarks. PrefEval (Zhao et al., 2025a) evaluates preference following across up to 100K
+tokens with static preferences. PersonaMem (Jiang et al., 2025a) introduces multiple sessions with temporally
+groundedprofiles,while PersonaMem-v2(Jiangetal.,2025b)scalesto128Ktokensandreportsloweraccuracy
+for dynamic than static preferences. ImplexConv (Li et al., 2025b) targets implicit reasoning where life events
+impose situational constraints, though underlying preferences remain static. RealPref (Guo et al., 2026)
+varies expression types across long histories. Other work addresses personalized alignment (Alberts et al.,
+2024; Zhao et al., 2025b), cross-user diversity (Zollo et al., 2025), preference selectivity (Yoon et al., 2026),
+profile-conditioned retrieval (Salemi et al., 2024; Kumar et al., 2024), persona coverage (Afzoon et al., 2024;
+Tan et al., 2025b; Tao et al., 2025), and preference structure (Li et al., 2026b, 2025a).
+Concurrent work, PERMA, likewise places preference development within event-driven dialogue (Liu et al.,
+2026). It models preferences that emerge or become more detailed through task interactions, then evaluates
+preferenceconsistency,taskcompletion,andmemoryefficiencyunderclean,noisy,andstyle-alignedhistories.
+HorizonBench focuses on a different transition in which an established preference is replaced after a life event.
+The previous preference is retained as a designated response option, so selecting it directly measures whether
+the model persists with a superseded value. The preference change is held fixed while context length and
+expression are varied, and the probability and magnitude of event-associated transitions are calibrated from
+longitudinal human ratings.
+Long-term memory and knowledge update. MemBench (Tan et al., 2025a) evaluates knowledge updating
+alongsideinformationextractionandtemporalreasoning. LoCoMo(Maharanaetal.,2024)groundsdialogues
+ontemporaleventgraphs,and LongMemEval(Wuetal.,2025)testsfivememoryabilitiesincludingknowledge
+updates. Position effects further limit the use of evidence in long contexts (Liu et al., 2024). Memora extends
+this literature to frequent additions, revisions, and deletions across preferences, activities, and goals (Uddin
+et al., 2026). It evaluates remembering, reasoning, and recommendation over weekly, monthly, and quarterly
+histories, with a metric that penalizes reliance on obsolete memories. STALE constructs implicit conflicts in
+which a later observation invalidates an earlier fact, condition, routine, or preference (Chao et al., 2026). Its
+three probes test recognition of the invalid state, resistance to a query that presupposes the stale state, and
+application of the new state in a response. HorizonBench complements these tasks by measuring attraction to
+the exact earlier preference after an event-linked transition across 25 models. Its short-history and expression
+controls test whether this error remains when retrieval demands and explicit cues change.
+User simulation and synthetic data generation. ThedatageneratorbuildsonLLM-basedagentsimulation(Park
+et al., 2023). AI Persona (Wang et al., 2024) and ChatBench (Chang et al., 2025) extend this to life-long
+personalization, while user simulators for conversational recommendation (Zhu et al., 2025; Yoon et al., 2024;
+Sekulicetal.,2024)focusonsingle-sessiontasks. Theseapproachespromptamodeltoactastheuserwithout
+a structured model of preference change. Harry et al. (2026) show that state variation can dominate stable
+trait differences in some user-behavior settings, motivating our mental state graph approach that models
+preferences as evolving state. The graph’s typed dependency edges and recorded causes of change enable
+consistent generation over six-month timelines.
+B Full HorizonBench Task Example
+C Human Longitudinal Preference Dataset
+Study design. Thedatasetcontainscompletelongitudinalrecordsfrom160participantsacrosssevensurveys,
+labeled T0 through T6, over 13 weeks. Consecutive surveys were separated by approximately two weeks. At
+every survey, participants rated their current preference for 52 recurring items on a seven-point scale. The
+anchors ranged from strongly dislike or not at all important to strongly like or very important, with a neutral
+15
+=== PAGE 16 ===
+User profile. Mei Ling Chen, Chinese-American, Philadelphia. Operates a traditional Asian restaurant in a historically significant building. Six-month
+timeline, 75 conversations,∼370K tokens.
+Early conversation (Sep 26, 2025). Breakup support, establishing emotional-support preferences
+User: “hey, broke up last week and i’m stuck in this heavy fog. can we talk?”
+User: “...now the silence is shouting. i mostly need someone to listen, not lecture.”
+Assistant: “I hear that—no lectures, just space to speak. That lost breakfast rhythm sounds painful. When you sit in that loud silence, what feelings float up first?”
+User: “...love that calligraphy visual, reminds me of workshops with grace. more stories like that, please.”
+Assistant: “Picture artisans restoring a weather-worn temple mural—tiny, patient strokes bringing faded colors back to life. Your heart’s doing the same.”
+User: “the imagery and tiny steps really clicked. keep that vibe next time.”
+Preference established: response_structure=narrative_storytelling,emotional_tone=serene_reflective
+[Redacted: 60+ conversations spanning Oct–Nov 2025]
+Synthetic event-linked preference transitions:
+1. Restaurant Fire & Community Rebuild (Oct): tone from serene to joyful, pacing to action-steps-first
+2. National Heritage Award (Nov): tone to steady-confident, encouragement to affirmations
+3. Announces Run for City Council (Nov): response structure fromnarrative_storytelling tostep_by_step_action_plan
+Evolved preference: response_structure=step_by_step_action_plan,emotional_tone=steady_confident
+Test conversation (Dec 4, 2025). Live Radio Debate on Emergency Rezoning Vote
+User: “ugh the debate’s tmr and i’m spinning. developers said our block is ‘blighted’. game plan?”
+[5 turns of debate-prep conversation]
+User: “cool, still shaky—hit me with a confidence jolt?”
+Question: Which response best aligns with the user’s preferences?
+A [pre-evolution distractor: narrative_storytelling]: “...picture this: It’s dawn in Old City Philly. A lone advocate—you—walks past
+shuttered storefronts toward City Hall, script in hand. The scene feels heavy until you remember Boston’s red lanterns and Tai Tung’s preserved bricks. In your
+mind’s eye, you replay that triumph like a movie montage: neighbors swapping blueprints over dim-sum steam, developers conceding height for heart...”
+B [correct: step_by_step_action_plan]: “Three steps for tomorrow: (1) open with ‘Calling Chinatown blighted ignores the people keeping it
+alive’; (2) give the Boston example and your affordable-housing number; (3) close with the exact compromise you want the council to adopt. Write those three lines
+on one card, rehearse them twice, and let each answer return to them. You are prepared.”
+C [reflective_question_sequence]: “Before you step up, ask yourself: What reminded Boston’s community that heritage
+mattered as much as rent? How did their clear vision transform hesitation into action?...”
+D [rapid_fire_bullet_tips]: “Quick confidence hits: shoulders back; slow the first sentence; keep water nearby; pause after the
+housing figure; look at the host, not the developers; finish on ‘our block is worth investing in.’ You’ve got this.”
+E [free_flowing_empathy]: “Let’s just breathe together for a second. You’ve already gathered facts, stories, and smart
+comebacks—that’s no small feat. I can feel the weight on your shoulders...”
+Figure 5 An end-to-end HorizonBench item. The user’s emotional-support preference forresponse_structure changes
+from narrative_storytelling (established Sep) to step_by_step_action_plan (Nov) through generated life events with
+recorded causes. The test question is embedded in a∼370K-token conversational history; answering correctly requires
+tracking the updated state. The pre-evolution distractor (A) uses the user’s original preferred style, while the correct
+response (B) instantiates an explicit three-step plan. Options C–E realize three further values of the same attribute, so all
+five replies suit the moment and only the user’s current state separates them.
+midpoint. The items span 13 categories grounded in economic theories of preference and in personality
+psychology (Appendix D). The complete item wording is included with the released data.
+Measurements across surveys. At T0, participants forecast their ratings at two, four, six, eight, ten, and twelve
+weeks. At each later survey through T5, they made new forecasts for the intervals that ended by T6. At every
+survey from T0 through T6, participants also described a specific novel event that they expected to experience
+during the next two weeks, selected six relevant preferences for that event, and rated those preferences. They
+alsoforecasttheirfutureratingsoftheseevent-relatedpreferencesateverysurvey,includingT6; theT6events
+have no follow-up survey, so those forecasts have no later ratings to compare against. At each survey from T1
+through T6, participants reported whether the event described two weeks earlier had been completed, was
+underway, had been delayed, or had been cancelled or postponed. Preferences associated with earlier events
+remained in later surveys so that their ratings could be followed over time.
+Beginning at T2, participants could explain cases in which a current rating differed from an earlier forecast by
+at least two points. Each follow-up also asked whether another significant life event had occurred since the
+previous survey. Attention checks were administered from T1 onward and are excluded from the released
+preference tables. Approximately one week after T6, participants completed a linked survey about perceived
+16
+=== PAGE 17 ===
+Table 5 Contents and research uses of the human longitudinal preference dataset.
+Component Measurements Research uses
+Recurring preferences Current ratings for 52 fixed items at seven
+surveys, withforecastsatallremainingtwo-
+week intervals
+Preference stability, forecast accuracy by in-
+terval, and individual variation in change
+Event-linked prefer-
+ences
+Six preferences associated with each
+planned event, repeated ratings, forecasts,
+and subsequent event status
+Event associated change, differences be-
+tweenconcreteandvaluebasedpreferences,
+andchangeconditionaloneventoccurrence
+Written responses Planned event descriptions, explanations
+for forecast errors, and reports of other life
+events
+Qualitative accounts of expected and expe-
+rienced preference change
+Final survey Perceived change, forecasting strategies,
+judgments about temporary and lasting
+change, study experience, and views about
+personalized artificial intelligence
+Links between observed trajectories, retro-
+spective judgments, and attitudes toward
+preference-aware systems
+Participant characteris-
+tics
+Privacy-safe aggregate distributions for age,
+gender, education, residence, relationship
+status, household size, and occupation
+Description of the cohort and assessment of
+population limits
+preference change, forecasting strategies, cues used to judge whether changes would last, retrospective study
+experience, and the usefulness and acceptability of preference-aware artificial intelligence.
+Released observations and missing data. Thereleasedratingtablecontains83,024observationsacrossrecurring
+and event-linked preferences. A separate table contains 960 event-status observations, and the linked final
+survey contains one structured record for each participant. All 160 participants completed all seven surveys.
+Individual unanswered items remain blank and are not imputed. Forecast columns whose target would fall
+after T6 are blank because those forecasts were not requested. The release also contains sanitized participant-
+authored explanations and event descriptions, the full recurring preference list, aggregate demographics, and
+code that reproduces the HorizonBench calibration estimates.
+Participant characteristics. Of the 160 participants, 84 (52.5%) were aged 18 to 29 and 75 (46.9%) were aged
+30 to 39. Ninety-two (57.5%) reported male and 67 (41.9%) female. One hundred forty (87.5%) reported a
+bachelor’s degree and 18 (11.2%) a master’s degree. Residence was reported as urban by 123 participants
+(76.9%), suburban by 32 (20.0%), and rural by 5 (3.1%). One hundred twenty-eight participants (80.0%)
+reported being single and 30 (18.8%) married. After normalization of spelling and capitalization variants, 139
+participants (86.9%) reported data annotation or AI training occupations. Categories with fewer than five
+participants are suppressed. Figure 6 summarizes the privacy-safe distributions.
+Calibration sample. The HorizonBench calibration compares ratings from one survey with ratings collected
+twoweekslaterwhentheeventassociationisunambiguous. Thisyields4,715linkeditemcomparisonsacross
+953eventswithatleastonelinkedrating. Theprimaryestimateuses470completedorongoingeventswithall
+six ratings available. Delayed and cancelled or postponed events are excluded from the primary calibration.
+Estimators. For event 𝑒, let Δ𝑒𝑗 =|𝑟𝑒,𝑗,𝑡+1 −𝑟𝑒,𝑗,𝑡| be the absolute change in linked preference 𝑗. We define
+𝐾𝑒(𝑐)= ˝6 𝑗=1 I(Δ𝑒𝑗 ≥𝑐). The preference-change probability is
+ˆ𝑝evo(𝑐)= 1 𝑁
+𝑁Õ
+𝑒=1
+I{2≤𝐾𝑒(𝑐)≤ 5}. (1)
+The primary threshold is 𝑐= 3, chosen to capture large changes on the seven-point scale. Change magnitude
+is the mean Δ𝑒𝑗 among threshold-crossing ratings in qualifying events. Uncertainty intervals resample
+participants, retaining all repeated observations contributed by each sampled participant, with 10,000
+bootstrap draws.
+17
+=== PAGE 18 ===
+0 100
+30 to 39
+18 to 29
+75 (46.9%)
+84 (52.5%)
+Categories with n < 5 suppressed
+Age
+0 100
+Female
+Male
+67 (41.9%)
+92 (57.5%)
+Categories with n < 5 suppressed
+Gender
+0 100
+Master's
+Bachelor's
+18 (11.2%)
+140 (87.5%)
+Categories with n < 5 suppressed
+Education
+0 100
+Rural
+Suburban
+Urban
+5 (3.1%)
+32 (20.0%)
+123 (76.9%)
+Geographic setting
+0 100
+6 or more
+5
+1
+3
+4
+2
+20 (12.5%)
+25 (15.6%)
+25 (15.6%)
+27 (16.9%)
+28 (17.5%)
+35 (21.9%)
+Household size
+0 100
+Other occupations
+Data annotation or AI training
+21 (13.1%)
+139 (86.9%)
+Occupation
+Participant characteristics for the completed longitudinal cohort (N = 160)
+Figure 6 Aggregate characteristics of the 160 participants who completed T0 through T6. Categories with fewer than five
+participants are suppressed. The cohort is concentrated among adults aged 18 to 39, urban residents, bachelor’s-degree
+holders, and data annotation or AI training workers. The human data release contains no row-level demographic
+attributes.
+Table 6 Calibration by change threshold. Event rate: share of completed or ongoing events in which two to five of the six
+linked ratings changed by at least the threshold.
+Threshold Event rate Mean affected ratings Conditional magnitude
+≥ 1 point 0.696 3.92 1.57
+≥ 2 points 0.457 3.00 2.60
+≥ 3 points 0.175 2.61 3.64
+≥ 4 points 0.066 2.58 4.45
+D Grounding of the Preference Items
+The 52 recurring preference items span 13 categories of four items each. Six categories cover concrete
+preferences (Food, Activity, Social Settings, Daily Rhythms, Media & Content, Environment), and seven
+cover value-based preferences (Work Style, Achievement, Planning & Structure, Risk & Novelty, Social &
+Communication, Cognitive & Learning, Values). Table 7 gives the theory behind each category.
+Concrete preferences. Following the characteristics approach to consumer theory (Lancaster, 1966), the
+concreteitemsdescribeattributesofexperiences, suchasspiciness, crowddensity, exerciseintensity, andtime
+of day, so every item applies to every participant regardless of the specific goods they consume. The Daily
+Rhythms items follow Becker (1965), who treats time as an input that people combine with goods to produce
+consumption. Several items contrast familiar and novel experiences, such as new foods, new restaurants, and
+unfamiliar destinations, which is the distinction between comfort and stimulation drawn by Scitovsky (1976).
+Value-based preferences. The value-based items draw on the economic preferences measured by the Global
+PreferenceSurvey(Falketal.,2018,2023): Risk&Noveltycorrespondstoriskpreference,Planning&Structure
+18
+=== PAGE 19 ===
+totimepreference,and“Helpingothersatpersonalcost”toaltruism. Otheritemscoverpreferencesstudiedin
+behavioral economics. “Seeking recognition” reflects image concerns (Bénabou and Tirole, 2006), “Following
+social norms” reflects identity-based utility (Akerlof and Kranton, 2000), “Competitive environments” reflects
+a preference for competition (Niederle and Vesterlund, 2007), and the Cognitive & Learning items and
+“News and current events” reflect preferences for acquiring and avoiding information (Golman et al., 2022).
+The Social Settings, Social & Communication, and Work Style items come from personality psychology.
+Economic preferences and personality measures are only weakly associated, and each explains differences in
+life outcomes that the other misses (Becker et al., 2012), so drawing on both covers individual differences
+more broadly.
+Preference change and forecasting. Economictheorytreatspreferencechangeintwoways. StiglerandBecker
+(1977) model tastes as stable and attribute apparent changes in taste to accumulated experience with a good.
+Loewenstein et al. (2003) show that people expect their future tastes to resemble their current tastes more
+than they do, a pattern they call projection bias. Because participants forecast their own ratings for every
+later survey, the dataset supports a direct test of projection bias, which predicts that forecasted trajectories are
+flatter than reported ones.
+Table 7 Theoretical grounding of the 13 preference categories.
+Category Construct Reference
+Food, Activity, Media & Content, Environment Characteristics of goods Lancaster (1966)
+Daily Rhythms Allocation of time Becker (1965)
+Risk & Novelty Risk preference; stimulation Falk et al. (2018); Scitovsky (1976)
+Planning & Structure Time preference Falk et al. (2018)
+Values Altruism; image; identity Falk et al. (2018); Bénabou and Tirole (2006); Akerlof and Kranton (2000)
+Achievement Preference for competition Niederle and Vesterlund (2007)
+Cognitive & Learning Information preferences Golman et al. (2022)
+Social Settings, Social & Communication, Work Style Personality traits Becker et al. (2012)
+E Full Per-Model Results
+Table8reportsaccuracyforall25modelsonthecombinedmulti-generatordataset,brokendownbygenerator
+and by whether the preference changed.
+F Data Generation Statistics
+Table 11 gives generation and filtering statistics for each generator model in the HorizonBench pipeline.
+G Human Annotation
+During development, two annotation rounds on earlier versions of the generator, with three annotators
+per item choosing the response that best fit the user, exposed three problems that we fixed before release:
+response options that paraphrased each other while sharing one value, responses that did not express their
+target value, and responses that stated numeric attribute values outright (e.g., “your spontaneity tolerance is
+at 0.6”).
+On the released benchmark, three annotators rated each of 4,235 of the 4,245 items for situational fit,
+conversation-flow realism, and assistant-persona consistency (Table 12).
+H Answerability of the Released Items
+An item’s answer is correct when two conditions hold: the new value follows from the life event, and the
+correct option is the one that expresses it. Each history averages 163K tokens, roughly a 400-page book
+per question, so human accuracy on full items is not a meaningful reference; PersonaMem makes the same
+19
+=== PAGE 20 ===
+Table 8 Per-model accuracy (%) overall, by generator, and by preference type. Δevo: evolved–static gap (pp). Sorted by
+overall accuracy.
+By Generator Model Preference Type
+Model HorizonBench Sonnet-4.5 o3 Gemini-3-flash Evolved Static 𝚫evo
+4,245 items 1,052 items 981 items 2,212 items 2,484 items 1,761 items
+Claude-opus-4.5 52.8 51.2 53.2 53.3 51.3 54.8 −3.5
+Claude-3.7-sonnet 47.8 49.9 60.8 41.1 46.7 49.5 −2.9
+Claude-opus-4 45.1 38.3 45.0 46.6 44.4 46.2 −1.8
+Gemini-3.1-pro 41.2 39.9 45.4 40.0 38.4 45.3 −6.9
+Gemini-3-pro 40.9 41.0 44.0 39.5 38.4 44.3 −5.9
+Claude-sonnet-4.5 34.0 30.9 34.9 35.2 32.6 36.0 −3.4
+Claude-3.5-haiku 32.5 30.8 55.1 23.3 31.8 33.6 −1.9
+Claude-sonnet-4 32.2 26.6 36.1 31.0 31.4 33.3 −1.9
+Claude-3.5-son.-v1 29.8 26.8 33.2 29.8 29.2 30.8 −1.6
+Gemini-3-flash 25.8 23.6 21.2 28.9 24.0 28.3 −4.3
+Gemini-2.0-flash 24.7 23.1 26.6 24.6 24.2 25.4 −1.1
+gpt-4o 24.6 24.0 25.4 24.6 23.9 25.7 −1.8
+Claude-haiku-4.5 23.0 21.3 21.0 24.8 22.0 24.5 −2.6
+Gemini-2.5-pro 22.8 22.0 21.2 23.9 21.5 24.6 −3.1
+Gemini-2.0-fl.-lite 20.9 19.7 18.7 22.5 20.3 21.8 −1.5
+gpt-4.1 19.5 22.6 16.2 19.5 19.0 20.3 −1.4
+Gemini-2.5-fl.-lite 19.5 25.3 17.1 17.9 18.2 21.4 −3.2
+o3 16.5 19.3 13.7 16.4 14.9 18.8 −3.9
+o1 16.0 19.0 11.9 16.4 15.5 16.8 −1.3
+Gemini-2.5-flash 15.7 14.3 14.5 16.9 14.4 17.5 −3.1
+o4-mini 15.3 18.6 13.5 14.6 14.4 16.6 −2.3
+Gemini-3.1-fl.-lite 15.1 15.7 10.7 16.7 14.0 16.6 −2.6
+o3-mini 14.9 14.2 12.4 16.4 14.1 16.0 −1.9
+gpt-5 13.5 15.9 10.7 13.7 12.2 15.4 −3.2
+gpt-5-mini 12.5 12.5 11.6 12.9 11.9 13.3 −1.4
+Average 26.3 25.9 27.0 26.0 25.1 27.9 −2.7
+choice “given the intractability of reading the long contexts” (Jiang et al., 2025a). We test the two conditions
+separately.
+Value-inference study. We sampled 60 items with a pre-evolution distractor, 20 per generator. For each item,
+three annotators saw the user’s profile, the tested preference and attribute, the earlier value, and the user’s
+turns in the life-event conversation, and chose which of the item’s five values describes the user after the
+event. Table 13 reports the results.
+Option check. On 1,000 items, gpt-6-astra and gemini-4-argon each read one option at a time, with the
+attribute name and the item’s five values but no history and no other options, and named the value the
+response reflects. They named the option’s recorded value for 81.6% and 82.0% of the 5,000 options, and
+never a value outside the item’s set.
+Results on items people answer unanimously. On the 42 items on which all three annotators chose the
+designated value, the 25 models answer 29.9% correctly with the full history, and 29.8% of their wrong
+answerschoosetheearliervalue(above25%for22of25models),asonthefullbenchmark(29.2%). gpt-6-astra
+and gemini-4-argon score 33.3% and 76.2% on these items with the full history, and 57.1% and 83.3% with the
+change-stated input of Appendix I.
+User-clustered statistics and generators. All 25 models answer the same items, and items share users, so we
+resample the 346 users with items across all models. The mean evolved–static gap is −2.7pp (95% CI −4.2 to
+−1.1) and the mean distractor rate is 29.2% (95% CI 26.9–31.4%). Without the four filter models, the gap is
+negative and the distractor rate exceeds 25% for all 21 remaining models. Table 14 reports both measures by
+generator.
+20
+=== PAGE 21 ===
+Table 9 Open-weight models on the 1,011 Claude-sonnet-4.5-generated items. Long histories are left-truncated, so results
+are not directly comparable to Table 8.
+Model Parameters Overall (%) Evolved (%) Static (%) Evo.–Static (pp)
+Llama-3.3-70B-Instruct 70B 11.6 10.7 12.6 −1.9
+OLMo-3-7B-Instruct 7B 14.3 14.3 14.4 −0.2
+Llama-3.1-8B-Instruct 8B 15.9 14.6 17.6 −3.0
+Qwen3-32B 32B 16.8 16.5 17.2 −0.6
+Llama-3.1-70B-Instruct 70B 17.1 17.1 17.2 −0.1
+Table 10 (A)Mentionsofthepre-andpost-evolutionvaluesinmodel-visiblehistories. (B)Meanaccuracyofthe25models
+on evolved items, grouped by which value is mentioned more often.
+A. Preference-value frequency
+Generator New share Old more Equal New more Mean old Mean new
+Claude-sonnet-4.5 65.7% 19.6% 14.9% 65.6% 2.61 5.34
+o3 69.2% 19.5% 10.0% 70.5% 3.56 8.90
+Gemini-3-flash 67.4% 18.9% 13.1% 68.0% 3.78 8.82
+B. Accuracy by frequency relation
+Generator Old more frequent Equal New more frequent
+Claude-sonnet-4.5 29.2% 27.1% 21.5%
+o3 34.4% 13.6% 20.8%
+Gemini-3-flash 22.3% 25.0% 25.5%
+I Matched-Evidence Test and Memory Agent
+Design. Wesampled200items,stratifiedbygenerator,whosehistorycontainsbothaconversationexpressing
+the earlier value and the life-event conversation. From each item’s own history, using the generator’s records
+of which conversations express each value and which contains the life event, we built inputs that keep the
+original conversations in date order and end with the item’s test conversation, question, and five options:
+• Change implied: the conversations expressing the earlier value, the life-event conversation, and any later
+conversations expressing the new value.
+• Change stated: the same, with one user sentence appended to the life-event conversation: “By the way, after
+{event}, my preference changed: for {preference}, my {attribute} is now {value}.”
+• Full history: the benchmark input.
+Two controls replace the stated sentence on the 195 items for which a paraphrase could be written without
+any content word of the value: a paraphrase that conveys the new value without naming it (written by gpt-4.1),
+and an irrelevant sentence in the same position (“By the way, after {event}, I finally got around to clearing out
+my email inbox.”).
+Of the 76 items on which gpt-6-astra chose the earlier value with the change implied, 33 become correct once
+the change is stated, and 6 move the other way; for gemini-4-argon, 27 of 47 become correct. On the 109 items
+whose only evidence of the change is the life event, gpt-6-astra scores 20.2% (implied) and 46.8% (stated), and
+gemini-4-argon 51.4% and 63.3%; on the 91 items with a later expression of the new value, the scores are
+35.2% and 51.6%, and 65.9% and 75.8%. On the Gemini-3-flash items, stating the change adds 24.0 points [13,
+35] for gpt-6-astra and 16.0 [5, 27] for gemini-4-argon.
+Note-taking memory agent. On the same 200 items, each model first reads the past conversations of the
+change-implied input and writes the memory notes it would keep about the user (at most 400 words), with
+theinstructiontorecordanypreferencethatchangedandwhy. Itthenanswerstheitemfromitsnotesandthe
+test conversation alone. gpt-6-astra scores 21.5% and gemini-4-argon 42.0%, below reading the conversations
+directly (−5.5pp [−10.5, −0.5] and−16.0pp [−22.5,−9.5]), and their choices of the earlier value rise to 35.0%
+21
+=== PAGE 22 ===
+Table 11 Generation and filtering statistics per generator. Candidates: generated items. Filtered: items passing the 5-LLM
+filter. Fourteen Claude-sonnet-4.5 users contributed no filtered items; the released timelines include all 360 users.
+Generator Users Convs. Convs./user Turns Turns/user Candidates Filtered Pass rate
+Claude-sonnet-4.5 120 17,048 142 434,233 3,619 13,217 1,052 8.0%
+o3 120 20,239 169 600,889 5,007 19,108 981 5.1%
+Gemini-3-flash 120 20,103 168 526,260 4,386 12,681 2,212 17.4%
+Combined 360 57,390 159 1,561,382 4,337 45,006 4,245 9.4%
+Table 12 Benchmark-wide binary response-quality ratings (4,235 items, three annotators per item).
+Dimension Individual yes Majority yes
+Situational context fit 99.7% 100%
+Conversation-flow realism 99.7% 100%
+Assistant-persona consistency 99.4% 100%
+and 31.5%.
+J Generation Prompts
+Each stage of the HorizonBench pipeline is implemented as one or more LLM generation calls with structured
+prompts. Below we present the core prompts for each pipeline stage described in §3, abbreviated for space.
+Variables in curly braces (e.g., {user_information}) are populated at runtime with the relevant agent states,
+event context, and preference metadata.
+J.1 Stage 1: Event Sampling
+Events are sampled conditional on both agent states and event history. When a stale preference is selected for
+temporal recall, the following prompt generates an event relevant to that preference domain.
+Your Task: Generate an event that would be specifically relevant
+to this user's preference.
+User Information - {user_name}:
+{user_attributes}
+Past Events: {past_events}
+Preference of Interest: {selected_preference}
+Generate an event that would naturally trigger this preference.
+The event should:
+- Be realistic and fit the user's life context
+- Directly involve the preference domain
+- Create a natural opportunity for the preference to be
+expressed or recalled
+J.2 Stage 2: Preference Evolution
+Forapreference-changestep,thefollowingpromptjointlygeneratesasingleeventandmeaningfullydifferent
+values for a selected set of preferences, together with a natural-language rationale for each change.
+Multiple user preferences are about to change due to a SINGLE
+significant life event.
+USER PROFILE: {user_profile}
+PREFERENCES TO EVOLVE: {preferences_block}
+Generate ONE realistic life event that would MEANINGFULLY change
+at least one attribute in EACH of the preferences listed above.
+22
+=== PAGE 23 ===
+Table 13 Value-inference study (60 items, 3 annotators). Chance is 20%.
+Measure Designated value chosen
+Majority of three 86.7%
+Single annotator, average 85.0%
+All three annotators 70.0%
+Majority, event is the only evidence (36 items) 83.3%
+Majority, later expression also present (24 items) 91.7%
+Fleiss𝜅 0.79
+Table 14 Belief-update measures by generator, averaged over the 25 models.
+Generator Items Evo.–static gap (pp) Distractor rate (%)
+o3 981 −2.9 38.2
+Claude-sonnet-4.5 1,052 −2.8 25.7
+Gemini-3-flash 2,212 −2.5 24.6
+Requirements:
+- The event must be causally connected to ALL the preference
+domains
+- It must be plausible for this user's life context
+- Changed attributes should be QUALITATIVELY DIFFERENT from
+current values
+- Every listed preference must have at least one attribute change
+Return JSON:
+{
+"event_name": "Brief name of the life event",
+"event_category": "Category (e.g., career, health, ...)",
+"event_description": "1-2 sentence description",
+"preference_changes": {
+"<preference_id>": {
+"<attribute_name>": {
+"new_value": "the new value after the event",
+"reason": "why this event caused this change"
+}
+}
+}
+}
+J.3 Stage 3: Conversation Generation
+Conversation generation proceeds in two steps. First, an outline prompt plans the structural flow.
+Generate a conversation outline for an AI assistant interaction
+that feels genuinely human and engaging.
+SCENARIO: {scenario}
+USER PROFILE: {user_information}
+ASSISTANT PROFILE: {assistant_information}
+USER'S AI INTERACTION PREFERENCES (unknown to assistant until
+expressed): {preferences_updated_user}
+ASSISTANT'S KNOWN USER PREFERENCES (from previous conversations):
+{preferences_current_user}
+CRITICAL LOGICAL CONSTRAINT:
+THE ASSISTANT CAN ONLY APPEAL TO:
+1. Preferences listed in "assistant_preferences" (already known)
+2. Preferences the user has expressed earlier in THIS conversation
+THE ASSISTANT CANNOT APPEAL TO unexpressed preferences!
+Second, a content prompt fills in the outline with natural dialogue, conditioned on an expression mode. Three
+modes control how preferences surface:
+[VERBAL MODE]
+23
+=== PAGE 24 ===
+Table 15 Matched-evidence test. Each cell: % correct / % of all answers choosing the earlier value. Brackets: 95% paired
+bootstrap CIs.
+Input Median tokens gpt-6-astra gemini-4-argon
+Full history 117K 28.5 / 29.5 63.5 / 19.5
+Change implied 5.3K 27.0 / 38.0 58.0 / 23.5
+Change stated 5.3K 49.0 / 24.5 69.0 / 17.0
+Stated− implied (pp) +22.0 [14.5, 29.5] +11.0 [3.0, 19.0]
+Table 16 Controls for the stated sentence (195 items, % correct). Brackets: change from the implied input, 95% paired
+bootstrap CIs.
+Input gpt-6-astra gemini-4-argon
+Change implied 27.7 57.9
+Change stated 48.2 68.2
+Stated in paraphrase 44.6 [+16.9: 9.7, 24.6] 64.6 [+6.7:−0.5, 14.4]
+Irrelevant sentence 27.2 [−0.5:−4.1, 2.6] 62.6 [+4.6: 0.0, 9.2]
+The user MUST state every single preference in the most direct,
+unambiguous language possible. Every preference must be expressed
+as a clear declarative statement using phrases like:
+- "I strongly prefer X over Y"
+- "I always want Z"
+- "My preference is specifically for..."
+[BEHAVIORAL MODE]
+The user's preferences must be nearly invisible in the
+conversation. They should surface only as fleeting, ambiguous,
+offhand remarks. BANNED: the user must NEVER state, declare,
+or name any preference. NEVER request a format, style, or
+approach. The preference should appear ONLY as:
+1. Passing, throwaway remarks
+2. Anecdotes about third parties
+3. Neutral, ambiguous reactions
+4. Environmental or contextual details
+J.4 Stage 4: Counterfactual Generation
+For each benchmark item, counterfactual assistant turns are generated reflecting alternative preference values.
+You are generating diverse alternative assistant responses based
+on different preference values.
+CONTEXT: {conversation_context}
+ORIGINAL ASSISTANT RESPONSE: {original_response}
+TEMPORAL PREFERENCE BEING RECALLED:
+- Preference ID: {preference_id}
+- Attribute: {attribute_name}
+- Original value: {original_value}
+TASK: Generate {N} DIVERSE alternative responses that each
+reflect a different preference value. Each response should:
+1. Naturally reference the specific alternative preference value
+2. Maintain the same conversational tone and helpfulness
+3. Be significantly different from the others
+4. Keep the same general structure but vary the preference content
+J.5 5-LLM History Validation
+Eachcandidateitemispresentedtofivevalidationmodelswithoutthefullconversationhistorytotestwhether
+it is answerable from surface cues alone.
+You are evaluating which AI assistant response would be MOST
+24
+=== PAGE 25 ===
+APPROPRIATE for a user, based ONLY on the conversation context
+provided.
+IMPORTANT: You are shown a SUBSET of this user's conversation
+history. There may be earlier conversations where the user
+expressed preferences that you CANNOT see.
+CONVERSATION CONTEXT ({N} intermediate conversations + current
+conversation up to this point): {context}
+RESPONSE OPTIONS: {options}
+TASK: Based ONLY on the visible conversations above, which option
+seems most appropriate?
+- You do NOT have access to the user's full history
+- Do NOT assume any prior knowledge about this user's preferences
+- Do NOT use stereotypes or demographic assumptions
+- Choose based ONLY on what's visible in the conversations
+K Per-Model Controlled Experiment Results
+Tables 17–18 report per-model belief-update metrics for the controlled experiments summarized in Table 3.
+For each model we report overall accuracy, accuracy on static and evolved items, the evolved–static gap (Δ),
+and the distractor rate (Dist.%; uniform-error reference 25%). Models are sorted by overall accuracy.
+Table 17 Per-model results: Neutral (unmodified) condition (981 items: 375 static, 606 evolved) and Short-horizon condition
+(0–14 day recall, 120 users, 1,778 items: 1,545 static, 233 evolved).
+Neutral (unmodified)
+Model All Sta. Evo. 𝚫 Dist.
+Cl-3.7-sonnet 60.8 61.1 60.6 −0.5 36.6
+Cl-3.5-haiku 55.1 57.9 53.5 −4.4 39.3
+Cl-opus-4.5 53.2 54.4 52.5 −1.9 38.6
+Gem-3.1-pro 45.4 48.8 43.2 −5.6 34.8
+Cl-opus-4 45.0 49.5 42.2 −7.3 37.5
+Gem-3-pro 44.0 48.0 41.6 −6.4 33.8
+Cl-sonnet-4 36.1 39.0 34.3 −4.6 39.7
+Cl-sonnet-4.5 34.9 38.4 32.7 −5.7 39.9
+Cl-3.5-son.-v1 33.2 32.5 33.7 +1.1 39.2
+Gem-2.0-flash 26.6 28.5 25.4 −3.1 34.8
+gpt-4o 25.4 28.5 23.4 −5.1 39.2
+Gem-2.5-pro 21.2 24.5 19.1 −5.4 40.3
+Gem-3-flash 21.2 23.5 19.8 −3.7 40.2
+Cl-haiku-4.5 21.0 24.3 19.0 −5.3 39.2
+Gem-2.0-fl.lt 18.7 21.1 17.2 −3.9 40.1
+Gem-2.5-fl.lt 17.1 17.6 16.8 −0.8 36.9
+gpt-4.1 16.2 18.1 15.0 −3.1 42.4
+Gem-2.5-flash 14.5 15.2 14.0 −1.2 37.5
+o3 13.7 14.9 12.9 −2.1 37.6
+o4-mini 13.5 13.6 13.4 −0.2 36.0
+o3-mini 12.4 12.3 12.5 +0.3 36.5
+o1 11.9 12.0 11.9 −0.1 37.7
+gpt-5-mini 11.6 10.9 12.0 +1.1 40.3
+Gem-3.1-fl.lt 10.7 11.7 10.1 −1.7 39.0
+gpt-5 10.7 12.0 9.9 −2.1 37.6
+Avg. 27.0 28.9 26.0 −2.9 38.2
+Short-horizon
+Model All Sta. Evo. 𝚫 Dist.
+Cl-opus-4.5 66.2 67.1 60.5 −6.5 50.7
+Cl-3.7-sonnet 61.6 63.4 49.8 −13.6 43.5
+Gem-3-pro 56.7 57.0 55.4 −1.6 43.5
+Gem-3.1-pro 56.7 57.0 54.5 −2.5 40.9
+Cl-opus-4 56.4 56.9 53.2 −3.7 46.5
+Cl-sonnet-4 47.8 48.8 40.8 −8.0 46.4
+Cl-3.5-haiku 46.4 49.0 29.6 −19.4 52.8
+Cl-sonnet-4.5 45.3 46.1 40.3 −5.7 46.3
+Cl-3.5-son.-v1 35.7 35.9 35.0 −0.9 36.6
+Gem-2.0-flash 30.1 30.4 27.9 −2.5 44.5
+gpt-4o 28.4 29.2 23.2 −6.0 59.7
+Cl-haiku-4.5 26.0 26.9 20.2 −6.7 50.3
+Gem-2.5-pro 25.9 27.0 18.5 −8.5 48.7
+Gem-3-flash 24.9 26.0 17.6 −8.4 50.6
+Gem-2.0-fl.lt 21.3 21.9 17.2 −4.7 46.8
+Gem-2.5-fl.lt 17.5 18.1 13.7 −4.4 50.3
+Gem-2.5-flash 16.4 17.0 12.4 −4.5 41.1
+gpt-4.1 15.9 16.7 10.7 −6.0 53.9
+o3 14.7 15.1 12.4 −2.6 45.1
+o4-mini 13.2 13.9 8.6 −5.3 47.0
+gpt-5 12.9 13.1 11.6 −1.6 45.4
+Gem-3.1-fl.lt 12.8 13.8 6.0 −7.8 49.4
+gpt-5-mini 11.1 11.7 7.7 −3.9 52.0
+o1 11.1 11.5 8.2 −3.4 51.8
+o3-mini 10.3 10.8 7.3 −3.5 49.4
+Avg. 30.6 31.4 25.7 −5.7 47.7
+25
+=== PAGE 26 ===
+Table 18 Per-model results: Explicit rewrite and Implicit rewrite conditions (981 items each: 375 static, 606 evolved).
+Explicit rewrite
+Model All Sta. Evo. 𝚫 Dist.
+Cl-3.5-haiku 68.2 70.8 66.6 −4.2 57.6
+Cl-3.7-sonnet 64.4 63.5 65.0 +1.5 43.8
+Cl-opus-4.5 60.2 62.3 59.0 −3.3 52.1
+Gem-3.1-pro 45.9 49.1 43.9 −5.2 46.9
+Gem-3-pro 44.0 48.5 41.3 −7.3 45.0
+Cl-opus-4 42.6 46.4 40.3 −6.1 53.2
+Cl-3.5-son.-v1 37.7 39.7 37.1 −2.6 26.0
+Cl-sonnet-4 35.5 35.2 35.6 +0.4 48.6
+Cl-sonnet-4.5 35.5 35.5 35.5 +0.0 57.3
+gpt-4o 25.3 27.5 23.9 −3.5 59.0
+Gem-2.0-flash 25.1 26.4 24.3 −2.1 44.4
+Gem-2.5-pro 21.7 23.5 20.6 −2.8 49.1
+Cl-haiku-4.5 20.3 21.1 19.8 −1.3 48.0
+Gem-3-flash 20.3 21.9 19.3 −2.6 53.5
+Gem-2.0-fl.lt 17.8 19.7 16.7 −3.1 53.7
+Gem-2.5-fl.lt 17.6 16.8 18.2 +1.4 56.8
+gpt-4.1 15.8 14.7 16.5 +1.8 56.5
+Gem-2.5-flash 14.8 17.1 13.4 −3.7 51.5
+o4-mini 14.8 14.1 15.2 +1.0 47.2
+o3 12.9 12.8 13.0 +0.2 45.9
+o3-mini 12.4 12.0 12.7 +0.7 48.8
+o1 12.1 12.8 11.7 −1.1 47.6
+gpt-5 11.0 10.1 11.6 +1.4 47.1
+gpt-5-mini 10.8 11.7 10.2 −1.5 47.6
+Gem-3.1-fl.lt 10.0 11.2 9.2 −2.0 55.8
+Avg. 27.9 29.0 27.2 −1.8 49.7
+Implicit rewrite
+Model All Sta. Evo. 𝚫 Dist.
+Cl-opus-4.5 57.7 62.4 54.8 −7.6 66.8
+Gem-3.1-pro 48.7 53.2 45.9 −7.3 53.4
+Cl-3.7-sonnet 47.3 45.7 48.2 +2.5 56.4
+Cl-3.5-haiku 45.7 46.3 45.4 −0.9 59.0
+Cl-opus-4 43.1 46.7 40.9 −5.7 63.0
+Gem-3-pro 39.9 45.1 36.8 −8.3 49.5
+Cl-sonnet-4.5 37.9 42.4 35.1 −7.3 63.1
+Cl-sonnet-4 37.7 41.1 35.6 −5.4 62.1
+Cl-3.5-son.-v1 29.7 29.5 29.6 +0.1 43.4
+Gem-2.0-flash 24.6 28.5 22.1 −6.4 56.0
+gpt-4o 24.0 26.9 22.1 −4.8 63.7
+Gem-3-flash 23.1 29.1 19.5 −9.6 66.9
+Gem-2.5-pro 22.7 27.5 19.8 −7.7 58.6
+Cl-haiku-4.5 20.9 25.3 18.2 −7.2 60.3
+Gem-2.0-fl.lt 19.3 22.4 17.3 −5.1 60.9
+Gem-2.5-flash 16.1 19.5 14.0 −5.4 53.0
+o4-mini 15.8 16.0 15.7 −0.3 56.7
+Gem-2.5-fl.lt 15.5 14.9 15.8 +0.9 57.9
+gpt-4.1 14.9 15.5 14.5 −0.9 66.0
+o3 14.1 14.4 13.9 −0.5 56.7
+o1 13.8 13.6 13.9 +0.3 58.1
+gpt-5 13.5 12.5 14.0 +1.5 57.0
+o3-mini 12.8 13.1 12.7 −0.4 58.2
+gpt-5-mini 12.6 13.6 12.0 −1.6 62.4
+Gem-3.1-fl.lt 9.5 10.9 8.6 −2.4 59.6
+Avg. 26.4 28.6 25.0 −3.6 58.8
+Table 19 Per-model results: Relaxed-filter condition (majority≥3/5 filter, 3,628 items: 1,485 static, 2,143 evolved).
+Model All Sta. Evo. 𝚫 Dist.
+Cl-opus-4.5 73.7 75.6 72.5 −3.1 55.4
+Cl-3.7-sonnet 73.0 74.5 72.0 −2.5 51.0
+Gem-3.1-pro 65.4 67.3 64.1 −3.2 48.3
+Gem-3-pro 65.1 67.5 63.5 −4.1 48.7
+Cl-opus-4 62.8 64.8 61.5 −3.4 54.1
+Cl-3.5-haiku 60.3 62.6 58.7 −3.8 58.4
+Cl-sonnet-4 54.5 55.1 54.1 −0.9 54.2
+Cl-sonnet-4.5 50.3 52.5 48.9 −3.6 59.1
+Cl-3.5-son.-v1 44.5 43.9 44.9 +1.0 51.1
+Gem-2.5-pro 36.9 39.9 34.8 −5.1 55.3
+Cl-haiku-4.5 35.6 37.0 34.7 −2.4 57.6
+gpt-4o 35.5 37.4 34.1 −3.3 60.7
+Gem-2.0-flash 35.4 35.5 35.3 −0.2 46.8
+Gem-3-flash 33.3 36.7 30.9 −5.8 57.2
+Gem-2.0-fl.lt 26.1 27.1 25.4 −1.7 53.6
+gpt-4.1 25.0 25.1 25.0 −0.2 60.0
+Gem-2.5-fl.lt 24.4 28.4 21.7 −6.7 61.3
+Gem-2.5-flash 24.3 27.7 22.0 −5.7 52.8
+o3 24.0 23.4 24.4 +1.0 51.4
+o4-mini 22.5 22.5 22.4 −0.0 49.9
+gpt-5 21.5 20.3 22.4 +2.1 51.1
+o1 19.7 20.8 18.9 −1.9 53.0
+gpt-5-mini 19.7 20.3 19.2 −1.2 54.8
+Gem-3.1-fl.lt 19.6 21.4 18.3 −3.1 56.9
+o3-mini 18.8 20.9 17.4 −3.5 54.1
+Avg. 38.9 40.3 37.9 −2.5 54.3
+26
