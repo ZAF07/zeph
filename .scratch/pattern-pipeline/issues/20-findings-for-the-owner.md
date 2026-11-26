@@ -785,6 +785,58 @@ Settles from the sections above: 02 "Curiosity Check-ins ignore pace and backing
 - **Kind:** note
 - **What:** `web/design/reference/AdminPatternCatalog.html` and its baseline now show the new catalog versions and three Prediction lines per card ("Prediction 1" to "Prediction 3", from the existing line part).
 
+## 41 — Conditions are tagged on Observations (2026-11-26)
+
+### The owner corrects the 10 drafted Tagging cases about Conditions
+
+- **Kind:** risk
+- **What:** the ten `cond-` cases in `tagging.yaml` were drafted by Claude (issue 41).
+- **Impact:** a wrong label makes the Tagging Eval's read of the Conditions meaningless.
+- **Suggested fix:** follow `docs/pattern-evals/adding-tagging-cases.md` (see "Audience, Stakes, State going in").
+- [ ] Owner corrected the `cond-` cases
+
+### The tagging prompt on production is kept if it was edited, without the "never guess" rule
+
+- **Kind:** risk
+- **What:** migration 0110 reloads `pattern_tagging_prompt` only where no Admin edited it. Code gives the model the three new lists either way, so an edited prompt fills them without being told to leave an unsaid one empty.
+- **Impact:** guessed Conditions on real Observations, which issues 42 to 44 will narrow and ask on.
+- **Suggested fix:** after the next deploy, check the backend log for "Kept the stored pattern_tagging_prompt"; if it is there, merge the new seed text in by hand before Pattern noticing is on. Minutes.
+
+### The model guessed audience and stakes until the prompt said not to
+
+- **Kind:** risk
+- **What:** Eval Run `7f09461a` (live model): "one-to-one" for any story with one other person, and stakes "low" or "high" unsaid, in 4 of 10 cases. After two more prompt lines, run `bd350ed4` had no wrong Condition on three models. Ten drafted cases, one try each.
+- **Impact:** a guessed Condition would narrow a Pattern on something the User never said (ADR-0031).
+- **Suggested fix:** when the owner corrects the `cond-` cases, add a few messier ones and run them with Repeats. Under S$0.50 on the live model.
+
+### A context line says "hers"
+
+- **Kind:** failure
+- **What:** run `bd350ed4` A, `cond-state-worn-out-before-call`: "holding Christmas at hers again" fails the "no he or she" check. The word means the sister's place, as the User said it.
+- **Impact:** a case that tagged everything right fails.
+- **Suggested fix:** the owner decides whether "hers" about someone the User named counts. No cost.
+
+### Opus calls a high-stakes story unclear
+
+- **Kind:** failure
+- **What:** run `bd350ed4` B, `cond-high-stakes-visa-interview`: claude-opus-5.5 named ACH.WORTH.PERF and CTRL.UNCERT.PLAN together. Flash and Haiku named ACH.WORTH.PERF alone.
+- **Impact:** only if the tagging model is changed to Opus; the draft may also be a fair "unclear".
+- **Suggested fix:** the owner decides the label when correcting the drafts.
+
+### State is emptied more widely when a past Conversation is tagged again
+
+- **Kind:** risk
+- **What:** the Safeguard rule asks whether the User had a Safeguard Event at or after the first message kept (`PatternTagger._tag`, `happened_from`), with no end time.
+- **Impact:** `tag_again` on an old Conversation loses a state the User said, if they had a crisis any time later. It errs on the safe side. The other way round is possible only if Message Retention deleted the messages before the event.
+- **Suggested fix:** store which Conversation a Safeguard Event happened in. A column and a migration; half a day.
+
+### An Admin's own traces show the model's raw tagging answer
+
+- **Kind:** risk
+- **What:** the Model Call Log keeps full content for Users who are Admins (and for everyone where content is kept, as on a local stack). The tagging answer in it now holds a state going in.
+- **Impact:** an Admin reading their own trace, or a developer on a local stack, sees a state. Other Users' calls keep no content, as before.
+- **Suggested fix:** none needed unless content is ever kept for real Users.
+
 ## Comments
 
 ### 25 Nov 2026 — first triage with the owner (sections 01 to 19)

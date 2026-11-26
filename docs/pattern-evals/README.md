@@ -65,6 +65,23 @@ going in, one person inside a group, and high stakes said plainly.
     never marks theirs situational. Those cases expect the step to say
     nothing, or a sign against.
 
+#### Conditions: first results (26 Nov 2026)
+
+The ten `cond-` cases, one try each.
+
+| Run | Tagging model | Passed | Cost |
+|---|---|---|---|
+| `7f09461a` | deepseek-v4.1-flash (live), first prompt | 7 of 10 | S$0.078 (estimate S$0.04) |
+| `bd350ed4` A | deepseek-v4.1-flash (live) | 9 of 10 | about S$0.06 |
+| `bd350ed4` B | claude-opus-5.5 | 9 of 10 | about S$0.81 |
+| `bd350ed4` C | claude-haiku-5.5 | 10 of 10 | about S$0.02 |
+
+- **State going in** was right in all 40 results: tagged when said, empty for a feeling afterwards.
+- **First run:** the model filled audience "one-to-one" whenever the story had one other person, and stakes "low" or "high" unsaid, in 4 cases. The prompt now says not to. Two drafts also drew a look-alike (APPR.GIVE.NEEDED) and were rewritten.
+- **Second run:** no Condition was wrong on any of the three models. The two fails were not about Conditions: flash wrote "hers" in a context line (`cond-state-worn-out-before-call`), and Opus called `cond-high-stakes-visa-interview` unclear between ACH.WORTH.PERF and CTRL.UNCERT.PLAN.
+- The run's estimate (S$0.22) priced every Variant at the live model; the real total was about S$0.90.
+- Ten cases, one try: a first look, not a score. The owner still corrects the drafts.
+
 #### Unclear stories an aimed Curiosity asked about
 
 A Tagging case can also give unclear Observations the made-up User already

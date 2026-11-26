@@ -1,6 +1,6 @@
 # Correcting and adding Tagging cases
 
-How to turn the 44 drafted Tagging cases into your own labels, and add new ones. Do it **after the whole pattern-pipeline PRD is built**; until then the drafts are the defaults.
+How to turn the drafted Tagging cases (81 in the seed, ten of them about Conditions) into your own labels, and add new ones. Do it **after the whole pattern-pipeline PRD is built**; until then the drafts are the defaults.
 
 ## Before you start
 
@@ -9,7 +9,7 @@ How to turn the 44 drafted Tagging cases into your own labels, and add new ones.
 | Edit cases on the Dashboard of your **main local stack** (Admin → Evals → Cases → Tagging). | Evals only run there (not in production), and a saved case is used by the next run straight away. |
 | When done, ask an agent to copy your cases into `src/companion/seed/evals/cases/tagging.yaml`. | The seed only fills new databases and never changes a case already saved, so editing the file alone does nothing to your stack. |
 | Never paste a real User's words. Write a made-up version with made-up names. | The platform has real Users; their words must not end up in test data. |
-| Check the estimate before each run (one case ≈ S$0.003, all 44 ≈ S$0.15). | Every run calls the real model and costs money. |
+| Check the estimate before each run. On the live model one case cost about S$0.007 on 26 Nov 2026, so all of them about S$0.60; the estimate has come out at about half the real cost. | Every run calls the real model and costs money. |
 
 ## The parts of a case
 
