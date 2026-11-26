@@ -25,7 +25,7 @@ Cut the database reads behind Copy while keeping the rule from the PRD: an Admin
   - in the backend process, refreshed on save (the PRD allowed this);
   - in the Dashboard's server (Next.js fetch caching with a tag cleared on save);
   - HTTP caching (`Cache-Control` / `ETag`) or a CDN in front of the public read.
-- How does a save reach every process holding a cache? ADR-0018 says there is one backend process today, but the standing rule is to design for many concurrent Users with no single-process assumptions. Decide which wins here.
+- How does a save reach every process holding a cache? ADR-0032 says there is one backend process today, but the standing rule is to design for many concurrent Users with no single-process assumptions. Decide which wins here.
 - Is "shows on the next page load" still the rule, or is a short delay (seconds) acceptable?
 - ~~What happens on a cache miss when the database is down: stale Copy, or the normal error state?~~ Decided 2026-11-19: stale Copy. Each web server keeps the last Copy it read and shows it, whole, when a read fails; with none, the normal error state. Still no default text in the web app (ADR-0019, PRD story 32).
 

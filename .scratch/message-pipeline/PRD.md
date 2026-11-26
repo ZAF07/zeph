@@ -138,7 +138,7 @@ The full design and every decision are in `docs/message-pipeline/README.md`; ter
 ### Message wait and starting over
 - The Message wait setting stays Admin-set, with a longer default (about 15 seconds instead of 5).
 - If a text arrives while a reply is being prepared and before any part of it has been sent, the reply in progress is dropped and the Message is answered again with every text in it. A Woven-in Check-in already saved for the dropped reply is taken back through the existing take-back path. Once part of a reply is sent, a new text starts the next Message, as today.
-- This works within the in-memory per-User queue (ADR-0018); no change to how many backend processes run.
+- This works within the in-memory per-User queue (ADR-0032); no change to how many backend processes run.
 
 ### The reply path (ADR-0021)
 - **Understanding** (existing core service, narrowed): its prompt is rewritten to read only. It is given the Message, every message from the last 24 hours across Conversations, the earlier Understandings, and the User Portrait. Its output: what the User said and means; how they feel and how strongly, and what they want, each split into said / read / unclear; whether the cause is known; whether they are struggling; whether they asked for a photo; and short phrases for past things to look up. It no longer picks Needs, Moves, Threads, Curiosities, Knowledge or memory categories. When it fails, a fallback Understanding is used, as today.

@@ -14,7 +14,7 @@ We expect about 500 signed-up Users. At a busy time, 25–50 of them chat at onc
 
 - **Measure first.** A repeatable load test (`make load-test`) drives the real stack with many Users chatting at once. Only the model and Telegram sending are faked, so it costs nothing. We run it on today's code to get a baseline, then after the fix.
 - **Messages waiting their turn don't hold a thread.** Each User's work (checking texts, answering a Message) goes on that User's queue. The queue runs each User's work one piece at a time, in order. Different Users run side by side on a fixed pool that is kept apart from the web pool. The webhook only hands the message to the queue and returns right away.
-- **One process, in memory, for now** (ADR-0018). The queue sits behind a port, so a database-backed queue can replace it when we run 2+ backends (issue 02). Known trade-off: a restart or deploy drops messages not yet answered.
+- **One process, in memory, for now** (ADR-0032). The queue sits behind a port, so a database-backed queue can replace it when we run 2+ backends (issue 02). Known trade-off: a restart or deploy drops messages not yet answered.
 
 What Users notice: replies keep coming at busy times, and heavy texters don't slow down anyone else. Admins notice the Dashboard stays fast while many Users chat.
 
@@ -51,7 +51,7 @@ What Users notice: replies keep coming at busy times, and heavy texters don't sl
 - **The incoming message handler uses the queue instead of its per-User reply lock.** Checking a text and answering a Message are both added to the User's queue. When the grouping wait ends, the timer adds "answer" to the queue and doesn't run it itself. The rules for grouping a Message (waits, Albums, texts still being checked) don't change.
 - **The webhook only hands off.** Parsing and the secret check stay. The handler adds work to the queue and returns at once, so web threads are never held by chat work.
 - **Crisis checks keep today's order:** a text sent during a reply is checked after that reply.
-- **Nothing else changes:** sticker adding mode, typing, the timer and the tick stay as they are. They are single-process (ADR-0018, issue 02).
+- **Nothing else changes:** sticker adding mode, typing, the timer and the tick stay as they are. They are single-process (ADR-0032, issue 02).
 - **Database pool:** connections are opened per query and not held during model calls, so the default pool should be enough. Change it only if the load test shows database timeouts.
 - **Load test:** a script started by `make load-test` against the worktree's running stack.
   - It posts Telegram updates to the backend's webhook for many test Users, and calls a Dashboard API page while that runs.
@@ -80,5 +80,5 @@ What Users notice: replies keep coming at busy times, and heavy texters don't sl
 
 ## Further Notes
 
-- Decision: ADR-0018. Grilling notes: `.scratch/scaling/issues/01-one-backend-handles-500-users.md`.
+- Decision: ADR-0032. Grilling notes: `.scratch/scaling/issues/01-one-backend-handles-500-users.md`.
 - `make load-test` is free, because the model is faked. Real evals are separate and cost money.

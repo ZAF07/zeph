@@ -81,7 +81,7 @@ Zeph makes Users wait too long, and it misses what they point at.
   - Matching is case-insensitive and ignores trailing spaces.
 - **Cap.** The handler remembers when the Message's first text arrived. Each wait is the rule's seconds or the time left to the cap, whichever is shorter (never below zero). The cap counts from the first text of the Message, including texts added by start-over.
 - **Where it plugs in.** The incoming message handler's wait restart calls the wait rule instead of reading the single wait setting. Albums keep their current behaviour: the wait for an Album item still restarts as each photo arrives, and the rule applies to the Album as one text (a captionless Album trails off).
-- **Start-over is unchanged** (ADR-0018 per-User queue lines). A text before any reply has gone out drops the reply; after, it starts the next Message.
+- **Start-over is unchanged** (ADR-0032 per-User queue lines). A text before any reply has gone out drops the reply; after, it starts the next Message.
 - **Platform Settings.**
   - `message_wait_seconds` stays as the **neither** wait (its hint is rewritten).
   - New: `message_wait_finished_seconds` (2), `message_wait_trailing_seconds` (12), `message_wait_cap_seconds` (20), `message_wait_long_text_words` (15), `message_wait_trailing_words` (a list of words and short openers).

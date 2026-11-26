@@ -54,11 +54,11 @@ def format_knowledge(
 def chosen_documents(
     documents: list[KnowledgeDocument], lookup: KnowledgeLookup
 ) -> list[KnowledgeDocument]:
-    """Find the Ready documents the Understanding chose.
+    """Find the Ready documents the Reply Plan chose.
 
     Args:
         documents: Every Knowledge document.
-        lookup: What the Understanding chose.
+        lookup: What the Reply Plan chose.
 
     Returns:
         The chosen documents that are still Ready; one deleted or no longer
@@ -73,7 +73,7 @@ def chosen_documents(
 
 
 class KnowledgeRetrieval:
-    """Finds passages in the Knowledge documents the Understanding chose."""
+    """Finds passages in the Knowledge documents the Reply Plan chose."""
 
     def __init__(
         self,
@@ -85,7 +85,7 @@ class KnowledgeRetrieval:
 
         Args:
             repositories: Where Knowledge documents are stored.
-            embedder: Embeds the Understanding's search phrase.
+            embedder: Embeds the Reply Plan's search phrase.
             vector_store: Finds the closest Knowledge chunks.
         """
         self._repositories = repositories
@@ -98,13 +98,13 @@ class KnowledgeRetrieval:
         Only the chosen Ready documents are searched, and only passages at
         least as close as the Admin-set bar count, at most
         `knowledge_chunks_per_reply`, given with where they come from.
-        Nothing is searched when the Understanding chose nothing or
+        Nothing is searched when the Reply Plan chose nothing or
         Knowledge doesn't work for the User. If the search fails the reply
         goes ahead without them.
 
         Args:
             snapshot: The User being replied to.
-            lookup: What the Understanding chose to search; None for nothing.
+            lookup: What the Reply Plan chose to search; None for nothing.
 
         Returns:
             The Knowledge section for the reply instructions; "" if none.
