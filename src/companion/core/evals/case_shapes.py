@@ -6,8 +6,10 @@ from typing import Any
 
 from companion.core.errors import InvalidError
 from companion.core.evals.models import EvalName
+from companion.core.models import Audience, Stakes, StateGoingIn
 
 TIME_FORMATS = ("%I:%M %p", "%I:%M%p", "%H:%M")
+MUST_BE_EMPTY = "empty"
 
 
 class InvalidFormError(InvalidError):
@@ -468,6 +470,34 @@ def text_list_field(
         required=required,
         item_label=item_label,
         default=[],
+    )
+
+
+def expected_condition_field(
+    name: str, label: str, description: str, values: type[StrEnum]
+) -> ShapeField:
+    """Build the choice of a Condition a Tagging case expects on an Observation.
+
+    Args:
+        name: The Condition's name in the content.
+        label: Its name on the form.
+        description: What the Condition means.
+        values: Its fixed list.
+
+    Returns:
+        The field: left empty the Condition isn't checked; otherwise the
+        kept Observation must hold the value picked, or none for "Must be
+        empty".
+    """
+    return ShapeField(
+        name,
+        label,
+        f"{description} Leave empty to not check it.",
+        FieldKind.CHOICE,
+        options=[
+            ChoiceOption(MUST_BE_EMPTY, "Must be empty"),
+            *(ChoiceOption(value.value, value.value.capitalize()) for value in values),
+        ],
     )
 
 
@@ -1907,6 +1937,26 @@ TAGGING_SHAPE = FormShape(
                             "so it counts for nothing.",
                             FieldKind.ON_OFF,
                             default=False,
+                        ),
+                        expected_condition_field(
+                            "audience",
+                            "Audience",
+                            "Who else was there, when the User's story says so.",
+                            Audience,
+                        ),
+                        expected_condition_field(
+                            "stakes",
+                            "Stakes",
+                            "Whether something that matters to the User could "
+                            "be lost, when their story says so.",
+                            Stakes,
+                        ),
+                        expected_condition_field(
+                            "state_going_in",
+                            "State going in",
+                            "How the User was before it happened, in their own "
+                            "words. Never how they felt after.",
+                            StateGoingIn,
                         ),
                     ],
                 ),

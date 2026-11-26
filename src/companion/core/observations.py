@@ -1229,7 +1229,10 @@ def describe_tag_lists() -> str:
     Returns:
         One line per list, e.g. "power: above, equal, below".
     """
-    lists = (*CONDITION_LISTS, ("evidence", EvidenceKind))
+    lists: tuple[tuple[str, type[StrEnum]], ...] = (
+        *CONDITION_LISTS,
+        ("evidence", EvidenceKind),
+    )
     return "\n".join(
         f"{name}: {', '.join(tag.value for tag in tags)}" for name, tags in lists
     )

@@ -7,10 +7,23 @@ import type {
 } from "@/lib/api-client";
 
 /**
+ * Writes Conditions by name, as the Case Result's checks do.
+ *
+ * @param conditions - Each Condition's value by its name; null for one
+ *   left empty.
+ * @returns E.g. ["audience: group", "state going in: empty"].
+ */
+function conditionParts(conditions: Record<string, string | null>): string[] {
+  return Object.entries(conditions).map(
+    ([name, value]) => `${name.replaceAll("_", " ")}: ${value ?? "empty"}`,
+  );
+}
+
+/**
  * Names an expected Observation as the Case Result's checks do.
  *
  * @param expected - The Observation expected.
- * @returns E.g. "CONF.AVOID.BELONG · for · unclear".
+ * @returns E.g. "CONF.AVOID.BELONG · for · unclear · audience: group".
  */
 export function describeExpected(expected: ExpectedObservation): string {
   return [
@@ -18,7 +31,37 @@ export function describeExpected(expected: ExpectedObservation): string {
     expected.direction,
     ...(expected.unclear ? ["unclear"] : []),
     ...(expected.situational ? ["situational"] : []),
+    ...conditionParts(expected.conditions ?? {}),
   ].join(" · ");
+}
+
+/**
+ * Says whether a Tagging result has any Condition to show: one a case
+ * expects, or one kept.
+ *
+ * @param result - What the case kept and expected.
+ * @returns True when an expected Observation states a Condition or a kept
+ *   one holds one.
+ */
+export function showsConditions(result: TaggingResult): boolean {
+  return (
+    result.expected.some(
+      (expected) => Object.keys(expected.conditions ?? {}).length > 0,
+    ) ||
+    result.kept.some((kept) =>
+      Object.values(kept.conditions ?? {}).some((value) => value !== null),
+    )
+  );
+}
+
+/**
+ * Writes the audience, stakes and state going in a kept Observation holds.
+ *
+ * @param kept - The kept Observation.
+ * @returns E.g. "audience: group · stakes: empty · state going in: low".
+ */
+export function describeKeptConditions(kept: KeptObservation): string {
+  return conditionParts(kept.conditions ?? {}).join(" · ");
 }
 
 /**

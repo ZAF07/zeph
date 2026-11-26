@@ -1282,6 +1282,7 @@ export type KeptObservation = {
   context: string;
   about: string;
   thread: string | null;
+  conditions?: Record<string, string | null>;
   expected: boolean;
 };
 
@@ -1300,6 +1301,7 @@ export type ExpectedObservation = {
   direction: string;
   unclear: boolean;
   situational: boolean;
+  conditions?: Record<string, string>;
   matched: boolean;
 };
 
