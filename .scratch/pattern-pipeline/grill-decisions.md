@@ -88,7 +88,7 @@ Discussed 24 Nov 2026, deliberately left out of this work as too big.
 
 `issues/archive/23-situations-vary-on-more-than-people.md` and ADR-0031 extend these decisions; the reasons are there.
 
-- Decision 7 (directness): it will also set where an Exploration starts and how long it waits (issue 40). It still never touches the gate.
+- Decision 7 (directness): it also sets where an Exploration starts and how long it waits, and, by the owner's choice on 26 Nov 2026, the tries before it rests and the fewest replies between Curiosities (issue 40, built 26 Nov 2026). It still never touches the gate.
 - Decisions 9 and 10 (situations and tags): tags are now called Conditions and gain audience, stakes and state going in. A situation is still one Life Thread; Conditions never add situations or points.
 - Decision 14 (Explorations): "way" is renamed Approach. "Missing part of life" becomes a "missing Condition" need, worked out by code from a coverage table, and the counter-test moves ahead of it.
 - Decision 16 (ready): narrowing uses any Condition, needs 2 clear stories on the side that holds, and at most 2 narrow one Pattern.
