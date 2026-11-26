@@ -7,8 +7,9 @@ empty; nothing is tagged again. They go when their Observation goes.
 `pattern_tagging_prompt` reloads from the seed where no Admin edited it:
 the tagging step is now told the three lists and to leave a Condition
 empty when the story doesn't say it. An edited prompt is kept and a
-warning is logged; until the new text is merged in by hand, the three
-Conditions stay empty. No User data is removed.
+warning is logged; until the new text is merged in by hand, the model is
+shown the three lists without the rule to leave an unsaid one empty, so
+merge it in before Pattern noticing is on. No User data is removed.
 
 Revision ID: 0110
 Revises: 0109

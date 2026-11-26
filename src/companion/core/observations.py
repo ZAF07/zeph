@@ -799,7 +799,8 @@ def read_choice[Choice: StrEnum](
 def read_tags(entry: dict[str, Any]) -> SituationTags | None:
     """Read the Conditions of one Observation the model wrote.
 
-    A Condition may be left empty when the story doesn't say it.
+    A Condition may be left empty, as null or "", when the story doesn't
+    say it.
 
     Args:
         entry: The Observation, as the model wrote it.
@@ -808,7 +809,7 @@ def read_tags(entry: dict[str, Any]) -> SituationTags | None:
         The Conditions; None if any of them is given but not from its list.
     """
     if any(
-        entry.get(key) is not None and read_choice(entry, key, tags) is None
+        entry.get(key) not in (None, "") and read_choice(entry, key, tags) is None
         for key, tags in CONDITION_LISTS
     ):
         return None

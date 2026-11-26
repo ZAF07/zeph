@@ -139,7 +139,7 @@ The differences from a normal tagging:
 - It skips any Observation already kept from that Conversation.
 - A quote the User deleted is never kept again, and nothing is kept for a Pattern Type they marked "never again" (the same checks as any tagging).
 - It doesn't touch exclusions, reactions, Predictions or settling.
-- State going in is emptied when the User had a Safeguard Event at any time since that Conversation started, not only in it.
+- State going in is emptied when the User had a Safeguard Event at any time since the first message still kept from that Conversation, not only in it. If Message Retention deleted the messages around a Safeguard Event, a state may be kept.
 - New Observations are scored at once (cause `evidence_tagged_again`).
 
 ## Testing it

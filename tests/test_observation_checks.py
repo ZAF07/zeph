@@ -607,7 +607,7 @@ def test_an_observation_holds_the_conditions_the_story_says_and_none_it_does_not
             entry(
                 quote="and then I stewed on it all night",
                 audience=None,
-                stakes=None,
+                stakes="",
             ),
         ],
         context(),
