@@ -1764,9 +1764,9 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         minimum=0,
         maximum=365,
         hint=(
-            "For a User set to balanced. Days before an Exploration is tried "
-            "again, by a different Approach, after an aimed Curiosity came "
-            "back vague or brushed off."
+            "Days before an Exploration is tried again, by a different "
+            "Approach, after an aimed Curiosity came back vague or brushed "
+            "off. For a User set to balanced; gentle and direct have their own."
         ),
     ),
     EditableSetting(
@@ -1798,9 +1798,9 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         minimum=1,
         maximum=50,
         hint=(
-            "For a User set to balanced. After this many tries in a row with "
-            "nothing useful, an Exploration rests and frees its place on the "
-            "Agenda. A new Observation for its Pattern wakes it."
+            "After this many tries in a row with nothing useful, an "
+            "Exploration rests until a new Observation for its Pattern wakes "
+            "it. For a User set to balanced; gentle and direct have their own."
         ),
     ),
     EditableSetting(
@@ -1810,9 +1810,9 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         minimum=1,
         maximum=50,
         hint=(
-            "The same number for a User set to gentle. Lower means Zeph gives "
-            "up sooner. Asking Zeph to drop it rests an Exploration at once, "
-            "whatever the setting."
+            "The same number for a User set to gentle: lower means Zeph "
+            "gives up sooner. Asking Zeph to drop it rests an Exploration at "
+            "once, whatever the setting."
         ),
     ),
     EditableSetting(
@@ -1822,7 +1822,7 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         minimum=1,
         maximum=50,
         hint=(
-            "The same number for a User set to direct. Higher means Zeph "
+            "The same number for a User set to direct: higher means Zeph "
             "keeps trying longer. Asking Zeph to drop it rests an Exploration "
             "at once, whatever the setting."
         ),
@@ -1983,9 +1983,9 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         minimum=1,
         maximum=50,
         hint=(
-            "For a User set to balanced. How many replies must pass after a "
-            "Curiosity is raised, in any Conversation, before another is "
-            "offered to the Reply Plan."
+            "How many replies must pass after a Curiosity is raised, in any "
+            "Conversation, before another is offered to the Reply Plan. For a "
+            "User set to balanced; gentle and direct have their own."
         ),
     ),
     EditableSetting(
@@ -1995,7 +1995,7 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         minimum=1,
         maximum=50,
         hint=(
-            "The same number for a User set to gentle. Higher means Zeph's "
+            "The same number for a User set to gentle: higher means Zeph's "
             "own questions come further apart. It still doubles while Zeph "
             "backs off after brush-offs."
         ),
@@ -2007,8 +2007,8 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         minimum=1,
         maximum=50,
         hint=(
-            "The same number for a User set to direct. Lower means Zeph's own "
-            "questions come closer together. It still doubles while Zeph "
+            "The same number for a User set to direct: lower means Zeph's "
+            "own questions come closer together. It still doubles while Zeph "
             "backs off after brush-offs."
         ),
     ),
