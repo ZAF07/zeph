@@ -10,6 +10,7 @@ For the Admin who edits prompts on the Dashboard and deploys releases.
   - **You never edited it:** the new seed text loads. Nothing to do.
   - **You edited it:** your text is kept, the new seed text does **not** load, and the backend log says so. You merge the new text in by hand.
   - **Old migrations (0101 and earlier) are the exception:** they wipe your edit and load the new seed text, with no warning. Take a copy first.
+  - **One deploy runs both kinds on the same prompt:** the old ones run first and wipe it, so the newer ones find nothing to keep and log nothing. The new seed text loads whole. Treat it as wiped.
 
 So after a release that changes a prompt you edited, one side is always missing: either the release's new rules, or your edit. The steps below put them back together.
 
@@ -74,6 +75,18 @@ ssh zeph-deploy 'cd ~/zeph && docker compose logs backend 2>&1 | grep "Kept the 
 
 **7. Check.** Send Zeph a message and read the reply. If the release added a behaviour (say, a new kind of question), check that too.
 
+## Page text (Copy)
+
+Text on Dashboard pages (Admin → Copy) follows the same rule, but with **no log line**: a release's new text loads only where you never edited that slot. An edited slot is kept silently.
+
+- **Before a deploy:** see which slots the release changes.
+
+  ```
+  git diff origin/production main -- src/companion/seed/copy.yaml
+  ```
+
+- **After the deploy:** open each changed slot on Admin → Copy. If it still shows your edit, add the release's new words from the diff and save.
+
 ## If something went wrong
 
 - **You deployed without a copy and the edit is gone.** The text is still in a nightly database backup from before the deploy (`docs/DEPLOYMENT_GUIDE.md`, Backups: kept 7 days on the server, 30 days in R2). Ask Claude to pull that one prompt out of the dump; don't restore the whole database.
@@ -83,6 +96,16 @@ ssh zeph-deploy 'cd ~/zeph && docker compose logs backend 2>&1 | grep "Kept the 
 
 Claude can do steps 1 to 5 and draft the merged prompt for you to read and paste. Say: "check my prompt edits before the deploy" or "merge my prompt edit after the deploy".
 
-## Open now (25 Nov 2026)
+## Open now (26 Nov 2026)
 
-The next deploy runs the old migrations 0080 to 0101, which wipe the edited `reply_plan_prompt`. The copy is already taken: see `.scratch/pattern-pipeline/prod-prompt-copies/README.md`. After that deploy, follow steps 5 to 7 with "your edit" as the missing side. Remove this section once done.
+Prod is at migration 0078. The next deploy runs 0080 to 0112 in one go. Remove this section once done.
+
+| Text | What the deploy does | What you do |
+| --- | --- | --- |
+| `reply_plan_prompt` (edited on prod) | Wiped by the old migrations. 0109 and 0111 then find nothing to keep. The new seed text loads whole. | Put your edit back: steps 5 to 7, with "your edit" as the missing side. The copy is taken: `.scratch/pattern-pipeline/prod-prompt-copies/README.md`. |
+| `reply_settings_instructions`, `pattern_tagging_prompt`, `curiosity_keeping_prompt` (not edited on 25 Nov) | Wiped the same way. The new seed text loads. | Nothing, unless you edited one since. Then take a copy first (step 3). |
+| Copy slot `account.directness.help` | Reloads only if never edited. | If you edited it, add the new words on Admin → Copy. |
+
+No "Kept the stored" line is expected from this deploy. If one shows, follow the table in step 4.
+
+The `persona`, `persona_outlook`, `response_prompt` and `understanding_prompt` edits are not touched.
