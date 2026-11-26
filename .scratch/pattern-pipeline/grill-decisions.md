@@ -86,7 +86,7 @@ Discussed 24 Nov 2026, deliberately left out of this work as too big.
 
 ## Extended by a later grill (25 Nov 2026, issue 23)
 
-`issues/23-situations-vary-on-more-than-people.md` and ADR-0031 extend these decisions; the reasons are there.
+`issues/archive/23-situations-vary-on-more-than-people.md` and ADR-0031 extend these decisions; the reasons are there.
 
 - Decision 7 (directness): it will also set where an Exploration starts and how long it waits (issue 40). It still never touches the gate.
 - Decisions 9 and 10 (situations and tags): tags are now called Conditions and gain audience, stakes and state going in. A situation is still one Life Thread; Conditions never add situations or points.

@@ -867,6 +867,15 @@ pattern_half_life_days: 75
 # counts, up to this many people.
 pattern_people_per_situation: 3
 
+# A Condition (audience, stakes, relationship, power, stance, setting, state
+# going in) narrows a Pattern ("in a group, not one-to-one") only when this
+# many clear stories for it say that Condition and the clear evidence against
+# is all under other values. At most this many Conditions narrow one Pattern,
+# those with the most stories; evidence against they don't explain counts in
+# full.
+narrowing_stories_needed: 2
+narrowings_per_pattern: 2
+
 # A noticed Pattern seen in this many situations with at least this score is
 # suspected; one under the floor is closed. States follow the evidence, so a
 # Pattern can move back.

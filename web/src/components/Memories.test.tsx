@@ -180,7 +180,21 @@ const patterns: Pattern[] = [
     state: "confirmed",
     pattern: "You seem to name the worst version of a plan first.",
     where_it_shows: [
-      { shows_with: ["family", "friend"], not_with: ["colleague"] },
+      {
+        condition: "relationship",
+        shows_with: ["family", "friend"],
+        not_with: ["colleague"],
+      },
+      {
+        condition: "audience",
+        shows_with: ["group"],
+        not_with: ["one-to-one"],
+      },
+      {
+        condition: "state_going_in",
+        shows_with: ["worn out"],
+        not_with: ["steady"],
+      },
     ],
     told_at: "2026-11-01T09:00:00Z",
     quote_groups: [
@@ -704,6 +718,14 @@ describe("Memories", () => {
     ).toBeVisible();
     expect(
       confirmed.getByText("It shows with family, friend; not with colleague."),
+    ).toBeVisible();
+    expect(
+      confirmed.getByText("It shows in a group; not one-to-one."),
+    ).toBeVisible();
+    expect(
+      confirmed.getByText(
+        "It shows on days you were worn out; not on days you felt steady.",
+      ),
     ).toBeVisible();
     expect(
       confirmed.getByText("How it went: it happened as Zeph thought."),
@@ -1344,7 +1366,14 @@ describe("Memories", () => {
         patterns.map((pattern) => ({
           ...pattern,
           pattern: "⟦data⟧",
-          where_it_shows: [{ shows_with: ["⟦data⟧"], not_with: ["⟦data⟧"] }],
+          where_it_shows: [
+            {
+              condition: "relationship",
+              shows_with: ["family"],
+              not_with: ["partner"],
+            },
+            { condition: "stakes", shows_with: ["high"], not_with: ["low"] },
+          ],
           quote_groups: [
             {
               life_thread: "⟦data⟧",

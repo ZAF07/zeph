@@ -9,8 +9,8 @@ from companion.core.check_in_decision import kinds_with_pattern_settled
 from companion.core.models import (
     CatalogPattern,
     CheckInKind,
+    Condition,
     EvidenceKind,
-    NarrowingTag,
     ObservationDirection,
     PatternNarrowing,
     PatternReaction,
@@ -258,17 +258,17 @@ def test_an_observation_names_a_pattern_type_first_or_second() -> None:
 def test_where_it_shows_is_put_in_plain_words() -> None:
     narrowings = [
         PatternNarrowing(
-            tag=NarrowingTag.RELATIONSHIP,
+            tag=Condition.RELATIONSHIP,
             holds_with=(Relationship.FAMILY.value, Relationship.FRIEND.value),
             not_with=(Relationship.PARTNER.value,),
         ),
         PatternNarrowing(
-            tag=NarrowingTag.POWER, holds_with=("above",), not_with=("equal",)
+            tag=Condition.POWER, holds_with=("above",), not_with=("equal",)
         ),
     ]
 
     assert describe_where_it_shows(narrowings) == (
-        " It shows with family, friend; not with partner."
+        " It shows with family, with friends; not with a partner."
         " It shows with people above them; not with their equals."
     )
     assert describe_where_it_shows([]) == ""

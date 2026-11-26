@@ -13,8 +13,8 @@ from sqlalchemy import Engine, text
 from companion.adapters.postgres.database import load_pattern_catalog, migrate
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.core.models import (
+    Condition,
     ExcludedEvidence,
-    NarrowingTag,
     PatternNarrowing,
     PatternState,
     ReadyCheck,
@@ -207,7 +207,7 @@ def test_a_pattern_becomes_ready_once_all_ten_checks_pass_and_the_log_says_what_
     described = call.history[0].text
     assert "Softening disagreement to protect belonging" in described
     assert "I just went along with it" in described
-    assert "relationship: shows with family, friend, not with partner" in described
+    assert "- It shows with family, with friends; not with a partner" in described
     assert chat_model.call_order.index(
         "pattern_other_side"
     ) > chat_model.call_order.index("pattern_tagging")
@@ -231,7 +231,7 @@ def test_a_counter_test_showing_it_doesnt_happen_with_a_partner_narrows_it_and_i
     assert pattern.state == PatternState.READY
     assert pattern.narrowings == (
         PatternNarrowing(
-            tag=NarrowingTag.RELATIONSHIP,
+            tag=Condition.RELATIONSHIP,
             holds_with=("family", "friend"),
             not_with=("partner",),
         ),

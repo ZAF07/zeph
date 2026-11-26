@@ -1463,6 +1463,111 @@
       max_length: 80
       placeholders: [shows_with, not_with]
       text: It shows with {shows_with}; not with {not_with}.
+    - key: memories.patterns.shows_when
+      name: "Patterns tab: when it shows and when it doesn't (not about who it is with)"
+      max_length: 80
+      placeholders: [shows_when, not_when]
+      text: It shows {shows_when}; not {not_when}.
+    - key: memories.patterns.condition.relationship.partner
+      name: "Patterns tab: where it shows, who the other person is: partner"
+      max_length: 60
+      text: your partner
+    - key: memories.patterns.condition.relationship.family
+      name: "Patterns tab: where it shows, who the other person is: family"
+      max_length: 60
+      text: family
+    - key: memories.patterns.condition.relationship.friend
+      name: "Patterns tab: where it shows, who the other person is: friend"
+      max_length: 60
+      text: friend
+    - key: memories.patterns.condition.relationship.acquaintance
+      name: "Patterns tab: where it shows, who the other person is: acquaintance"
+      max_length: 60
+      text: people you know a little
+    - key: memories.patterns.condition.relationship.colleague
+      name: "Patterns tab: where it shows, who the other person is: colleague"
+      max_length: 60
+      text: colleague
+    - key: memories.patterns.condition.relationship.stranger
+      name: "Patterns tab: where it shows, who the other person is: stranger"
+      max_length: 60
+      text: strangers
+    - key: memories.patterns.condition.power.above
+      name: "Patterns tab: where it shows, where the other person stands: above"
+      max_length: 60
+      text: people above you
+    - key: memories.patterns.condition.power.equal
+      name: "Patterns tab: where it shows, where the other person stands: equal"
+      max_length: 60
+      text: your equals
+    - key: memories.patterns.condition.power.below
+      name: "Patterns tab: where it shows, where the other person stands: below"
+      max_length: 60
+      text: people below you
+    - key: memories.patterns.condition.audience.one_to_one
+      name: "Patterns tab: where it shows, who else was there: one to one"
+      max_length: 60
+      text: one-to-one
+    - key: memories.patterns.condition.audience.group
+      name: "Patterns tab: where it shows, who else was there: group"
+      max_length: 60
+      text: in a group
+    - key: memories.patterns.condition.audience.in_front_of_others
+      name: "Patterns tab: where it shows, who else was there: in front of others"
+      max_length: 60
+      text: in front of others
+    - key: memories.patterns.condition.stakes.low
+      name: "Patterns tab: where it shows, what was riding on it: low"
+      max_length: 60
+      text: when little is riding on it
+    - key: memories.patterns.condition.stakes.high
+      name: "Patterns tab: where it shows, what was riding on it: high"
+      max_length: 60
+      text: when a lot is riding on it
+    - key: memories.patterns.condition.stance.supportive
+      name: "Patterns tab: where it shows, how the other person was towards you: supportive"
+      max_length: 60
+      text: when the other person is on your side
+    - key: memories.patterns.condition.stance.neutral
+      name: "Patterns tab: where it shows, how the other person was towards you: neutral"
+      max_length: 60
+      text: when the other person is neither for nor against you
+    - key: memories.patterns.condition.stance.hostile
+      name: "Patterns tab: where it shows, how the other person was towards you: hostile"
+      max_length: 60
+      text: when the other person is against you
+    - key: memories.patterns.condition.setting.home
+      name: "Patterns tab: where it shows, where it happened: home"
+      max_length: 60
+      text: at home
+    - key: memories.patterns.condition.setting.work
+      name: "Patterns tab: where it shows, where it happened: work"
+      max_length: 60
+      text: at work
+    - key: memories.patterns.condition.setting.social
+      name: "Patterns tab: where it shows, where it happened: social"
+      max_length: 60
+      text: out with friends
+    - key: memories.patterns.condition.setting.online
+      name: "Patterns tab: where it shows, where it happened: online"
+      max_length: 60
+      text: online
+    - key: memories.patterns.condition.state_going_in.worn_out
+      name: "Patterns tab: where it shows, how you were doing that day: worn out"
+      max_length: 60
+      text: on days you were worn out
+    - key: memories.patterns.condition.state_going_in.under_pressure
+      name: "Patterns tab: where it shows, how you were doing that day: under pressure"
+      max_length: 60
+      text: on days you were under pressure
+    - key: memories.patterns.condition.state_going_in.low
+      name: "Patterns tab: where it shows, how you were doing that day: low"
+      max_length: 60
+      text: on days you were feeling low
+    - key: memories.patterns.condition.state_going_in.steady
+      name: "Patterns tab: where it shows, how you were doing that day: steady"
+      max_length: 60
+      text: on days you felt steady
     - key: memories.patterns.quotes_label
       name: "Patterns tab: label above your quotes"
       max_length: 40

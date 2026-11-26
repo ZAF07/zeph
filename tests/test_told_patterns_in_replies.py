@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from companion.core.models import (
     CatalogPattern,
-    NarrowingTag,
+    Condition,
     ObservationDirection,
     PatternNarrowing,
     PatternState,
@@ -43,7 +43,17 @@ from tests.test_pattern_sharing import (
 )
 from tests.test_patterns_dashboard import set_state, told_belonging
 from tests.test_ready_gate import belonging
-from tests.test_ready_gate_rules import BELONG, NOW, PATTERN_TYPES, TODAY, WORTH, story
+from tests.test_ready_gate_rules import (
+    BELONG,
+    NOW,
+    PATTERN_TYPES,
+    TODAY,
+    WEIGHING,
+    WORTH,
+    story,
+)
+
+NUMBERS = WEIGHING.numbers
 
 TOLD_HEADER = "Patterns you have told them"
 STILL_GETTING_TO_KNOW = "you are still getting to know them"
@@ -77,7 +87,9 @@ def test_only_patterns_being_tested_or_confirmed_come_to_mind_oldest_told_first(
         if state not in {PatternState.SHARED, PatternState.CONFIRMED}
     ]
 
-    in_mind = told_patterns_in_mind([tested, *others, confirmed], PATTERN_TYPES, [], {})
+    in_mind = told_patterns_in_mind(
+        [tested, *others, confirmed], PATTERN_TYPES, [], {}, NUMBERS
+    )
 
     assert [(item.number, item.pattern.id) for item in in_mind] == [
         (1, confirmed.id),
@@ -102,6 +114,7 @@ def test_a_told_pattern_says_where_it_last_showed_up_and_was_acted_against() -> 
         PATTERN_TYPES,
         [earlier, against, newest, unclear],
         {mei_thread: "Falling-out with Mei"},
+        NUMBERS,
     )
 
     assert in_mind.last_showed == Showing(
@@ -117,14 +130,14 @@ def test_the_reply_plan_reads_each_told_pattern_with_how_it_stands() -> None:
         told(PatternState.CONFIRMED),
         narrowings=(
             PatternNarrowing(
-                tag=NarrowingTag.RELATIONSHIP,
+                tag=Condition.RELATIONSHIP,
                 holds_with=("family",),
                 not_with=("partner",),
             ),
         ),
     )
     [in_mind] = told_patterns_in_mind(
-        [narrowed], PATTERN_TYPES, [story(about="Mei")], {}
+        [narrowed], PATTERN_TYPES, [story(about="Mei")], {}, NUMBERS
     )
 
     described = describe_told([in_mind])
@@ -132,14 +145,16 @@ def test_the_reply_plan_reads_each_told_pattern_with_how_it_stands() -> None:
     assert TOLD_HEADER in described
     assert (
         "[1] (confirmed) The words Zeph told it in. It shows with family; "
-        "not with partner. Last showed up: 25 Nov 2026, about Mei."
+        "not with a partner. Last showed up: 25 Nov 2026, about Mei."
     ) in described
     assert "acted against" not in described.split("[1]")[1]
     assert describe_told([]) == ""
 
 
 def test_asked_for_patterns_the_reply_may_recall_only_what_it_told_them() -> None:
-    in_mind = told_patterns_in_mind([told(PatternState.SHARED)], PATTERN_TYPES, [], {})
+    in_mind = told_patterns_in_mind(
+        [told(PatternState.SHARED)], PATTERN_TYPES, [], {}, NUMBERS
+    )
 
     with_one = format_asked_for_patterns_for_reply(in_mind)
     with_none = format_asked_for_patterns_for_reply([])
@@ -372,7 +387,11 @@ def test_evidence_that_only_narrows_a_pattern_is_not_acting_against_it() -> None
     )
 
     [in_mind] = told_patterns_in_mind(
-        [pattern], PATTERN_TYPES, [story(about="Mei"), not_with_partner], {}
+        [pattern],
+        PATTERN_TYPES,
+        [story(about="Mei"), story(about="their mother"), not_with_partner],
+        {},
+        NUMBERS,
     )
 
     assert in_mind.last_showed is not None

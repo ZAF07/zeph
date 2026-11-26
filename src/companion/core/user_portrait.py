@@ -26,8 +26,8 @@ from companion.core.models import (
     UserSnapshot,
 )
 from companion.core.move_outcomes import describe_move_outcome
+from companion.core.narrowing_words import describe_where_it_shows
 from companion.core.pattern_catalog import PatternCatalogService
-from companion.core.pattern_sharing import describe_where_it_shows
 from companion.core.platform_settings import (
     PORTRAIT_MODEL,
     PORTRAIT_PROMPT,

@@ -47,7 +47,12 @@ from tests.test_moves_migration import downgrade_to
 from tests.test_pattern_states import BELONG, moves_of, states_and_causes
 from tests.test_pattern_tagging import observation_entry, observations_of
 from tests.test_post_conversation import processing_answer, quiet_gap
-from tests.test_ready_gate import belonging, make_belonging_ready, suspect_belonging
+from tests.test_ready_gate import (
+    belonging,
+    make_belonging_ready,
+    pass_the_stored_checks,
+    suspect_belonging,
+)
 from tests.test_recent_messages import change_settings
 from tests.test_settings_via_chat import me, reply_call
 
@@ -163,7 +168,7 @@ def test_a_ready_pattern_is_offered_to_the_reply_plan_with_quotes_from_many_thre
 
     offered = saw[saw.index(OFFER_HEADER) :].split("\n\n")[0]
     assert APPROVED_WORDING in offered
-    assert "It shows with family, friend; not with partner." in offered
+    assert "It shows with family, with friends; not with a partner." in offered
     assert "“I said yes to Mei again”" in offered
     assert "“Then I stewed on it all night”" in offered
     assert "“I just went along with it”" in offered
@@ -221,7 +226,7 @@ def test_the_reply_is_told_the_three_parts_as_zephs_view_with_no_clinical_words(
     assert "no clinical or diagnostic words" in section
     assert "1. The Pattern, in your own warm words" in section
     assert APPROVED_WORDING in section
-    assert "It shows with family, friend; not with partner." in section
+    assert "It shows with family, with friends; not with a partner." in section
     assert "quote two or three of these word for word" in section
     assert "“I said yes to Mei again”" in section
     assert "“I just went along with it”" in section
@@ -230,6 +235,37 @@ def test_the_reply_is_told_the_three_parts_as_zephs_view_with_no_clinical_words(
     assert "ask them what would prove it wrong" in section
     assert BELONG not in told
     assert "Softening disagreement to protect belonging" not in told
+
+
+def test_a_pattern_heard_about_only_in_a_group_is_shared_with_one_thing_not_seen(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    user_id = turn_sharing_on(client, auth_verifier)
+    suspect_belonging(
+        client, chat_model, clock, scheduler, seeded_settings, audience="group"
+    )
+    pass_the_stored_checks(
+        client, chat_model, clock, scheduler, seeded_settings, audience="group"
+    )
+    assert belonging(client.engine, user_id).state == PatternState.READY
+
+    told = share(client, chat_model, clock)
+
+    section = told[told.index("Tell them this Pattern in this reply") :]
+    assert "It shows with family, with friends; not with a partner." in section
+    assert "you have only heard about this in a group" in section
+    assert "you haven't heard how it goes one-to-one" in section
+    assert "as something you don't know" in section
+    assert section.count("One thing you don't know") == 1
+    assert "3. One Prediction" in section
+    assert "ask them what would prove it wrong" in section
 
 
 def test_only_when_the_check_says_so_is_it_shared_with_its_prediction_and_logged(

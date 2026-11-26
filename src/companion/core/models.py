@@ -3369,26 +3369,19 @@ class ReadyCheck(StrEnum):
     ALLOWED = "allowed"
 
 
-class NarrowingTag(StrEnum):
-    """The situation tag a Pattern is narrowed by."""
-
-    RELATIONSHIP = "relationship"
-    POWER = "power"
-
-
 @dataclass(frozen=True)
 class PatternNarrowing:
     """Where a Pattern holds and where a counter-test showed it doesn't.
 
-    E.g. "with seniors, not with friends". It holds no words of the User's.
+    E.g. "in a group, not one-to-one". It holds no words of the User's.
 
     Attributes:
-        tag: The situation tag that tells the two apart.
-        holds_with: That tag's values where the Pattern showed.
-        not_with: That tag's values where it was shown not to happen.
+        tag: The Condition that tells the two apart.
+        holds_with: That Condition's values where the Pattern showed.
+        not_with: That Condition's values where it was shown not to happen.
     """
 
-    tag: NarrowingTag
+    tag: Condition
     holds_with: tuple[str, ...]
     not_with: tuple[str, ...]
 

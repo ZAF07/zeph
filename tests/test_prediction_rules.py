@@ -458,11 +458,16 @@ def test_evidence_that_only_narrows_a_shared_pattern_does_not_count_against_it()
     )
 
     found = shared_pattern_facts(
-        pattern, [story(), not_with_friends], [], [], WEIGHING, "UTC"
+        pattern,
+        [story(), story(about="their mother"), not_with_friends],
+        [],
+        [],
+        WEIGHING,
+        "UTC",
     )
 
-    assert found.scored.points == pytest.approx(140)
-    assert found.points_after_sharing == pytest.approx(140)
+    assert found.scored.points == pytest.approx(280)
+    assert found.points_after_sharing == pytest.approx(280)
 
 
 def reaction(

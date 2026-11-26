@@ -204,7 +204,11 @@ def test_a_user_sees_a_pattern_zeph_told_them_with_quotes_by_thread_and_predicti
             "when they matter to you."
         ),
         "where_it_shows": [
-            {"shows_with": ["family", "friend"], "not_with": ["partner"]}
+            {
+                "condition": "relationship",
+                "shows_with": ["family", "friend"],
+                "not_with": ["partner"],
+            }
         ],
         "told_at": shown["told_at"],
         "quote_groups": [

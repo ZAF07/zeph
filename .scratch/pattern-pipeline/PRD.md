@@ -262,4 +262,4 @@ A good test here checks what a User or Admin would see or what is saved, never h
 - Evals cost money: every run shows its estimate first, and the owner is reminded before any run.
 - With fifteen Pattern Types most of what Zeph notices will be unmatched at first, so the review list sets how fast Zeph can share more.
 - Source design: "Zeph insight pipeline" and its Pattern Catalog doc, linked from the decisions file.
-- Extended on 25 Nov 2026 (issue 23, ADR-0031): Observations gain more Conditions (audience, stakes, state going in), which narrow a Pattern and aim Zeph's questions. Decisions and reasons are in `issues/23-situations-vary-on-more-than-people.md`; built through issues 41 to 44, with issue 40 for directness.
+- Extended on 25 Nov 2026 (issue 23, ADR-0031): Observations gain more Conditions (audience, stakes, state going in), which narrow a Pattern and aim Zeph's questions. Decisions and reasons are in `issues/archive/23-situations-vary-on-more-than-people.md`; built through issues 41 to 44, with issue 40 for directness.

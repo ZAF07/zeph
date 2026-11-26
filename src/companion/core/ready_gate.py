@@ -27,6 +27,7 @@ from companion.core.models import (
     User,
     UserSnapshot,
 )
+from companion.core.narrowing_words import describe_narrowing
 from companion.core.observations import (
     UserText,
     find_quoted_text,
@@ -262,8 +263,8 @@ def gate_facts(
         The facts, with the quotes not looked at and the other side not
         asked yet.
     """
-    narrowings = narrowings_of(observations)
-    counted = without_narrowing(observations)
+    narrowings = narrowings_of(observations, weighing.numbers)
+    counted = without_narrowing(observations, weighing.numbers)
 
     return GateFacts(
         score=weighing.score(counted),
@@ -356,21 +357,6 @@ def read_other_side_answer(answer: str) -> bool | None:
     return better if isinstance(better, bool) else None
 
 
-def describe_narrowing(narrowing: PatternNarrowing) -> str:
-    """Write one narrowing in plain words.
-
-    Args:
-        narrowing: The narrowing.
-
-    Returns:
-        E.g. "power: shows with above, not with equal".
-    """
-    return (
-        f"{narrowing.tag.value}: shows with {', '.join(narrowing.holds_with)}, "
-        f"not with {', '.join(narrowing.not_with)}"
-    )
-
-
 def describe_pattern_to_argue(
     pattern_type: PatternType,
     observations: Sequence[Observation],
@@ -402,7 +388,9 @@ def describe_pattern_to_argue(
         f"{observation.context} They said: “{observation.quote}”"
         for observation in newest_first(observations)
     )
-    narrowed = "\n".join(describe_narrowing(narrowing) for narrowing in narrowings)
+    narrowed = "\n".join(
+        f"- It shows {describe_narrowing(narrowing)}" for narrowing in narrowings
+    )
     return (
         f"Today: {format_day(now, time_zone)}\n\n"
         f"The Pattern Zeph is about to tell them:\n"
@@ -412,7 +400,8 @@ def describe_pattern_to_argue(
         f"Function: {pattern_type.function}.\n\n"
         f"Look-alikes:\n{look_alikes or 'None.'}\n\n"
         f"What anyone would do: {pattern_type.anyone_would}\n\n"
-        f"Where it was shown not to happen:\n{narrowed or 'Nowhere.'}\n\n"
+        f"Where it shows, and where it was shown not to happen:\n"
+        f"{narrowed or 'Not narrowed.'}\n\n"
         f"The evidence:\n{evidence}"
     )
 
@@ -447,6 +436,7 @@ class JudgedPattern:
         pattern: The Pattern, as stored.
         pattern_type: Its Pattern Type.
         observations: Its Observations.
+        tries: The tries of its Exploration.
         facts: What code found out about it.
         bars: The bars it must pass.
         scored: Its score as scoring counts it, for the log.
@@ -455,6 +445,7 @@ class JudgedPattern:
     pattern: CatalogPattern
     pattern_type: PatternType
     observations: list[Observation]
+    tries: list[ExplorationTry]
     facts: GateFacts
     bars: ReadyBars
     scored: PatternScore
@@ -853,11 +844,14 @@ class ReadyKeeper:
                     pattern=pattern,
                     pattern_type=pattern_type,
                     observations=its_observations,
+                    tries=its_tries,
                     facts=gate_facts(
                         pattern_type, its_observations, its_tries, safety, weighing
                     ),
                     bars=ready_bars(settings, pattern_type),
-                    scored=weighing.score(without_narrowing(its_observations)),
+                    scored=weighing.score(
+                        without_narrowing(its_observations, weighing.numbers)
+                    ),
                 )
             )
         return all_judged

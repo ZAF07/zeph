@@ -4,14 +4,19 @@ from uuid import uuid4
 
 from companion.core.models import (
     CatalogPattern,
+    Condition,
     LifeThread,
-    NarrowingTag,
     ObservationDirection,
     PatternNarrowing,
     PatternState,
     Prediction,
 )
-from companion.core.told_patterns import told_patterns, was_told, where_it_shows
+from companion.core.told_patterns import (
+    WhereItShows,
+    told_patterns,
+    was_told,
+    where_it_shows,
+)
 from tests.test_ready_gate_rules import (
     BELONG,
     NOW,
@@ -150,18 +155,18 @@ def test_a_pattern_shows_its_own_predictions_newest_first() -> None:
     assert [entry.wording for entry in shown.predictions] == ["second", "first"]
 
 
-def test_where_it_shows_is_said_to_the_user() -> None:
+def test_where_it_shows_lists_each_narrowing_for_the_tab_to_word() -> None:
     pattern = replace(
         told(PatternState.SHARED),
         narrowings=(
-            PatternNarrowing(NarrowingTag.RELATIONSHIP, ("family",), ("partner",)),
-            PatternNarrowing(NarrowingTag.POWER, ("above",), ("equal", "below")),
+            PatternNarrowing(Condition.RELATIONSHIP, ("family",), ("partner",)),
+            PatternNarrowing(Condition.POWER, ("above",), ("equal", "below")),
         ),
     )
 
     shown = where_it_shows(pattern)
 
-    assert [(where.shows_with, where.not_with) for where in shown] == [
-        (("family",), ("partner",)),
-        (("people above you",), ("your equals", "people below you")),
-    ]
+    assert shown == (
+        WhereItShows(Condition.RELATIONSHIP, ("family",), ("partner",)),
+        WhereItShows(Condition.POWER, ("above",), ("equal", "below")),
+    )

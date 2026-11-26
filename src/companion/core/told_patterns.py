@@ -5,12 +5,11 @@ from uuid import UUID
 
 from companion.core.models import (
     CatalogPattern,
+    Condition,
     LifeThread,
-    NarrowingTag,
     Observation,
     PatternState,
     PatternType,
-    Power,
     Prediction,
 )
 from companion.core.pattern_sharing import (
@@ -25,22 +24,19 @@ STATES_SHOWN_IN_ORDER = (
     PatternState.CONTESTED,
     PatternState.CLOSED,
 )
-POWER_WORDS_TO_THE_USER = {
-    Power.ABOVE.value: "people above you",
-    Power.EQUAL.value: "your equals",
-    Power.BELOW.value: "people below you",
-}
 
 
 @dataclass(frozen=True)
 class WhereItShows:
-    """Where a Pattern shows and where it doesn't, in words said to the User.
+    """Where a Pattern shows and where it doesn't, for the Patterns tab to word.
 
     Attributes:
-        shows_with: Who it shows with, e.g. "family".
-        not_with: Who it was shown not to happen with.
+        condition: The Condition that tells the two apart.
+        shows_with: That Condition's values where it shows, e.g. "group".
+        not_with: Its values where it was shown not to happen.
     """
 
+    condition: Condition
     shows_with: tuple[str, ...]
     not_with: tuple[str, ...]
 
@@ -111,26 +107,23 @@ def told_at(pattern: CatalogPattern) -> datetime:
 
 
 def where_it_shows(pattern: CatalogPattern) -> tuple[WhereItShows, ...]:
-    """Put a Pattern's narrowings in words said to the User.
+    """List a Pattern's kept narrowings for the Patterns tab.
 
     Args:
         pattern: The Pattern.
 
     Returns:
-        One entry per narrowing, with "people above you" for a power tag.
+        One entry per narrowing, with the Condition and its values as
+        stored; the tab's Copy puts each in words said to the User.
     """
-    shown = []
-    for narrowing in pattern.narrowings:
-        words = POWER_WORDS_TO_THE_USER if narrowing.tag == NarrowingTag.POWER else {}
-        shown.append(
-            WhereItShows(
-                shows_with=tuple(
-                    words.get(value, value) for value in narrowing.holds_with
-                ),
-                not_with=tuple(words.get(value, value) for value in narrowing.not_with),
-            )
+    return tuple(
+        WhereItShows(
+            condition=narrowing.tag,
+            shows_with=narrowing.holds_with,
+            not_with=narrowing.not_with,
         )
-    return tuple(shown)
+        for narrowing in pattern.narrowings
+    )
 
 
 def group_quotes(

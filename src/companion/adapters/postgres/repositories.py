@@ -171,7 +171,6 @@ from companion.core.models import (
     MoveOutcomeToSave,
     MoveResult,
     MoveRole,
-    NarrowingTag,
     Need,
     NeedDetails,
     NextDueTimeChange,
@@ -4062,7 +4061,7 @@ class PostgresPatternRepository:
                 blocked_by=ReadyCheck(row.blocked_by) if row.blocked_by else None,
                 narrowings=tuple(
                     PatternNarrowing(
-                        tag=NarrowingTag(narrowing["tag"]),
+                        tag=Condition(narrowing["tag"]),
                         holds_with=tuple(narrowing["holds_with"]),
                         not_with=tuple(narrowing["not_with"]),
                     )
