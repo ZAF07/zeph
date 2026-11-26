@@ -36,6 +36,9 @@ from companion.core.models import (
     UserRole,
     UserSnapshot,
 )
+from companion.core.pattern_catalog import PatternCatalogService
+from companion.core.pattern_scoring import PatternScorer
+from companion.core.pattern_sharing import PatternSharing
 from companion.core.photos import PhotoService, PhotoTools, SendPhotoTools
 from companion.core.platform_settings import (
     REPLY_DELETE_DATA_INSTRUCTIONS,
@@ -45,6 +48,8 @@ from companion.core.platform_settings import (
     WEB_SEARCH_DAILY_LIMIT,
 )
 from companion.core.ports import ChatTool, Repositories
+from companion.core.predictions import PredictionKeeper
+from companion.core.ready_gate import ReadyKeeper
 from companion.core.recent_messages import RecentMessages
 from companion.core.reply_tools import Attachment, ReplyContext, ReplyOffer
 from companion.core.response_composition import EmptyReplyError, ResponseComposer
@@ -274,6 +279,35 @@ def test_what_a_providers_tool_picks_is_sent_as_the_sticker_or_shared_photo(
     assert reply.shared_photo == shared_photo
 
 
+def test_a_reply_written_again_sends_nothing_its_first_draft_picked(
+    repositories: Repositories,
+) -> None:
+    user = add_user(repositories)
+    chat_model = ScriptedChatModel()
+    chat_model.script(ToolCall("pick_sticker", {}), "All done!", "Want me to?")
+    drafts: list[str] = []
+
+    def correct_first_draft(reply: str) -> str:
+        drafts.append(reply)
+        return "Nothing was done." if len(drafts) == 1 else ""
+
+    composer = build_composer(
+        repositories,
+        chat_model,
+        [
+            FakeProvider(picking_offer("pick_sticker", a_sticker())),
+            FakeProvider(ReplyOffer(correction=correct_first_draft)),
+        ],
+    )
+
+    reply = composer.compose(RecentMessages(uuid4(), []), snapshot_for(user))
+
+    assert drafts == ["All done!", "Want me to?"]
+    assert reply.texts == ["Want me to?"]
+    assert reply.sticker is None
+    assert chat_model.calls[1].instructions.endswith("Nothing was done.")
+
+
 def test_a_reply_with_only_a_pick_is_sent_but_one_with_nothing_is_empty(
     repositories: Repositories,
 ) -> None:
@@ -326,16 +360,32 @@ def build_settings_tools(repositories: Repositories) -> SettingsTools:
     clock = FakeClock(NOW)
     chat_channel = FakeChatChannel()
     features = FeatureService(repositories, clock, DASHBOARD_URL)
-    user_memory = UserMemoryService(repositories, features, clock)
+    pattern_catalog = PatternCatalogService(repositories.pattern_catalog)
+    ready_keeper = ReadyKeeper(repositories, pattern_catalog, clock)
+    user_memory = UserMemoryService(
+        repositories,
+        features,
+        pattern_catalog,
+        PatternScorer(repositories, pattern_catalog, clock),
+        ready_keeper,
+        clock,
+    )
     usage_limiter = UsageLimiter(repositories, clock)
+    chat_model = recording_chat_model(repositories, clock)
     check_ins = CheckInService(
         repositories=repositories,
         features=features,
         user_snapshots=UserSnapshotLoader(repositories, clock),
-        chat_model=recording_chat_model(repositories, clock),
+        chat_model=chat_model,
         usage_limiter=usage_limiter,
         chat_channel=chat_channel,
         clock=clock,
+        pattern_sharing=PatternSharing(
+            repositories, ready_keeper, pattern_catalog, chat_model, clock
+        ),
+        prediction_keeper=PredictionKeeper(
+            repositories, pattern_catalog, chat_model, clock
+        ),
     )
     users = UserService(
         repositories.users, features, user_memory, check_ins, clock, frozenset()
@@ -346,6 +396,7 @@ def build_settings_tools(repositories: Repositories) -> SettingsTools:
         check_ins,
         user_memory,
         ChatDataDeletion(repositories, chat_channel, clock),
+        chat_model,
     )
 
 

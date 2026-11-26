@@ -5,14 +5,18 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 
 from companion.adapters.eval_case_seed import read_eval_case_seed
+from companion.adapters.pattern_catalog_seed import read_pattern_catalog_seed
 from companion.adapters.postgres.eval_repositories import (
     PostgresEvalCaseRepository,
     PostgresEvalImageRepository,
 )
 from companion.core.evals.case_seed import add_seed_cases
 from companion.core.evals.case_shapes import CASE_SHAPES, find_problems
+from companion.core.evals.cases import read_tagging_case
 from companion.core.evals.models import EvalCase, EvalName
+from companion.core.pattern_catalog import read_pattern_types
 from companion.main import EVAL_CASES_DIR, EVAL_IMAGES_DIR
+from tests.conftest import PATTERN_CATALOG_DIR
 from tests.fakes import FakeAuthVerifier, FakeClock
 from tests.telegram_helpers import auth_headers, owner_headers
 
@@ -109,6 +113,32 @@ VALID_CONTENT: dict[EvalName, dict[str, Any]] = {
             }
         ],
     },
+    EvalName.TAGGING: {
+        "now": "2026-11-24T10:00:00",
+        "threads": [
+            {"title": "Helping Mei move", "story": "Mei asked.", "people": ["Mei"]}
+        ],
+        "messages": [
+            {"who": "person", "text": "I said yes to Mei again, it's fine."},
+            {"who": "zeph", "text": "How do you feel about it?"},
+        ],
+        "observations": [
+            {
+                "pattern_type": "CONF.AVOID.BELONG",
+                "direction": "for",
+                "unclear": False,
+                "situational": False,
+            }
+        ],
+    },
+    EvalName.WHOLE_PIPELINE: {
+        "now": "2026-11-02T19:30:00",
+        "true_pattern_types": ["CONF.AVOID.BELONG"],
+        "conversations": [
+            {"days_later": 0, "messages": ["I said yes to Mei again, it's fine."]},
+            {"days_later": 2, "messages": ["With Sam I say what I think."]},
+        ],
+    },
 }
 
 
@@ -120,6 +150,8 @@ EDITS: dict[EvalName, dict[str, Any]] = {
     EvalName.PHOTO_DESCRIPTIONS: {"must_leave_out": ["4929", "hunter2"]},
     EvalName.UNDERSTANDING: {"now": "2026-11-14T09:00:00"},
     EvalName.MOVE_OUTCOME: {"now": "2026-11-15T09:00:00"},
+    EvalName.TAGGING: {"observations": []},
+    EvalName.WHOLE_PIPELINE: {"true_pattern_types": []},
     EvalName.DAY_SUMMARY: {
         "questions": [
             {
@@ -128,6 +160,25 @@ EDITS: dict[EvalName, dict[str, Any]] = {
             }
         ]
     },
+}
+
+
+MADE_UP_OBSERVATION = {
+    "quote": "I said yes to Mei again",
+    "sign": "I2",
+    "direction": "for",
+    "context": "Mei asked for help moving; they said yes though worn out.",
+    "about": "Mei, their sister",
+    "days_ago": 6,
+}
+SUSPECTED_PATTERN = {
+    "pattern_type": "CONF.AVOID.BELONG",
+    "observations": [MADE_UP_OBSERVATION],
+}
+UNCLEAR_STORY = {
+    **MADE_UP_OBSERVATION,
+    "pattern_type": "CONF.AVOID.BELONG",
+    "second_pattern_type": "ACH.WORTH.PERF",
 }
 
 
@@ -314,6 +365,90 @@ def test_an_invalid_save_is_refused_with_a_message_per_field(
             "No Life Thread has this title: No such thread",
         ),
         (
+            EvalName.UNDERSTANDING,
+            {"messages": [{"text": "hi", "expect": {"aimed_raised": True}}]},
+            "messages.0.expect.aimed_raised",
+            "Needs a suspected Pattern in the made-up User Memory.",
+        ),
+        (
+            EvalName.UNDERSTANDING,
+            {
+                "memory": {"patterns": [SUSPECTED_PATTERN]},
+                "messages": [
+                    {
+                        "text": "hi",
+                        "expect": {"aimed_raised": False, "aimed_need": "unclear"},
+                    }
+                ],
+            },
+            "messages.0.expect.aimed_need",
+            "Expects no aimed Curiosity, so leave this empty.",
+        ),
+        (
+            EvalName.UNDERSTANDING,
+            {
+                "memory": {
+                    "patterns": [
+                        {
+                            **SUSPECTED_PATTERN,
+                            "observations": [{**MADE_UP_OBSERVATION, "thread": "Gone"}],
+                        }
+                    ]
+                },
+                "messages": [{"text": "hi", "expect": {}}],
+            },
+            "memory.patterns.0.observations.0.thread",
+            "No Life Thread has this title: Gone",
+        ),
+        (
+            EvalName.UNDERSTANDING,
+            {
+                "memory": {
+                    "patterns": [
+                        {
+                            **SUSPECTED_PATTERN,
+                            "tries": [
+                                {
+                                    "need": "unclear",
+                                    "approach": "thought_experiment",
+                                    "outcome": "vague",
+                                    "days_ago": 3,
+                                }
+                            ],
+                        }
+                    ]
+                }
+            },
+            "memory.patterns.0.tries.0.approach",
+            "Pick one of: Story follow-up",
+        ),
+        (
+            EvalName.TAGGING,
+            {
+                "unclear": [
+                    {
+                        **UNCLEAR_STORY,
+                        "asked": False,
+                        "ends_clear_for": "CONF.AVOID.BELONG",
+                    }
+                ]
+            },
+            "unclear.0.ends_clear_for",
+            "Only a story Zeph asked about can end clear.",
+        ),
+        (
+            EvalName.TAGGING,
+            {"unclear": [{**UNCLEAR_STORY, "ends_clear_for": "REL.MOOD.FIX"}]},
+            "unclear.0.ends_clear_for",
+            "Must be one of its two Pattern Types: CONF.AVOID.BELONG or ACH.WORTH.PERF",
+        ),
+        (
+            EvalName.TAGGING,
+            {"unclear": [{**UNCLEAR_STORY, "second_pattern_type": ""}]},
+            "unclear.0.second_pattern_type",
+            "Needs some text.",
+        ),
+        (
             EvalName.SETTINGS,
             {"forgotten": ["Work stress"]},
             "forgotten",
@@ -403,6 +538,12 @@ def test_an_invalid_save_is_refused_with_a_message_per_field(
             },
             "outcomes.0.rules",
             "No such rule below: no_such",
+        ),
+        (
+            EvalName.TAGGING,
+            {"messages": [{"who": "zeph", "text": "How was your day?"}]},
+            "messages",
+            "Add at least one message from the User.",
         ),
         (
             EvalName.DAY_SUMMARY,
@@ -511,10 +652,17 @@ def test_an_admin_edits_the_judge_and_a_model_not_listed_is_refused(
         headers=admin,
     )
 
-    assert seeded["values"]["model"] == "deepseek-flash"
+    assert seeded["values"]["model"] == "deepseek/deepseek-v4.1-flash-1017"
     assert seeded["values"]["thinking"] is False
     model_field = seeded["shape"]["sections"][0]["fields"][0]
-    assert [option["value"] for option in model_field["options"]] == ["deepseek-flash"]
+    assert [option["value"] for option in model_field["options"]] == [
+        "deepseek/deepseek-v4.1-flash-1017",
+        "deepseek/deepseek-v4-pro-0813",
+        "anthropic/claude-haiku-5.5",
+        "anthropic/claude-sonnet-5.5",
+        "anthropic/claude-opus-5.5",
+        "anthropic/claude-fable-5.2",
+    ]
     assert saved.status_code == 200
     assert saved.json()["values"] == new_values
     assert refused.status_code == 422
@@ -583,3 +731,35 @@ def test_the_seed_leaves_a_case_edited_on_the_dashboard_and_an_archived_one_alon
 def test_every_seed_case_fits_its_eval_s_case_shape() -> None:
     for case in read_eval_case_seed(EVAL_CASES_DIR, EVAL_IMAGES_DIR):
         assert find_problems(CASE_SHAPES[case.eval], case.content) == {}, case.key
+
+
+def test_the_tagging_seed_covers_each_kind_of_case_for_every_pattern_type() -> None:
+    pattern_types = {
+        pattern_type.id: pattern_type
+        for pattern_type in read_pattern_types(
+            read_pattern_catalog_seed(PATTERN_CATALOG_DIR)
+        )
+    }
+    cases = [
+        read_tagging_case(case.key, case.content)
+        for case in read_eval_case_seed(EVAL_CASES_DIR, EVAL_IMAGES_DIR)
+        if case.eval == EvalName.TAGGING
+    ]
+    expected = [item for case in cases for item in case.observations]
+
+    assert len(cases) >= 40
+    assert {item.pattern_type for item in expected} == set(pattern_types)
+    for pattern_type in pattern_types:
+        directions = {
+            item.direction.value
+            for item in expected
+            if item.pattern_type == pattern_type and not item.unclear
+        }
+        assert directions == {"for", "against"}, pattern_type
+    assert sum(1 for case in cases if not case.observations) >= 5
+    assert sum(1 for item in expected if item.unclear) >= 4
+    situational = [item for item in expected if item.situational]
+    assert len(situational) >= 4
+    assert all(
+        pattern_types[item.pattern_type].anyone_would_when for item in situational
+    )

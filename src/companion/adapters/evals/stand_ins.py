@@ -7,6 +7,7 @@ from typing import Any
 
 from companion.core.evals.cases import EvalWebResult
 from companion.core.evals.models import ModelTokens
+from companion.core.evals.ports import EvalSetupError
 from companion.core.incoming_messages import MESSAGE_WAIT_PREFIX
 from companion.core.models import (
     AccountIdentity,
@@ -258,18 +259,39 @@ class InlineUserWorkQueue:
         del self._waiting[key]
 
 
-class IdleScheduler:
-    """Scheduler for Evals: never ticks, so no Check-in runs on the Eval database."""
+class ManualScheduler:
+    """Scheduler for Evals: never ticks on its own.
+
+    An Eval that needs the scheduled work, e.g. to end a quiet Conversation,
+    runs one tick by hand. That tick does everything the live one does: it
+    also sends the Check-ins that are due and deletes expired messages on
+    the Eval database.
+    """
+
+    def __init__(self) -> None:
+        """Start with no tick to run."""
+        self._tick: Callable[[], None] | None = None
 
     def start(self, tick: Callable[[], None]) -> None:
-        """Ignore the scheduled work.
+        """Keep the scheduled work, without running it.
 
         Args:
             tick: The work a real scheduler would run.
         """
+        self._tick = tick
 
     def stop(self) -> None:
         """Do nothing."""
+
+    def run_tick(self) -> None:
+        """Run the scheduled work once, as the real scheduler does every so often.
+
+        Raises:
+            EvalSetupError: If the app hasn't started the scheduler.
+        """
+        if self._tick is None:
+            raise EvalSetupError("The app has not started the scheduler")
+        self._tick()
 
 
 class RunningClock:
@@ -360,6 +382,7 @@ class CountingChatModel:
         instructions: str,
         history: list[ChatLine],
         tools: Sequence[ChatTool] = (),
+        message_instructions: str = "",
     ) -> ModelAnswer:
         """Generate an answer with the real chat model and count its tokens.
 
@@ -369,13 +392,19 @@ class CountingChatModel:
             instructions: What the model should be and do.
             history: The conversation so far, oldest first.
             tools: The tools the model may call.
+            message_instructions: The instructions made for this one call.
 
         Returns:
             The real chat model's answer.
         """
         recorded_tools = [self._recording(tool) for tool in tools]
         answer = self._chat_model.generate(
-            model, thinking, instructions, history, recorded_tools
+            model=model,
+            thinking=thinking,
+            instructions=instructions,
+            history=history,
+            tools=recorded_tools,
+            message_instructions=message_instructions,
         )
         self._counter.add(model, answer)
         return answer

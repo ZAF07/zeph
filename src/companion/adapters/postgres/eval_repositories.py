@@ -51,7 +51,13 @@ from companion.core.evals.models import (
     StoredEvalCase,
     Variant,
 )
-from companion.core.models import Feature, ModelCall, Move, Need
+from companion.core.models import (
+    CuriosityTreatment,
+    Feature,
+    ModelCall,
+    Move,
+    Need,
+)
 
 TAKE_RUN_LOCK = 7_301_013
 RUNNER_LOCK = 7_301_014
@@ -540,13 +546,15 @@ def _need_values(need: Need) -> dict[str, Any]:
         "ruled_out_move_ids": sorted(
             str(move_id) for move_id in need.ruled_out_move_ids
         ),
+        "curiosities": need.curiosities.value,
     }
 
 
 def _to_need(values: dict[str, Any]) -> Need:
     """Read a Need from a run's snapshot.
 
-    Snapshots taken before Moves rule none out.
+    Snapshots taken before Moves rule none out, and those taken before Needs
+    said how Curiosities are treated ask them only if they fit.
 
     Args:
         values: Its fields, as `_need_values` wrote them.
@@ -563,6 +571,9 @@ def _to_need(values: dict[str, Any]) -> Need:
         is_fallback=values["is_fallback"],
         ruled_out_move_ids=frozenset(
             UUID(move_id) for move_id in values.get("ruled_out_move_ids", [])
+        ),
+        curiosities=CuriosityTreatment(
+            values.get("curiosities", CuriosityTreatment.ONLY_IF_IT_FITS)
         ),
     )
 
@@ -1297,6 +1308,7 @@ def _eval_model_call_values(case_result_id: UUID, call: ModelCall) -> dict[str, 
         "reply_plan_shape": (
             asdict(call.reply_plan_shape) if call.reply_plan_shape else None
         ),
+        "tagging_shape": asdict(call.tagging_shape) if call.tagging_shape else None,
     }
 
 

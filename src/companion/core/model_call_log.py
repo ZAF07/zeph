@@ -18,6 +18,7 @@ from companion.core.models import (
     ModelStep,
     OfferedTool,
     ReplyPlanShape,
+    TaggingShape,
     TraceKind,
     UnderstandingShape,
     UserRole,
@@ -36,7 +37,7 @@ class ModelCallRequest:
 
     Attributes:
         step: Which step it is for.
-        model: The model asked, e.g. "deepseek-flash".
+        model: The model asked, e.g. "deepseek/deepseek-v4.1-flash-1017".
         thinking: Whether the model was asked to think before it answers.
         instructions: What the model is told to be and do.
         history: The lines it is given, oldest first.
@@ -216,6 +217,21 @@ class ModelCallLog:
             self._repositories.model_calls.set_check_in_shape(snapshot.trace.id, shape)
         except Exception:
             logger.exception("Could not save a woven-in Check-in's shape")
+
+    def record_tagging_shape(self, snapshot: UserSnapshot, shape: TaggingShape) -> None:
+        """Record how many Observations its trace's tagging call wrote and dropped.
+
+        The shape lands on the trace's newest Pattern tagging call, so it
+        must come right after that call. Saving never raises.
+
+        Args:
+            snapshot: The User the call was for, with its trace.
+            shape: How many were tagged and dropped.
+        """
+        try:
+            self._repositories.model_calls.set_tagging_shape(snapshot.trace.id, shape)
+        except Exception:
+            logger.exception("Could not save a Pattern tagging call's shape")
 
     def list_traces(
         self,

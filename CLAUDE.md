@@ -20,6 +20,10 @@ Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agent
 
 How Zeph handles a message, from texts arriving to what is kept when a Conversation ends, is in `docs/message-pipeline/README.md`. Read it before planning or changing the reply path, Conversation-end steps or User Memory.
 
+### Pattern pipeline
+
+How Zeph finds, tests and shares a Pattern (the Pattern Catalog, Observations, scoring, the Agenda, Thought Experiments) is in `docs/pattern-pipeline/README.md`. It is a target design, not built yet. Read it before planning or changing Patterns, Observations, Curiosities, the Agenda or Thought Experiments. Issues are in `.scratch/pattern-pipeline/`.
+
 ### UI design
 
 The Dashboard UI design lives in `web/design/`. Its `README.md` is the build contract: read it in full before any UI work. Pages are built against `web/design/reference/*.html` and checked with the pixel test (`web/design/compare.cjs`); see ADR 0018.
@@ -56,6 +60,7 @@ The Dashboard UI design lives in `web/design/`. Its `README.md` is the build con
 - Use UV for package and virtual env management
 - All methods _MUST_ have _google-style docstrings_ describing in concise manner what the method does, what parameters it takes and what it returns
 - Read secrets and settings via `config.py`.
+- A migration that reloads a seed prompt uses `reload_prompt_unless_edited`, never a plain delete, so an Admin's edit is kept. See `src/companion/adapters/postgres/migrations/README.md`.
 - Checks: `pytest`, `ruff`, `ruff format` and `mypy`.
 
 ### TypeScript / Next.js (Dashboard, `web/`)

@@ -7,6 +7,7 @@ from sqlalchemy import Engine, create_engine, insert, make_url, text
 
 from companion.adapters.evals.in_process_companion import InProcessCompanion
 from companion.adapters.postgres.database import (
+    load_pattern_catalog,
     migrate,
     seed_check_in_kinds,
     seed_helplines,
@@ -14,6 +15,7 @@ from companion.adapters.postgres.database import (
     seed_moves,
     seed_needs,
     seed_platform_settings,
+    seed_thought_experiments,
 )
 from companion.adapters.postgres.tables import (
     metadata,
@@ -118,6 +120,10 @@ class PostgresEvalEnvironment:
             self._seed_dir / "moves.yaml",
             self._seed_dir / "needs.yaml",
         )
+        seed_thought_experiments(
+            self._engine, self._seed_dir / "thought_experiments.yaml"
+        )
+        load_pattern_catalog(self._engine, self._seed_dir / "pattern_catalog")
         return InProcessCompanion(
             engine=self._engine,
             chat_model=self._chat_model,
@@ -169,6 +175,7 @@ class PostgresEvalEnvironment:
                 "how_to_reply": need.how_to_reply,
                 "sort_order": need.sort_order,
                 "is_fallback": need.is_fallback,
+                "curiosities": need.curiosities,
             }
             for need in needs
         ]
@@ -196,6 +203,7 @@ class PostgresEvalEnvironment:
                 "needed_feature": (
                     None if move.needed_feature is None else move.needed_feature.value
                 ),
+                "asks_a_question": move.asks_a_question,
             }
             for move in moves
         ]

@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Protocol
 from uuid import UUID
@@ -39,12 +39,17 @@ class ReplyOffer:
             written, to send after its text; None until one is picked.
         closing_text: A fixed text a tool asked to send, word for word, as
             the last text message of the reply; "" if none.
+        correction: Reads the reply as written and returns what to tell the
+            model before it writes the reply again, e.g. that it said a
+            setting was changed but called no tool; "" when the reply may
+            go as it is. None when the provider checks nothing.
     """
 
     tools: list[ChatTool] = field(default_factory=list)
     instructions: str = ""
     picked: Attachment | None = None
     closing_text: str = ""
+    correction: Callable[[str], str] | None = None
 
 
 @dataclass(frozen=True)
@@ -52,19 +57,17 @@ class ReplyGuidance:
     """What the Reply Plan adds to the reply's instructions, by priority.
 
     Attributes:
-        boundaries: The Life Threads to leave alone, each with why; "" if
-            none.
+        boundaries: The Life Threads to leave alone, each with why, and
+            the topics they asked Zeph to drop; "" if none.
         plan: The Need's "how to reply", the Moves' "how to do it", the
-            nuance and mood, the "ask why" note when it applies and the
-            Life Threads to bring up; "" if none.
-        curiosities: The Curiosities it chose to bring up; "" if none.
+            nuance and mood, the "ask why" note when it applies, the Life
+            Threads to bring up and the Curiosity to ask; "" if none.
         past_days: The past days it read with the past-day tool, word for
             word or saying none are kept; "" if it read none.
     """
 
     boundaries: str = ""
     plan: str = ""
-    curiosities: str = ""
     past_days: str = ""
 
 

@@ -193,6 +193,20 @@ class ChatSetting(StrEnum):
     USER_MEMORY = "user_memory"
     PHOTO_VIEWING = "photo_viewing"
     TIME_ZONE = "time_zone"
+    DIRECTNESS = "directness"
+    CONTESTED_GATHERING = "contested_gathering"
+
+
+class Directness(StrEnum):
+    """How direct a User wants the Companion to be with its Read.
+
+    It changes how soon and how plainly the Read is said, never whether the
+    Companion forms one or whether a Pattern may be shared.
+    """
+
+    GENTLE = "gentle"
+    BALANCED = "balanced"
+    DIRECT = "direct"
 
 
 class ChangedBy(StrEnum):
@@ -201,6 +215,18 @@ class ChangedBy(StrEnum):
     DASHBOARD = "dashboard"
     CHAT = "chat"
     ADMIN = "admin"
+
+
+class Familiarity(StrEnum):
+    """How well the Companion knows a User, least first.
+
+    Code works it out from counts against Admin-set bars each time a
+    Conversation ends; the Reply Plan is told it on every reply.
+    """
+
+    NEW = "new"
+    GETTING_TO_KNOW = "getting_to_know"
+    KNOWS_WELL = "knows_well"
 
 
 @dataclass(frozen=True)
@@ -221,6 +247,8 @@ class User:
             AI notice, if they have.
         user_memory_enabled: Whether the Companion may keep User Memory.
         photo_viewing_enabled: Whether the Companion may look at their photos.
+        directness: How direct they want the Companion to be, with its Read
+            and with how it asks.
         onboarding_completed_at: When they finished onboarding, if they have.
         role: Whether they are a plain User or an Admin.
         check_ins: Their Check-in settings.
@@ -230,6 +258,12 @@ class User:
             for them; a setting is left out once the User changes it.
         data_deletion_requested_at: When they asked in chat to delete their
             data and are yet to reply with the confirmation word; None if not.
+        pattern_noticing_told_at: When they pressed "Got it" on the notice
+            saying Zeph keeps quotes as evidence; none is kept before.
+        familiarity: How well the Companion knows them, as worked out when
+            their last Conversation ended.
+        contested_gathering_enabled: Whether the Companion may keep noting
+            evidence for a Pattern they disagreed with.
     """
 
     id: UUID
@@ -244,12 +278,16 @@ class User:
     ai_notice_acknowledged_at: datetime | None = None
     user_memory_enabled: bool = True
     photo_viewing_enabled: bool = True
+    directness: Directness = Directness.BALANCED
     onboarding_completed_at: datetime | None = None
     role: UserRole = UserRole.USER
     check_ins: CheckInSettings = field(default_factory=CheckInSettings)
     settings_changed_in_chat: dict[ChatSetting, datetime] = field(default_factory=dict)
     settings_changed_by_admin: dict[ChatSetting, datetime] = field(default_factory=dict)
     data_deletion_requested_at: datetime | None = None
+    pattern_noticing_told_at: datetime | None = None
+    familiarity: Familiarity = Familiarity.NEW
+    contested_gathering_enabled: bool = True
 
     @property
     def has_finished_onboarding(self) -> bool:
@@ -322,6 +360,44 @@ class AdminCheckInChanges:
     quiet_hours_end: time | None = None
 
 
+class PatternState(StrEnum):
+    """Where a Pattern stands, from first noticed to confirmed or closed.
+
+    Code moves a Pattern of a Pattern Type between the first seven
+    (ADR-0024). Unmatched is apart from them: the state of a Pattern the
+    keeping step wrote that fits no Pattern Type, which code never moves.
+    A Pattern with no Pattern Type is always unmatched.
+    """
+
+    NOTICED = "noticed"
+    SUSPECTED = "suspected"
+    READY = "ready"
+    SHARED = "shared"
+    CONFIRMED = "confirmed"
+    CONTESTED = "contested"
+    CLOSED = "closed"
+    UNMATCHED = "unmatched"
+
+
+@dataclass(frozen=True)
+class FamiliarityCounts:
+    """What the Companion has of a User, as Familiarity is worked out from.
+
+    Attributes:
+        conversations: How many Conversations they have had.
+        life_threads: How many Life Threads the Companion follows for them.
+        real_story_observations: How many of their Observations are from
+            something that really happened.
+        pattern_states: How many Patterns they have in each state, with or
+            without a Pattern Type; a state with none may be left out.
+    """
+
+    conversations: int
+    life_threads: int
+    real_story_observations: int
+    pattern_states: Mapping[PatternState, int]
+
+
 @dataclass(frozen=True)
 class UserOverview:
     """What Admins see about a User: activity counts, never message text.
@@ -336,7 +412,10 @@ class UserOverview:
         has_portrait: Whether they have a User Portrait.
         move_outcome_count: How many Move Outcomes the Companion keeps for
             them.
-        confirmed_pattern_count: How many of their Patterns they agreed with.
+        pattern_counts: How many Patterns they have in each state, every
+            state given, with or without a Pattern Type; never their content.
+        kept_quote_count: How many quotes Zeph keeps as evidence for them
+            (their Observations); never the quotes.
     """
 
     user: User
@@ -346,7 +425,8 @@ class UserOverview:
     life_thread_count: int
     has_portrait: bool
     move_outcome_count: int
-    confirmed_pattern_count: int
+    pattern_counts: Mapping[PatternState, int]
+    kept_quote_count: int
 
 
 @dataclass(frozen=True)
@@ -382,6 +462,10 @@ class PreferenceChanges:
         name: What the Companion should call them.
         user_memory_enabled: Whether the Companion may keep User Memory.
         photo_viewing_enabled: Whether the Companion may look at their photos.
+        directness: How direct they want the Companion to be, with its Read
+            and with how it asks.
+        contested_gathering_enabled: Whether the Companion may keep noting
+            evidence for a Pattern they disagreed with.
         country: Two-letter country code.
         time_zone: IANA time zone name.
     """
@@ -389,6 +473,8 @@ class PreferenceChanges:
     name: str | None = None
     user_memory_enabled: bool | None = None
     photo_viewing_enabled: bool | None = None
+    directness: Directness | None = None
+    contested_gathering_enabled: bool | None = None
     country: str | None = None
     time_zone: str | None = None
 
@@ -956,6 +1042,15 @@ class MoveDirection(StrEnum):
     DOWN = "down"
 
 
+class CuriosityTreatment(StrEnum):
+    """How Curiosities are treated while a Need is picked."""
+
+    ASK_BY_DEFAULT = "ask_by_default"
+    TEST_THE_WATER = "test_the_water"
+    ONLY_IF_IT_FITS = "only_if_it_fits"
+    NEVER = "never"
+
+
 @dataclass(frozen=True)
 class NeedDetails:
     """What an Admin sets on a Need.
@@ -965,12 +1060,14 @@ class NeedDetails:
         when_it_fits: When to pick it, as the Understanding model is told.
         how_to_reply: How to reply when it is picked, as the reply is told.
         ruled_out_move_ids: The Moves that never go with it.
+        curiosities: How Curiosities are treated while it is picked.
     """
 
     name: str
     when_it_fits: str
     how_to_reply: str
     ruled_out_move_ids: frozenset[UUID]
+    curiosities: CuriosityTreatment = CuriosityTreatment.ONLY_IF_IT_FITS
 
 
 @dataclass(frozen=True)
@@ -985,6 +1082,7 @@ class Need:
         sort_order: Where it comes in the list, lowest first.
         is_fallback: Whether it is the one used when it isn't clear.
         ruled_out_move_ids: The Moves that never go with it.
+        curiosities: How Curiosities are treated while it is picked.
     """
 
     id: UUID
@@ -994,6 +1092,7 @@ class Need:
     sort_order: int
     is_fallback: bool
     ruled_out_move_ids: frozenset[UUID]
+    curiosities: CuriosityTreatment = CuriosityTreatment.ONLY_IF_IT_FITS
 
 
 @dataclass(frozen=True)
@@ -1107,22 +1206,6 @@ class LifeThreadToSave:
     embedding: list[float] | None
 
 
-class PatternState(StrEnum):
-    """Whether a Pattern is only suspected, agreed with by the User, or rejected."""
-
-    SUSPECTED = "suspected"
-    CONFIRMED = "confirmed"
-    CLOSED = "closed"
-
-
-class PatternReaction(StrEnum):
-    """How the User took a view the Companion offered from a Pattern."""
-
-    AGREED = "agreed"
-    PUSHED_BACK = "pushed_back"
-    BRUSHED_OFF = "brushed_off"
-
-
 @dataclass(frozen=True)
 class PatternEvidence:
     """One time a Pattern showed up in a User's life.
@@ -1153,15 +1236,21 @@ class Pattern:
         id: Our ID for the Pattern.
         user_id: The User it is about.
         pattern: The pattern in a sentence or two.
-        state: Suspected, confirmed or closed.
+        state: Unmatched. Confirmed is read where a Pattern is offered or
+            shown, but none is confirmed until sharing is built.
         evidence: Each time it showed up, oldest first.
         started_at: When it was first kept.
         updated_at: When it last changed.
-        last_offered_at: When the Companion last offered a view from it;
-            None if never.
-        last_reaction: How the User took that view; None if never offered.
         confirmed_at: When the User agreed with it, so it became confirmed;
             None while it is not confirmed.
+        matched_pattern_type_id: The Pattern Type the matching pass found
+            it fits; None when it fits none or wasn't matched yet.
+        general_description: The way of acting in words that could be true
+            of anyone, with nothing about the User, as Admins read it;
+            None when an unmatched Pattern has none yet, and always for a
+            Pattern that isn't unmatched.
+        unmatched_entry_id: The unmatched entry its general description
+            was grouped under; None when it has none yet.
     """
 
     id: UUID
@@ -1171,9 +1260,10 @@ class Pattern:
     evidence: tuple[PatternEvidence, ...]
     started_at: datetime
     updated_at: datetime
-    last_offered_at: datetime | None = None
-    last_reaction: PatternReaction | None = None
     confirmed_at: datetime | None = None
+    matched_pattern_type_id: str | None = None
+    general_description: str | None = None
+    unmatched_entry_id: UUID | None = None
 
     @property
     def thread_ids(self) -> set[UUID]:
@@ -1194,6 +1284,55 @@ class PatternToSave:
 
     pattern: Pattern
     embedding: list[float] | None
+
+
+class UnmatchedMark(StrEnum):
+    """What an Admin decided about an unmatched entry."""
+
+    TO_REVIEW = "to_review"
+    NEW_PATTERN_TYPE = "new_pattern_type"
+    FOLDED = "folded"
+    DROPPED = "dropped"
+
+
+@dataclass(frozen=True)
+class UnmatchedEntry:
+    """Something the Companion keeps noticing that fits no Pattern Type.
+
+    Like general descriptions of unmatched Patterns, from any Users, are
+    grouped under one entry. It holds nothing about a User.
+
+    Attributes:
+        id: Our ID for the entry.
+        description: The general description it was started with.
+        mark: What an Admin decided about it.
+        folded_into_pattern_type_id: The Pattern Type it was folded into;
+            None unless its mark is folded.
+        users_when_marked: How many Users it appeared for when it was
+            marked; None while it was never marked.
+        marked_at: When it was last marked; None while it never was.
+    """
+
+    id: UUID
+    description: str
+    mark: UnmatchedMark
+    folded_into_pattern_type_id: str | None
+    users_when_marked: int | None
+    marked_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class CountedUnmatchedEntry:
+    """An unmatched entry with how many Users it appears for now.
+
+    Attributes:
+        entry: The entry.
+        user_count: How many Users have an unmatched Pattern grouped under
+            it that the matching command linked to no Pattern Type.
+    """
+
+    entry: UnmatchedEntry
+    user_count: int
 
 
 class BringUpWay(StrEnum):
@@ -1259,6 +1398,23 @@ class CuriosityState(StrEnum):
     CLOSED = "closed"
 
 
+class CuriosityAim(StrEnum):
+    """What a Curiosity is trying to learn. One with no aim is never made."""
+
+    COMMITMENT = "commitment"
+    LOOK_BACK = "look_back"
+    GUESS = "guess"
+    NEXT_MOVE = "next_move"
+    EXPLORATION = "exploration"
+    STARTER = "starter"
+    PREDICTION = "prediction"
+
+
+AIMS_WRITTEN_BY_CODE = frozenset(
+    {CuriosityAim.EXPLORATION, CuriosityAim.STARTER, CuriosityAim.PREDICTION}
+)
+
+
 @dataclass(frozen=True)
 class Curiosity:
     """Something the Companion wants to ask a User later. Internal: never shown.
@@ -1273,6 +1429,11 @@ class Curiosity:
         sensitivity: How sensitive it is.
         state: Waiting, raised or closed (no longer relevant).
         created_at: When it was made.
+        aim: What it is trying to learn: how a commitment went, how
+            something looks to them now, whether a guess is right, or where
+            they've got to on a next Move never made, an Exploration's
+            need, how a new User would choose in a starter Thought
+            Experiment, or how a shared Pattern's Prediction went.
         source_memory_item_id: The Memory Item it came from, if any; deleting
             that item deletes it.
         source_life_thread_id: The Life Thread it came from, if any; deleting
@@ -1285,6 +1446,19 @@ class Curiosity:
         guess: What the Companion suspects but isn't sure of, e.g. "their
             mum lives in Singapore"; None for a plain Curiosity.
         how_sure: How sure it is of the guess; None without one.
+        exploration_id: The Exploration it is a try for, when code wrote it
+            for the Agenda; deleting that Exploration deletes it.
+        source_observation_id: The Observation it aims at, if any; deleting
+            that Observation deletes it.
+        thought_experiment_id: The starter Thought Experiment it puts to a
+            new User, when code wrote it for that; None otherwise (an
+            Exploration's try names its own).
+        not_after: The last day, in the User's time zone, it may be asked;
+            None for no last day.
+        pattern_id: The shared Pattern it is about, when code wrote it for
+            a Prediction; deleting that Pattern deletes it.
+        prediction_id: The Prediction it asks about; None when it tells
+            the reply to give the Pattern a new Prediction.
     """
 
     id: UUID
@@ -1295,6 +1469,7 @@ class Curiosity:
     sensitivity: CuriositySensitivity
     state: CuriosityState
     created_at: datetime
+    aim: CuriosityAim
     source_memory_item_id: UUID | None = None
     source_life_thread_id: UUID | None = None
     raised_at: datetime | None = None
@@ -1302,6 +1477,12 @@ class Curiosity:
     reaction: ThreadReaction | None = None
     guess: str | None = None
     how_sure: HowSure | None = None
+    exploration_id: UUID | None = None
+    source_observation_id: UUID | None = None
+    thought_experiment_id: UUID | None = None
+    not_after: date | None = None
+    pattern_id: UUID | None = None
+    prediction_id: UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -1560,6 +1741,20 @@ class ReplyPlanForm:
         pattern_offered: The Pattern the reply offers as Zeph's view, with
             the Read; None for none, and always None when the Read isn't
             said.
+        pattern_to_share: The ready Pattern the reply shares with the User;
+            None for none, and always None unless code offered it.
+        pattern_raised: The Pattern the User disagreed with and has now
+            raised themselves, which the reply may talk about; None for
+            none.
+        pattern_named: The Pattern the Companion told them before (being
+            tested or confirmed) that the reply links today's story to;
+            None for none.
+        asked_for_patterns: Whether their latest message asks what
+            patterns the Companion sees in them.
+        curiosity_not_asked_why: Why no Curiosity is asked, when the Need
+            asks them by default and one was offered; "" otherwise.
+        curiosity_taken: How the User took the Curiosity Zeph asked in its
+            last reply; None when it asked none, or it can't be told.
     """
 
     need: str
@@ -1584,6 +1779,12 @@ class ReplyPlanForm:
     check_in: ChosenCheckIn | None = None
     patterns_used: tuple[PatternPicked, ...] = ()
     pattern_offered: PatternPicked | None = None
+    pattern_to_share: PatternPicked | None = None
+    pattern_raised: PatternPicked | None = None
+    pattern_named: PatternPicked | None = None
+    asked_for_patterns: bool = False
+    curiosity_not_asked_why: str = ""
+    curiosity_taken: ThreadReaction | None = None
 
 
 @dataclass(frozen=True)
@@ -2050,6 +2251,9 @@ class CheckInKind:
             change it.
         raises_curiosity: Whether its message asks one of the User's
             Curiosities. Fixed when the Kind is made; Admins can't change it.
+        shares_pattern: Whether its message shares a ready Pattern that
+            waited too long for a moment in chat. Fixed when the Kind is
+            made; Admins can't change it.
     """
 
     id: UUID
@@ -2058,6 +2262,17 @@ class CheckInKind:
     sort_order: int
     sends_shared_photo: bool = False
     raises_curiosity: bool = False
+    shares_pattern: bool = False
+
+    @property
+    def has_fixed_behaviour(self) -> bool:
+        """Say whether code decides when this Kind may be sent.
+
+        Returns:
+            True when it sends a Shared Photo, asks a Curiosity or shares a
+            Pattern.
+        """
+        return self.sends_shared_photo or self.raises_curiosity or self.shares_pattern
 
 
 @dataclass(frozen=True)
@@ -2189,6 +2404,9 @@ class Feature(StrEnum):
     PHOTO_VIEWING = "photo_viewing"
     PERSONAL_STICKERS = "personal_stickers"
     CURIOSITIES = "curiosities"
+    PATTERN_NOTICING = "pattern_noticing"
+    PATTERN_EXPLORING = "pattern_exploring"
+    PATTERN_SHARING = "pattern_sharing"
 
 
 @dataclass(frozen=True)
@@ -2229,6 +2447,8 @@ class FeatureReason(StrEnum):
     OFF_FOR_USER = "off_for_user"
     TURNED_OFF_BY_USER = "turned_off_by_user"
     STICKERS_OFF = "stickers_off"
+    PATTERN_NOTICING_OFF = "pattern_noticing_off"
+    PATTERN_EXPLORING_OFF = "pattern_exploring_off"
 
 
 @dataclass(frozen=True)
@@ -2307,6 +2527,7 @@ class TraceKind(StrEnum):
     CHECK_IN = "check_in"
     CONVERSATION_END = "conversation_end"
     PORTRAIT_REWRITE = "portrait_rewrite"
+    PATTERN_MATCHING = "pattern_matching"
 
 
 class ModelStep(StrEnum):
@@ -2322,6 +2543,13 @@ class ModelStep(StrEnum):
     LIFE_THREADS = "life_threads"
     CURIOSITIES = "curiosities"
     MOVE_OUTCOMES = "move_outcomes"
+    PATTERN_TAGGING = "pattern_tagging"
+    PATTERN_MATCHING = "pattern_matching"
+    PATTERN_OTHER_SIDE = "pattern_other_side"
+    PATTERN_SHARED_CHECK = "pattern_shared_check"
+    PREDICTION_GIVEN_CHECK = "prediction_given_check"
+    CURIOSITY_ASKED_CHECK = "curiosity_asked_check"
+    SETTINGS_CLAIM_CHECK = "settings_claim_check"
     PATTERNS = "patterns"
     PORTRAIT = "portrait"
     PERSONAL_STICKERS = "personal_stickers"
@@ -2425,6 +2653,19 @@ class ReplyPlanShape:
             None for none.
         pattern_used: Whether its Read was built on a Pattern in mind.
         pattern_offered: Whether the reply was to offer a Pattern.
+        curiosities_offered: How many Curiosities it could ask; 0 when the
+            Need it picked never asks one. None on a shape saved before
+            this was recorded.
+        curiosity_asked: Whether the reply was to ask a Curiosity and, once
+            it is sent, whether the asked check found it did; None on
+            a shape saved before this was recorded.
+        pattern_to_share_offered: Whether code offered it a ready Pattern
+            to share; None on a shape saved before this was recorded.
+        pattern_share_planned: Whether the reply was to share that Pattern;
+            None on a shape saved before this was recorded.
+        pattern_shared: Whether the check after the reply found the Pattern
+            was shared; None when the reply wasn't to share one, or the
+            check hasn't run.
     """
 
     need: str
@@ -2442,6 +2683,11 @@ class ReplyPlanShape:
     check_in_kind: str | None = None
     pattern_used: bool = False
     pattern_offered: bool = False
+    curiosities_offered: int | None = None
+    curiosity_asked: bool | None = None
+    pattern_to_share_offered: bool | None = None
+    pattern_share_planned: bool | None = None
+    pattern_shared: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -2458,6 +2704,19 @@ class CheckInShape:
 
 
 @dataclass(frozen=True)
+class TaggingShape:
+    """The shape of a Pattern tagging call: counts only, never any words.
+
+    Attributes:
+        tagged: How many Observations the model wrote.
+        dropped: How many of them code dropped.
+    """
+
+    tagged: int
+    dropped: int
+
+
+@dataclass(frozen=True)
 class ModelCall:
     """One model call in the Model Call Log.
 
@@ -2466,7 +2725,7 @@ class ModelCall:
         trace: The trace it belongs to.
         user_id: The User it was for.
         step: Which step it was for.
-        model: The model asked, e.g. "deepseek-flash".
+        model: The model asked, e.g. "deepseek/deepseek-v4.1-flash-1017".
         thinking: Whether the model was asked to think before it answers.
         started_at: When the call started.
         duration_ms: How long it took, in milliseconds.
@@ -2483,6 +2742,9 @@ class ModelCall:
             Woven-in Check-in, kept for every User; None for other calls.
         reply_plan_shape: The shape of the Reply Plan it made, kept for
             every User; None for other steps.
+        tagging_shape: How many Observations a Pattern tagging call wrote
+            and how many were dropped, kept for every User; None for other
+            steps.
     """
 
     id: UUID
@@ -2501,6 +2763,7 @@ class ModelCall:
     understanding_shape: UnderstandingShape | None
     check_in_shape: CheckInShape | None = None
     reply_plan_shape: ReplyPlanShape | None = None
+    tagging_shape: TaggingShape | None = None
 
 
 @dataclass(frozen=True)
@@ -2672,3 +2935,916 @@ class CopyTab:
     tab: str
     name: str
     slots: list[CopySlot]
+
+
+class PatternArea(StrEnum):
+    """The part of life a Pattern Type is about."""
+
+    CONFLICT = "conflict"
+    APPROVAL = "approval"
+    CONTROL = "control"
+    ACHIEVEMENT = "achievement"
+    RELATIONSHIPS = "relationships"
+
+
+class SignStrength(StrEnum):
+    """How much one sign of a Pattern Type counts."""
+
+    WEAK = "weak"
+    MODERATE = "moderate"
+    STRONG = "strong"
+
+
+class SignPart(StrEnum):
+    """The part of a Pattern a sign shows.
+
+    The situation that sets it off, what goes on inside the person (how they
+    read it, what they believe and feel), or the behaviour that follows.
+    """
+
+    SITUATION = "situation"
+    INSIDE = "inside"
+    BEHAVIOUR = "behaviour"
+
+
+class ExcludedEvidence(StrEnum):
+    """What happens to evidence gathered while an exclusion applies."""
+
+    IGNORED = "ignored"
+    COUNTED_NOT_SHARED = "counted_not_shared"
+
+
+class PatternTypeStatus(StrEnum):
+    """Where a Pattern Type stands in review; only approved ones are shared."""
+
+    DRAFT = "draft"
+    APPROVED = "approved"
+    ARCHIVED = "archived"
+
+
+@dataclass(frozen=True)
+class PatternSign:
+    """One sign for or against a Pattern Type.
+
+    Attributes:
+        id: Its key within the Pattern Type, e.g. `I1`.
+        text: What the User says or does.
+        strength: How much it counts.
+        part: The part of the Pattern it shows.
+    """
+
+    id: str
+    text: str
+    strength: SignStrength
+    part: SignPart
+
+
+@dataclass(frozen=True)
+class LookAlike:
+    """Something a Pattern Type can be mistaken for.
+
+    Attributes:
+        pattern_type_id: The other Pattern Type's ID; None when the look-alike
+            is not a Pattern Type.
+        name: What it is called. A Pattern Type's file gives it only when the
+            look-alike is not a Pattern Type; the catalog Admins read fills in
+            the other Pattern Type's name.
+        tells_apart: What tells the two apart.
+    """
+
+    pattern_type_id: str | None
+    name: str | None
+    tells_apart: str
+
+
+@dataclass(frozen=True)
+class PatternExclusion:
+    """A time in a User's life when a Pattern Type must not be shared.
+
+    Attributes:
+        text: What is going on, e.g. "Grief".
+        evidence: Whether evidence from then is ignored, or counted but not
+            shared.
+    """
+
+    text: str
+    evidence: ExcludedEvidence
+
+
+@dataclass(frozen=True)
+class PatternTypeNumbers:
+    """A Pattern Type's own numbers.
+
+    Attributes:
+        situations_needed: How many situations it must be seen in.
+        base_rate: The share of adults thought to show it clearly, from 0 to 1.
+    """
+
+    situations_needed: int
+    base_rate: float
+
+
+class Relationship(StrEnum):
+    """Who the other person in an Observation is to the User."""
+
+    PARTNER = "partner"
+    FAMILY = "family"
+    FRIEND = "friend"
+    ACQUAINTANCE = "acquaintance"
+    COLLEAGUE = "colleague"
+    STRANGER = "stranger"
+
+
+class Power(StrEnum):
+    """Where the other person in an Observation stands next to the User."""
+
+    ABOVE = "above"
+    EQUAL = "equal"
+    BELOW = "below"
+
+
+class SituationSetting(StrEnum):
+    """Where what an Observation is about happened."""
+
+    HOME = "home"
+    WORK = "work"
+    SOCIAL = "social"
+    ONLINE = "online"
+
+
+class Stance(StrEnum):
+    """How the other person in an Observation was towards the User."""
+
+    SUPPORTIVE = "supportive"
+    NEUTRAL = "neutral"
+    HOSTILE = "hostile"
+
+
+class Audience(StrEnum):
+    """Who else was there in what an Observation is about."""
+
+    ONE_TO_ONE = "one-to-one"
+    GROUP = "group"
+    IN_FRONT_OF_OTHERS = "in front of others"
+
+
+class Stakes(StrEnum):
+    """Whether something that matters to the User could be lost."""
+
+    LOW = "low"
+    HIGH = "high"
+
+
+class StateGoingIn(StrEnum):
+    """How the User was before what an Observation is about happened."""
+
+    WORN_OUT = "worn out"
+    UNDER_PRESSURE = "under pressure"
+    LOW = "low"
+    STEADY = "steady"
+
+
+class Condition(StrEnum):
+    """The Conditions an Observation can hold, named as on `SituationTags`."""
+
+    RELATIONSHIP = "relationship"
+    POWER = "power"
+    STANCE = "stance"
+    SETTING = "setting"
+    AUDIENCE = "audience"
+    STAKES = "stakes"
+    STATE_GOING_IN = "state_going_in"
+
+
+@dataclass(frozen=True)
+class SituationTags:
+    """The Conditions an Observation happened under, as tags from the fixed lists.
+
+    Attributes:
+        relationship: Who the other person is to the User; None if there is
+            no one else or it isn't clear.
+        power: Where they stand next to the User; None if it isn't clear.
+        setting: Where it happened; None if it isn't clear.
+        stance: How they were towards the User; None if it isn't clear.
+        audience: Who else was there; None if the User's story doesn't say.
+        stakes: Whether something that matters to the User could be lost;
+            None if their story doesn't say.
+        state_going_in: How the User was before it happened, in their own
+            words; None if their story doesn't say, and always None from a
+            Conversation with a Safeguard Event.
+    """
+
+    relationship: Relationship | None
+    power: Power | None
+    setting: SituationSetting | None
+    stance: Stance | None
+    audience: Audience | None = None
+    stakes: Stakes | None = None
+    state_going_in: StateGoingIn | None = None
+
+
+@dataclass(frozen=True)
+class SituationMatch:
+    """One situation where anyone would act the same, as tags.
+
+    A tag left empty matches any value. An Observation fits when, for every
+    tag given, its own value is one of those listed; an Observation without
+    a value for a tag given never fits.
+
+    Attributes:
+        relationships: The relationships it covers.
+        powers: The power positions it covers.
+        settings: The settings it covers.
+        stances: The stances it covers.
+        audiences: The audiences it covers.
+        stakes: The stakes it covers.
+        states: The states going in it covers.
+    """
+
+    relationships: tuple[Relationship, ...] = ()
+    powers: tuple[Power, ...] = ()
+    settings: tuple[SituationSetting, ...] = ()
+    stances: tuple[Stance, ...] = ()
+    audiences: tuple[Audience, ...] = ()
+    stakes: tuple[Stakes, ...] = ()
+    states: tuple[StateGoingIn, ...] = ()
+
+
+@dataclass(frozen=True)
+class PatternType:
+    """One entry of the Pattern Catalog, at one version (ADR-0025).
+
+    Attributes:
+        id: Its stable ID, e.g. `CONF.AVOID.BELONG`. Never reused.
+        version: Its version, e.g. `1.0.0`; any change gives it a new one.
+        area: The part of life it is about.
+        name: Its internal name.
+        definition: What it is, in a few sentences.
+        if_situation: The situation that sets it off.
+        then_behaviour: What the person does then.
+        function: What that protects or gets them.
+        frameworks: The published ideas it draws on.
+        signs: What counts for it.
+        signs_against: What counts against it.
+        look_alikes: What it can be mistaken for.
+        anyone_would: What anyone would do in the situation, which is no
+            evidence of it.
+        anyone_would_when: The same as situation tags, so code can tell
+            when an Observation is situational.
+        exclusions: When it must not be shared.
+        approved_wording: How Zeph may word it to a User.
+        prediction_wordings: How Zeph words its Predictions, each testing
+            a different side of the Pattern, with `{name}` placeholders;
+            at least one.
+        numbers: Its own numbers.
+        status: Where it stands in review.
+        approved_by: Who approved it; None unless approved.
+        approved_on: The day it was approved; None unless approved.
+    """
+
+    id: str
+    version: str
+    area: PatternArea
+    name: str
+    definition: str
+    if_situation: str
+    then_behaviour: str
+    function: str
+    frameworks: tuple[str, ...]
+    signs: tuple[PatternSign, ...]
+    signs_against: tuple[PatternSign, ...]
+    look_alikes: tuple[LookAlike, ...]
+    anyone_would: str
+    exclusions: tuple[PatternExclusion, ...]
+    approved_wording: str
+    prediction_wordings: tuple[str, ...]
+    numbers: PatternTypeNumbers
+    status: PatternTypeStatus
+    approved_by: str | None
+    approved_on: date | None
+    anyone_would_when: tuple[SituationMatch, ...] = ()
+
+
+@dataclass(frozen=True)
+class PatternTypeFile:
+    """One Pattern Type as its YAML file holds it, before it is checked.
+
+    Attributes:
+        name: The file's name, used to say where a problem is.
+        content: What the file holds, as plain JSON values.
+    """
+
+    name: str
+    content: Any
+
+
+@dataclass(frozen=True)
+class PatternTypeVersion:
+    """One stored version of a Pattern Type. It never changes once stored.
+
+    Attributes:
+        pattern_type_id: The Pattern Type's ID.
+        version: The version.
+        content: The Pattern Type as its file held it at this version.
+        is_current: Whether this is the version in the catalog now.
+        loaded_at: When this version was first loaded.
+    """
+
+    pattern_type_id: str
+    version: str
+    content: Any
+    is_current: bool
+    loaded_at: datetime
+
+
+@dataclass(frozen=True)
+class CatalogPatternType:
+    """A Pattern Type in the catalog now, with its history.
+
+    Attributes:
+        pattern_type: The Pattern Type at its current version.
+        loaded_at: When that version was first loaded.
+        other_versions: Its other stored versions, newest first.
+    """
+
+    pattern_type: PatternType
+    loaded_at: datetime
+    other_versions: tuple[str, ...]
+
+
+class ObservationDirection(StrEnum):
+    """Whether an Observation counts for its Pattern Type or against it."""
+
+    FOR = "for"
+    AGAINST = "against"
+
+
+class EvidenceKind(StrEnum):
+    """What kind of evidence an Observation is, strongest first."""
+
+    REAL_STORY = "real_story"
+    REPORTED_HABIT = "reported_habit"
+    WHAT_IF_ANSWER = "what_if_answer"
+    OWN_OPINION = "own_opinion"
+
+
+@dataclass(frozen=True)
+class Observation:
+    """One quoted piece of evidence for or against a Pattern Type.
+
+    It is User Memory, and it outlives Message Retention (ADR-0027): it
+    keeps the quote itself, not a link to the message.
+
+    Attributes:
+        id: The Observation's ID.
+        user_id: The User it is about.
+        conversation_id: The Conversation it was tagged from.
+        pattern_type_id: The Pattern Type it matched.
+        pattern_type_version: That Pattern Type's version when it was tagged.
+        sign_id: The sign it matched, e.g. `I2`.
+        direction: Whether it counts for the Pattern Type or against it.
+        quote: The User's own words, word for word.
+        context: What was going on, in the Companion's words.
+        day: The day the User said it, in their time zone.
+        thread_id: The Life Thread it belongs to; None if none.
+        about: Who it is about, e.g. "their mum".
+        tags: The situation, as tags.
+        evidence_kind: What kind of evidence it is.
+        second_pattern_type_id: The look-alike it couldn't be told apart
+            from, which makes it unclear; None when it is clear.
+        second_pattern_type_version: That Pattern Type's version; None when
+            it is clear.
+        situational: Whether anyone would act the same in its situation.
+        tagged_at: When it was tagged.
+        excluded: Whether it was said while an exclusion of one of its
+            Pattern Types applied whose evidence is ignored; it then
+            carries no weight.
+        ruled_out_topic: The ruled-out topic it touches, as the Admin-set
+            list named it then; None if none.
+        raised_by_user: Whether the User brought that topic up themselves.
+    """
+
+    id: UUID
+    user_id: UUID
+    conversation_id: UUID
+    pattern_type_id: str
+    pattern_type_version: str
+    sign_id: str
+    direction: ObservationDirection
+    quote: str
+    context: str
+    day: date
+    thread_id: UUID | None
+    about: str
+    tags: SituationTags
+    evidence_kind: EvidenceKind
+    second_pattern_type_id: str | None
+    second_pattern_type_version: str | None
+    situational: bool
+    tagged_at: datetime
+    excluded: bool = False
+    ruled_out_topic: str | None = None
+    raised_by_user: bool = False
+
+    @property
+    def unclear(self) -> bool:
+        """Say whether it names two Pattern Types it couldn't tell apart.
+
+        Returns:
+            True when it has a second Pattern Type.
+        """
+        return self.second_pattern_type_id is not None
+
+
+class ReadyCheck(StrEnum):
+    """One of the ten checks a Pattern must pass to be ready, in order."""
+
+    SITUATIONS = "situations"
+    CONVERSATIONS = "conversations"
+    CLEAR = "clear"
+    SCORE = "score"
+    COUNTER_TEST = "counter_test"
+    SITUATIONAL = "situational"
+    QUOTES = "quotes"
+    OTHER_SIDE = "other_side"
+    SAFE = "safe"
+    ALLOWED = "allowed"
+
+
+@dataclass(frozen=True)
+class PatternNarrowing:
+    """Where a Pattern holds and where a counter-test showed it doesn't.
+
+    E.g. "in a group, not one-to-one". It holds no words of the User's.
+
+    Attributes:
+        tag: The Condition that tells the two apart.
+        holds_with: That Condition's values where the Pattern showed.
+        not_with: That Condition's values where it was shown not to happen.
+    """
+
+    tag: Condition
+    holds_with: tuple[str, ...]
+    not_with: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class CatalogPattern:
+    """A User's Pattern of one Pattern Type, fed by their Observations.
+
+    Its Observations are the User's Observations naming its Pattern Type,
+    first or second. Its score is worked out from them when it is read and
+    never stored; only its state is.
+
+    Attributes:
+        id: Our ID for the Pattern.
+        user_id: The User it is about.
+        pattern_type_id: Its Pattern Type's ID.
+        state: Where it stands.
+        started_at: When it was first noticed.
+        updated_at: When it last moved.
+        blocked_by: The ready check that last stopped it being ready; None
+            if the ready gate never looked at it or nothing stops it.
+        narrowings: Where counter-tests showed it doesn't happen.
+        other_side_asked_at: When a model last argued the other side and
+            gave a readable answer; None if never.
+        other_side_found_better: Whether it then found a better
+            explanation; None if never asked.
+        shared_at: When the Companion first told the User about it; None
+            if it never did.
+        shared_wording: The approved wording it was told in; None if it
+            was never told, or was told before the wording was kept.
+    """
+
+    id: UUID
+    user_id: UUID
+    pattern_type_id: str
+    state: PatternState
+    started_at: datetime
+    updated_at: datetime
+    blocked_by: ReadyCheck | None = None
+    narrowings: tuple[PatternNarrowing, ...] = ()
+    other_side_asked_at: datetime | None = None
+    other_side_found_better: bool | None = None
+    shared_at: datetime | None = None
+    shared_wording: str | None = None
+
+
+class ShareVia(StrEnum):
+    """How a Pattern was shared with a User."""
+
+    CHAT = "chat"
+    CHECK_IN = "check_in"
+
+
+class PredictionOutcome(StrEnum):
+    """How a Prediction went, as the User reported it or code closed it.
+
+    Came true counts as a strong sign for its Pattern and didn't as a
+    strong sign against it. Hasn't come up counts nothing and leaves the
+    Prediction open. Not followed up is set by code when no answer came in
+    time, and counts nothing.
+    """
+
+    CAME_TRUE = "came_true"
+    DID_NOT = "did_not"
+    NOT_COME_UP = "not_come_up"
+    NOT_FOLLOWED_UP = "not_followed_up"
+
+
+OUTCOMES_READ_BY_THE_MODEL = frozenset(
+    {
+        PredictionOutcome.CAME_TRUE,
+        PredictionOutcome.DID_NOT,
+        PredictionOutcome.NOT_COME_UP,
+    }
+)
+
+
+@dataclass(frozen=True)
+class Prediction:
+    """The one thing a User is asked to watch for in a Pattern they were told.
+
+    Attributes:
+        id: Our ID for the Prediction.
+        user_id: The User it was given to.
+        pattern_id: The Pattern it tests.
+        wording: The Prediction, as the Companion put it to them.
+        made_at: When it was given.
+        outcome: How it went; None until the User says or code closes it.
+        outcome_at: When the outcome was read or set; None without one.
+        outcome_conversation_id: The Conversation the User said how it
+            went in; None when code set the outcome or there is none.
+        wording_number: Which of its Pattern Type's Prediction wordings it
+            was given from, counted from 1; None for one given before
+            they were numbered.
+    """
+
+    id: UUID
+    user_id: UUID
+    pattern_id: UUID
+    wording: str
+    made_at: datetime
+    outcome: PredictionOutcome | None = None
+    outcome_at: datetime | None = None
+    outcome_conversation_id: UUID | None = None
+    wording_number: int | None = None
+
+    @property
+    def is_open(self) -> bool:
+        """Whether it still waits for how it went.
+
+        Returns:
+            True with no outcome, or when it hasn't come up yet.
+        """
+        return self.outcome in {None, PredictionOutcome.NOT_COME_UP}
+
+
+class PatternReaction(StrEnum):
+    """How a User took a Pattern the Companion told them."""
+
+    AGREED = "agreed"
+    PUSHED_BACK = "pushed_back"
+    BRUSHED_OFF = "brushed_off"
+
+
+@dataclass(frozen=True)
+class ReactionToPattern:
+    """How a User took a Pattern in one Conversation, as the model read it.
+
+    It holds no words of the User's. Agreeing counts as a weak sign for the
+    Pattern and pushing back as a weak sign against it.
+
+    Attributes:
+        id: Our ID for the reaction.
+        user_id: The User who reacted.
+        pattern_id: The Pattern they reacted to.
+        reaction: How they took it.
+        conversation_id: The Conversation it was read from; None once that
+            Conversation is gone.
+        reacted_at: When it was read.
+    """
+
+    id: UUID
+    user_id: UUID
+    pattern_id: UUID
+    reaction: PatternReaction
+    conversation_id: UUID | None
+    reacted_at: datetime
+
+
+@dataclass(frozen=True)
+class ExclusionFlag:
+    """An exclusion of a Pattern Type that applies to a User now.
+
+    The tagging step flags it from their open Life Threads and recent Day
+    Summaries; each tagging replaces the User's flags.
+
+    Attributes:
+        user_id: The User.
+        pattern_type_id: The Pattern Type.
+        exclusion: The exclusion, as the Pattern Catalog words it.
+        evidence: Whether evidence from now is ignored, or counted but not
+            shared.
+        flagged_at: When it was flagged.
+    """
+
+    user_id: UUID
+    pattern_type_id: str
+    exclusion: str
+    evidence: ExcludedEvidence
+    flagged_at: datetime
+
+
+@dataclass(frozen=True)
+class DeletedQuote:
+    """A record that a User deleted a quote kept as evidence, so it is never kept again.
+
+    It holds none of their words: only which Conversation the quote was
+    from, a hash of the text it was in and where in that text it sat, so
+    a longer or shorter quote of the same words is known too.
+
+    Attributes:
+        user_id: The User.
+        conversation_id: The Conversation the quote was said in.
+        text_hash: A hash of the User's text the quote was in, evened out.
+        span_start: Where the quote starts in that text, evened out.
+        span_end: Where it ends.
+        deleted_at: When they deleted it.
+    """
+
+    user_id: UUID
+    conversation_id: UUID
+    text_hash: str
+    span_start: int
+    span_end: int
+    deleted_at: datetime
+
+
+class PatternMoveCause(StrEnum):
+    """What made code look at a User's Patterns again, so one moved."""
+
+    CONVERSATION_TAGGED = "conversation_tagged"
+    OBSERVATIONS_DELETED = "observations_deleted"
+    EVIDENCE_TAGGED_AGAIN = "evidence_tagged_again"
+    LOOKED_BEFORE_SHARING = "looked_before_sharing"
+    SHARED_IN_CHAT = "shared_in_chat"
+    SHARED_IN_CHECK_IN = "shared_in_check_in"
+    USER_REACTED = "user_reacted"
+
+
+class PatternMoveReason(StrEnum):
+    """Why a Pattern the User was told was confirmed or closed."""
+
+    PREDICTIONS_CAME_TRUE = "predictions_came_true"
+    STRONG_EVIDENCE_AFTER_SHARING = "strong_evidence_after_sharing"
+    SCORE_UNDER_FLOOR = "score_under_floor"
+    PREDICTIONS_DID_NOT = "predictions_did_not"
+
+
+@dataclass(frozen=True)
+class PatternMove:
+    """One move of a Pattern between states, as its append-only log keeps it.
+
+    It holds no words of the User's, and stays when its Pattern is deleted.
+
+    Attributes:
+        id: The move's ID.
+        user_id: The User whose Pattern moved.
+        pattern_id: The Pattern that moved.
+        pattern_type_id: Its Pattern Type's ID.
+        from_state: The state it left; None when it was first noticed.
+        to_state: The state it moved to.
+        cause: What made code score it again.
+        conversation_id: The Conversation tagged, when that was the cause.
+        points: Its score at the move.
+        situations: The situations it was seen in at the move.
+        moved_at: When it moved.
+        blocked_by: For a move to ready, the ready check that last stopped
+            it before; for a move back from ready, the check it now fails;
+            None for any other move.
+        reason: Why a shared Pattern was confirmed or closed; None for any
+            other move.
+    """
+
+    id: UUID
+    user_id: UUID
+    pattern_id: UUID
+    pattern_type_id: str
+    from_state: PatternState | None
+    to_state: PatternState
+    cause: PatternMoveCause
+    conversation_id: UUID | None
+    points: float
+    situations: int
+    moved_at: datetime
+    blocked_by: ReadyCheck | None = None
+    reason: PatternMoveReason | None = None
+
+
+class ExplorationState(StrEnum):
+    """Where an Exploration stands on its User's Agenda."""
+
+    ACTIVE = "active"
+    WAITING = "waiting"
+    RESTING = "resting"
+
+
+@dataclass(frozen=True)
+class Exploration:
+    """Zeph's ongoing effort on one suspected Pattern. Internal: never shown.
+
+    Attributes:
+        id: Our ID for it.
+        user_id: The User it is about.
+        pattern_id: The Pattern it explores; deleting that Pattern deletes it.
+        pattern_type_id: That Pattern's Pattern Type's ID.
+        state: Active (on the Agenda), waiting for a place, or resting.
+        created_at: When it was made.
+        updated_at: When its state last changed.
+        rested_at: When it last started resting; None if it never did.
+        woke_at: When it last woke from resting; None if it never did.
+    """
+
+    id: UUID
+    user_id: UUID
+    pattern_id: UUID
+    pattern_type_id: str
+    state: ExplorationState
+    created_at: datetime
+    updated_at: datetime
+    rested_at: datetime | None = None
+    woke_at: datetime | None = None
+
+
+class ExplorationNeed(StrEnum):
+    """What an Exploration still needs to learn, in the order it is worked on."""
+
+    UNCLEAR = "unclear"
+    COUNTER_TEST = "counter_test"
+    MISSING_CONDITION = "missing_condition"
+
+
+class ExplorationApproach(StrEnum):
+    """An Approach: how an aimed Curiosity asks.
+
+    Listed least pushy first; the order they are tried in follows the
+    User's directness.
+    """
+
+    STORY_FOLLOW_UP = "story_follow_up"
+    WOULD_IT_DIFFER = "would_it_differ"
+    THOUGHT_EXPERIMENT = "thought_experiment"
+    NOTICE_THIS_WEEK = "notice_this_week"
+
+
+class TryOutcome(StrEnum):
+    """How a try came back, as code judges it from the User's reaction."""
+
+    USEFUL = "useful"
+    VAGUE = "vague"
+    BRUSHED_OFF = "brushed_off"
+
+
+@dataclass(frozen=True)
+class ExplorationTry:
+    """One try at an Exploration's need: an aimed Curiosity and how it went.
+
+    Attributes:
+        curiosity_id: The aimed Curiosity; deleting it deletes the try.
+        exploration_id: The Exploration it is for.
+        user_id: The User it is about.
+        need: The need it aims at.
+        approach: Its Approach: how it asks.
+        created_at: When code wrote it.
+        observation_id: The Observation it aims at, for an unclear story, or
+            the story a counter-test or a missing Condition starts from;
+            None otherwise.
+        condition: The Condition it aims at, for a missing one; None
+            otherwise.
+        condition_value: The value of that Condition it is to learn about,
+            from the Condition's list; None otherwise.
+        outcome: How it came back; None until the Conversation it was asked
+            in ends. When and where it was asked are its Curiosity's.
+        thought_experiment_id: The Thought Experiment it puts to the User,
+            for that Approach; None otherwise.
+    """
+
+    curiosity_id: UUID
+    exploration_id: UUID
+    user_id: UUID
+    need: ExplorationNeed
+    approach: ExplorationApproach
+    created_at: datetime
+    observation_id: UUID | None = None
+    condition: Condition | None = None
+    condition_value: str | None = None
+    outcome: TryOutcome | None = None
+    thought_experiment_id: UUID | None = None
+
+
+@dataclass(frozen=True)
+class ThoughtExperimentDetails:
+    """What an Admin sets on a Thought Experiment.
+
+    Attributes:
+        wording: The made-up situation and its question, as the User hears it.
+        pattern_type_id: One of the two look-alike Pattern Types it tells
+            apart.
+        other_pattern_type_id: The other one.
+        sensitivity: How sensitive it is, as its Curiosity's.
+        starter: Whether it may be offered to a new User.
+        on: Whether Zeph may ask it.
+    """
+
+    wording: str
+    pattern_type_id: str
+    other_pattern_type_id: str
+    sensitivity: CuriositySensitivity
+    starter: bool
+    on: bool
+
+
+@dataclass(frozen=True)
+class ThoughtExperiment:
+    """A made-up situation written to tell two look-alike Pattern Types apart.
+
+    Managed by Admins and never deleted: an archived one is never asked
+    again, and the tries that asked it still name it.
+
+    Attributes:
+        id: Our ID for it.
+        details: What an Admin set.
+        created_at: When it was added.
+        updated_at: When it was last changed.
+        archived_at: When it was archived; None while it isn't.
+        seed_key: The key of the seed entry it came from; None for one an
+            Admin added.
+    """
+
+    id: UUID
+    details: ThoughtExperimentDetails
+    created_at: datetime
+    updated_at: datetime
+    archived_at: datetime | None = None
+    seed_key: str | None = None
+
+    @property
+    def askable(self) -> bool:
+        """Say whether Zeph may ask it now.
+
+        Returns:
+            True when it is on and not archived.
+        """
+        return self.details.on and self.archived_at is None
+
+    @property
+    def pair(self) -> frozenset[str]:
+        """Name the two Pattern Types it tells apart, in no order.
+
+        Returns:
+            Their IDs.
+        """
+        return frozenset(
+            (self.details.pattern_type_id, self.details.other_pattern_type_id)
+        )
+
+
+@dataclass(frozen=True)
+class AgendaChanges:
+    """What keeping a User's Agenda at a Conversation's end changes.
+
+    Attributes:
+        added: New Explorations, in their state.
+        changed: Explorations whose state changed.
+        judged: Tries with the outcome just worked out.
+        closed_curiosity_ids: Waiting aimed Curiosities no longer wanted.
+        new_curiosities: The aimed Curiosities code wrote.
+        new_tries: Their tries.
+    """
+
+    added: list[Exploration]
+    changed: list[Exploration]
+    judged: list[ExplorationTry]
+    closed_curiosity_ids: list[UUID]
+    new_curiosities: list[Curiosity]
+    new_tries: list[ExplorationTry]
+
+
+INSTRUCTIONS_SEPARATOR = "\n\n"
+
+
+def join_instructions(instructions: str, message_instructions: str) -> str:
+    """Join a model call's fixed instructions and the ones for this one call.
+
+    Args:
+        instructions: The instructions that stay the same from call to call.
+        message_instructions: The instructions made for this one call; "" if none.
+
+    Returns:
+        One text, the fixed instructions first, with a blank line between
+        them. An empty one is left out.
+    """
+    return INSTRUCTIONS_SEPARATOR.join(
+        part for part in (instructions, message_instructions) if part
+    )

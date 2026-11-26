@@ -14,12 +14,42 @@ import { FieldSelect } from "@/components/FieldSelect";
 import { FoldingCard } from "@/components/FoldingCard";
 import { FormEditor } from "@/components/FormEditor";
 import { FormSectionHeading } from "@/components/FormSectionHeading";
+import { HoverNote } from "@/components/HoverNote";
 import { SavedNote } from "@/components/SavedNote";
 import { Switch } from "@/components/Switch";
 import type { AdminSettings, CoreService, ExtraPrompt } from "@/lib/api-client";
 import { saveFailedMessage } from "@/lib/save-failed-message";
 import { lastSavedNote, onOffSetting, textSetting } from "@/lib/settings";
 import { useSaveAdminSettings } from "@/lib/use-admin-settings";
+
+/**
+ * Says how a model locks the thinking switch.
+ *
+ * @param model - The chosen model.
+ * @param modelsThatCannotThink - The models that can't think.
+ * @param modelsThatAlwaysThink - The models that always think.
+ * @returns What thinking is locked to and the note saying why, or null when
+ *   the model can think or not.
+ */
+function lockedThinking(
+  model: string,
+  modelsThatCannotThink: string[],
+  modelsThatAlwaysThink: string[],
+): { thinking: boolean; note: string } | null {
+  if (modelsThatAlwaysThink.includes(model)) {
+    return {
+      thinking: true,
+      note: "This model always thinks, so thinking stays on.",
+    };
+  }
+  if (modelsThatCannotThink.includes(model)) {
+    return {
+      thinking: false,
+      note: "This model can’t think, so thinking stays off.",
+    };
+  }
+  return null;
+}
 
 /**
  * One core service as a folding card of the card list. The folded row shows
@@ -30,32 +60,51 @@ import { useSaveAdminSettings } from "@/lib/use-admin-settings";
  * description) each with its name and hint above it. Grouped extra prompts
  * sit in groups that are folded shut until clicked. One save bar saves them
  * together. The prompt is combined with the Persona when the service runs.
- * When the backend refuses a save, the save bar shows its reason.
+ * When the backend refuses a save, the save bar shows its reason. While the
+ * chosen model can't think, the thinking switch is off and can't be changed,
+ * and a pop-up says why while the mouse is over it.
+ * Choosing such a model switches thinking off, and it stays off until it is
+ * switched on again for a model that can think. A model that always thinks
+ * is the same in reverse: the switch is on and can't be changed, with its
+ * own pop-up, and thinking stays on until it is switched off for another
+ * model.
  *
  * @param props - `service` is the core service, `modelChoices` the models
- *   Admins can pick, `settings` the saved settings, and `isOpen` and
- *   `onToggle` open and fold the card.
+ *   Admins can pick, `modelsThatCannotThink` the ones of those that can't
+ *   think, `modelsThatAlwaysThink` the ones that always think, `settings`
+ *   the saved settings, and `isOpen` and `onToggle` open and fold the card.
  * @returns The card.
  */
 export function CoreServiceCard({
   service,
   modelChoices,
+  modelsThatCannotThink,
+  modelsThatAlwaysThink,
   settings,
   isOpen,
   onToggle,
 }: {
   service: CoreService;
   modelChoices: string[];
+  modelsThatCannotThink: string[];
+  modelsThatAlwaysThink: string[];
   settings: AdminSettings;
   isOpen: boolean;
   onToggle: () => void;
 }) {
   const saveSettings = useSaveAdminSettings();
   const savedModel = textSetting(settings, service.model_key);
-  const savedThinking = onOffSetting(settings, service.thinking_key);
+  const savedThinking =
+    lockedThinking(savedModel, modelsThatCannotThink, modelsThatAlwaysThink)
+      ?.thinking ?? onOffSetting(settings, service.thinking_key);
   const savedPrompt = textSetting(settings, service.prompt_key);
   const [model, setModel] = useState(savedModel);
   const [thinking, setThinking] = useState(savedThinking);
+  const thinkingLock = lockedThinking(
+    model,
+    modelsThatCannotThink,
+    modelsThatAlwaysThink,
+  );
   const [prompt, setPrompt] = useState(savedPrompt);
   const allExtraPrompts = [
     ...service.extra_prompts,
@@ -87,6 +136,7 @@ export function CoreServiceCard({
   const idPrefix = `service-${service.prompt_key}`;
   const modelId = `${idPrefix}-model`;
   const promptHintId = `${idPrefix}-prompt-hint`;
+  const thinkingLockedNoteId = `${idPrefix}-thinking-locked`;
   const settingsGroupId = `${idPrefix}-settings`;
   const promptsGroupId = `${idPrefix}-prompts`;
 
@@ -171,6 +221,13 @@ export function CoreServiceCard({
               }))}
               onChange={(choice) => {
                 setModel(choice);
+                setThinking(
+                  lockedThinking(
+                    choice,
+                    modelsThatCannotThink,
+                    modelsThatAlwaysThink,
+                  )?.thinking ?? thinking,
+                );
                 saveSettings.reset();
               }}
             />
@@ -179,14 +236,21 @@ export function CoreServiceCard({
             title="Thinking"
             caption={settings[service.thinking_key]?.hint}
           >
-            <Switch
-              label={`Thinking for ${service.name}`}
-              checked={thinking}
-              onChange={(isOn) => {
-                setThinking(isOn);
-                saveSettings.reset();
-              }}
-            />
+            <HoverNote
+              noteId={thinkingLockedNoteId}
+              note={thinkingLock?.note ?? null}
+            >
+              <Switch
+                label={`Thinking for ${service.name}`}
+                checked={thinking}
+                disabled={thinkingLock !== null}
+                describedById={thinkingLock ? thinkingLockedNoteId : undefined}
+                onChange={(isOn) => {
+                  setThinking(isOn);
+                  saveSettings.reset();
+                }}
+              />
+            </HoverNote>
           </FieldRow>
           {service.limits.map((limit) => {
             const limitId = `${idPrefix}-${limit.key}`;

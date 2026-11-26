@@ -9,7 +9,9 @@ from companion.core.evals.cases import (
     read_photo_description_case,
     read_safeguard_case,
     read_settings_case,
+    read_tagging_case,
     read_understanding_case,
+    read_whole_pipeline_case,
 )
 from companion.core.evals.day_summary_eval import check_day_summary_case
 from companion.core.evals.judge import JudgeSettings
@@ -26,7 +28,9 @@ from companion.core.evals.photo_description_eval import check_photo_description_
 from companion.core.evals.ports import EvalCompanion
 from companion.core.evals.safeguard_eval import check_safeguard_case
 from companion.core.evals.settings_eval import check_settings_case
+from companion.core.evals.tagging_eval import check_tagging_case
 from companion.core.evals.understanding_eval import check_understanding_case
+from companion.core.evals.whole_pipeline_eval import check_whole_pipeline_case
 
 type CaseChecker = Callable[
     [EvalCase, EvalCompanion, JudgeSettings, StopCheck], CaseCheckResult
@@ -96,6 +100,28 @@ def check_understanding(
     )
 
 
+def check_whole_pipeline(
+    case: EvalCase,
+    companion: EvalCompanion,
+    _judge: JudgeSettings,
+    should_stop: StopCheck,
+) -> CaseCheckResult:
+    """Read and check a Whole-pipeline case, which may stop between Conversations.
+
+    Args:
+        case: The case.
+        companion: The app on the Eval database.
+        _judge: The Judge's settings for the run; this Eval has no Judge.
+        should_stop: Says why the run is to stop, or None to carry on.
+
+    Returns:
+        What checking it found.
+    """
+    return check_whole_pipeline_case(
+        read_whole_pipeline_case(case.key, case.content), companion, should_stop
+    )
+
+
 CHECKERS: dict[EvalName, CaseChecker] = {
     EvalName.SAFEGUARD: checker(read_safeguard_case, check_safeguard_case),
     EvalName.PERSONA: judged_checker(read_persona_case, check_persona_case),
@@ -109,6 +135,8 @@ CHECKERS: dict[EvalName, CaseChecker] = {
         read_move_outcome_case, check_move_outcome_case
     ),
     EvalName.DAY_SUMMARY: judged_checker(read_day_summary_case, check_day_summary_case),
+    EvalName.TAGGING: checker(read_tagging_case, check_tagging_case),
+    EvalName.WHOLE_PIPELINE: check_whole_pipeline,
 }
 
 READERS: dict[EvalName, Callable[[str, dict[str, Any]], object]] = {
@@ -120,6 +148,8 @@ READERS: dict[EvalName, Callable[[str, dict[str, Any]], object]] = {
     EvalName.UNDERSTANDING: read_understanding_case,
     EvalName.MOVE_OUTCOME: read_move_outcome_case,
     EvalName.DAY_SUMMARY: read_day_summary_case,
+    EvalName.TAGGING: read_tagging_case,
+    EvalName.WHOLE_PIPELINE: read_whole_pipeline_case,
 }
 
 

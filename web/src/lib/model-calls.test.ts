@@ -8,6 +8,7 @@ import {
   modelStepLabel,
   traceKindLabel,
   replyPlanShapeFacts,
+  taggingShapeFacts,
   understandingShapeFacts,
 } from "@/lib/model-calls";
 
@@ -52,6 +53,72 @@ describe("model call labels", () => {
     ]);
   });
 
+  it("writes how many Curiosities a Reply Plan was offered and whether it asked one", () => {
+    const facts = replyPlanShapeFacts({
+      need: "Think it through",
+      lead_move: null,
+      support_move: null,
+      next_move: null,
+      threads_reminded: 0,
+      threads_led_with: 0,
+      threads_woven_in: 0,
+      threads_left_alone: 0,
+      threads_held_back: 0,
+      read_formed: false,
+      read_said: false,
+      check_in_kinds_offered: 0,
+      check_in_kind: null,
+      pattern_used: false,
+      pattern_offered: false,
+      curiosities_offered: 2,
+      curiosity_asked: true,
+    });
+    expect(facts.slice(-2)).toEqual([
+      { label: "Curiosities offered", value: "2" },
+      { label: "Curiosity asked", value: "Yes" },
+    ]);
+  });
+
+  it("says what came of a ready Pattern the Reply Plan was offered", () => {
+    const shape = {
+      need: "Think it through",
+      lead_move: null,
+      support_move: null,
+      next_move: null,
+      threads_reminded: 0,
+      threads_led_with: 0,
+      threads_woven_in: 0,
+      threads_left_alone: 0,
+      threads_held_back: 0,
+      read_formed: false,
+      read_said: false,
+      check_in_kinds_offered: 0,
+      check_in_kind: null,
+      pattern_used: false,
+      pattern_offered: false,
+    };
+    const patternToShare = (
+      offered: boolean,
+      planned: boolean,
+      shared: boolean | null,
+    ) =>
+      replyPlanShapeFacts({
+        ...shape,
+        pattern_to_share_offered: offered,
+        pattern_share_planned: planned,
+        pattern_shared: shared,
+      }).find((fact) => fact.label === "Pattern to share")?.value;
+
+    expect(patternToShare(false, false, null)).toBe("None offered");
+    expect(patternToShare(true, false, null)).toBe("Offered, not picked");
+    expect(patternToShare(true, true, null)).toBe("Picked");
+    expect(patternToShare(true, true, false)).toBe("Picked, not shared");
+    expect(patternToShare(true, true, true)).toBe("Shared");
+    expect(replyPlanShapeFacts(shape).map((fact) => fact.label)).not.toContain(
+      "Pattern to share",
+    );
+  });
+
   it("writes a Reply Plan with no Moves or Threads brought up", () => {
     const facts = replyPlanShapeFacts({
       need: "Ask more",
@@ -71,6 +138,9 @@ describe("model call labels", () => {
       pattern_offered: false,
     });
     expect(facts).toContainEqual({ label: "Need picked", value: "Ask more" });
+    expect(facts.map((fact) => fact.label)).not.toContain(
+      "Curiosities offered",
+    );
     expect(facts).toContainEqual({ label: "Pattern", value: "None" });
     expect(facts).toContainEqual({ label: "Threads brought up", value: "0" });
     expect(facts).toContainEqual({ label: "Lead Move", value: "None" });
@@ -171,5 +241,25 @@ describe("describePatternUse", () => {
         pattern_offered: true,
       }),
     ).toBe("Offered");
+  });
+});
+
+describe("taggingShapeFacts", () => {
+  it("names the tagging step and counts what was tagged and dropped", () => {
+    expect(modelStepLabel("pattern_tagging")).toBe("Pattern tagging");
+    expect(modelStepLabel("pattern_matching")).toBe("Pattern matching");
+    expect(modelStepLabel("pattern_other_side")).toBe("Other side");
+    expect(modelStepLabel("pattern_shared_check")).toBe("Pattern shared check");
+    expect(modelStepLabel("prediction_given_check")).toBe(
+      "Prediction given check",
+    );
+    expect(modelStepLabel("curiosity_asked_check")).toBe(
+      "Curiosity asked check",
+    );
+    expect(modelStepLabel("settings_claim_check")).toBe("Settings claim check");
+    expect(taggingShapeFacts({ tagged: 3, dropped: 1 })).toEqual([
+      { label: "Observations tagged", value: "3" },
+      { label: "Dropped by code", value: "1" },
+    ]);
   });
 });

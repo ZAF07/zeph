@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ModelCallLog } from "@/components/ModelCallLog";
 import type { AdminUser, ApiClient, ModelCallTrace } from "@/lib/api-client";
 import { renderWithQueries } from "@/test/render-with-queries";
+import { noPatterns } from "@/lib/users";
 
 const apiClient = {
   listModelCallTraces: vi.fn<ApiClient["listModelCallTraces"]>(),
@@ -28,7 +29,9 @@ const users: AdminUser[] = [
     life_thread_count: 0,
     move_outcome_count: 0,
     has_portrait: false,
-    confirmed_pattern_count: 0,
+    pattern_counts: noPatterns,
+    kept_quote_count: 0,
+    familiarity: "new",
   },
 ];
 

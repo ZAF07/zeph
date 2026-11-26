@@ -143,6 +143,7 @@ def test_every_message_gets_an_understanding_then_a_reply_plan_before_the_reply(
         "understanding",
         "reply_plan",
         "reply",
+        "claim_check",
     ]
     [understanding_call] = chat_model.understanding_calls
     [reply_plan_call] = chat_model.reply_plan_calls
@@ -470,6 +471,7 @@ def test_a_failed_reply_plan_still_replies_with_the_fallback_and_shows_in_the_lo
         ("understanding", None),
         ("reply_plan", "TimeoutError"),
         ("reply", None),
+        ("settings_claim_check", None),
     ]
     assert calls[2]["reply_plan_shape"]["need"] == FALLBACK_NEED
 
@@ -503,6 +505,7 @@ def test_a_failed_understanding_still_replies_and_shows_in_the_log(
         ("understanding", "TimeoutError"),
         ("reply_plan", None),
         ("reply", None),
+        ("settings_claim_check", None),
     ]
 
 

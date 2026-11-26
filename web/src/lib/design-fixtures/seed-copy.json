@@ -1717,6 +1717,12 @@
         "text": "Photos"
       },
       {
+        "key": "memories.tabs.quotes",
+        "name": "Tabs: Things you said",
+        "max_length": 30,
+        "text": "Things you said"
+      },
+      {
         "key": "memories.loading",
         "name": "Loading, read out by screen readers",
         "max_length": 60,
@@ -1927,30 +1933,267 @@
         "text": "Patterns"
       },
       {
-        "key": "memories.patterns.lead",
+        "key": "memories.patterns.intro",
         "name": "Patterns tab: line under the heading",
         "max_length": 300,
-        "text": "Things Zeph has noticed across different parts of your life, that you agreed with when it said them. Each one shows the days it is based on. Delete one and Zeph stops using it."
+        "text": "Things Zeph has noticed across different parts of your life and told you about. Each one shows your own words behind it and what Zeph asked you to notice. Delete one and Zeph forgets it, along with the quotes it rests on."
       },
       {
-        "key": "memories.patterns.agreed",
-        "name": "Patterns tab: when you agreed",
+        "key": "memories.patterns.section.shared",
+        "name": "Patterns tab: heading above Patterns still being tested",
+        "max_length": 40,
+        "text": "Being tested"
+      },
+      {
+        "key": "memories.patterns.section.confirmed",
+        "name": "Patterns tab: heading above confirmed Patterns",
+        "max_length": 40,
+        "text": "Confirmed"
+      },
+      {
+        "key": "memories.patterns.section.contested",
+        "name": "Patterns tab: heading above Patterns you disagreed with",
+        "max_length": 40,
+        "text": "You disagreed"
+      },
+      {
+        "key": "memories.patterns.section.closed",
+        "name": "Patterns tab: heading above Patterns that turned out wrong",
+        "max_length": 40,
+        "text": "Didn't hold up"
+      },
+      {
+        "key": "memories.patterns.told_on",
+        "name": "Patterns tab: when Zeph told you",
         "max_length": 60,
         "placeholders": ["day"],
-        "text": "You agreed with this on {day}"
+        "text": "Zeph told you this on {day}"
       },
       {
-        "key": "memories.patterns.based_on",
-        "name": "Patterns tab: label above the evidence",
-        "max_length": 40,
-        "text": "What it is based on"
+        "key": "memories.patterns.where_it_shows",
+        "name": "Patterns tab: who it shows with and who it doesn't",
+        "max_length": 80,
+        "placeholders": ["shows_with", "not_with"],
+        "text": "It shows with {shows_with}; not with {not_with}."
       },
       {
-        "key": "memories.patterns.evidence_when",
-        "name": "Patterns tab: day and Thread of each piece of evidence",
+        "key": "memories.patterns.shows_when",
+        "name": "Patterns tab: when it shows and when it doesn't (not about who it is with)",
+        "max_length": 80,
+        "placeholders": ["shows_when", "not_when"],
+        "text": "It shows {shows_when}; not {not_when}."
+      },
+      {
+        "key": "memories.patterns.condition.relationship.partner",
+        "name": "Patterns tab: where it shows, who the other person is: partner",
+        "max_length": 60,
+        "text": "your partner"
+      },
+      {
+        "key": "memories.patterns.condition.relationship.family",
+        "name": "Patterns tab: where it shows, who the other person is: family",
+        "max_length": 60,
+        "text": "family"
+      },
+      {
+        "key": "memories.patterns.condition.relationship.friend",
+        "name": "Patterns tab: where it shows, who the other person is: friend",
+        "max_length": 60,
+        "text": "friend"
+      },
+      {
+        "key": "memories.patterns.condition.relationship.acquaintance",
+        "name": "Patterns tab: where it shows, who the other person is: acquaintance",
+        "max_length": 60,
+        "text": "people you know a little"
+      },
+      {
+        "key": "memories.patterns.condition.relationship.colleague",
+        "name": "Patterns tab: where it shows, who the other person is: colleague",
+        "max_length": 60,
+        "text": "colleague"
+      },
+      {
+        "key": "memories.patterns.condition.relationship.stranger",
+        "name": "Patterns tab: where it shows, who the other person is: stranger",
+        "max_length": 60,
+        "text": "strangers"
+      },
+      {
+        "key": "memories.patterns.condition.power.above",
+        "name": "Patterns tab: where it shows, where the other person stands: above",
+        "max_length": 60,
+        "text": "people above you"
+      },
+      {
+        "key": "memories.patterns.condition.power.equal",
+        "name": "Patterns tab: where it shows, where the other person stands: equal",
+        "max_length": 60,
+        "text": "your equals"
+      },
+      {
+        "key": "memories.patterns.condition.power.below",
+        "name": "Patterns tab: where it shows, where the other person stands: below",
+        "max_length": 60,
+        "text": "people below you"
+      },
+      {
+        "key": "memories.patterns.condition.audience.one_to_one",
+        "name": "Patterns tab: where it shows, who else was there: one to one",
+        "max_length": 60,
+        "text": "one-to-one"
+      },
+      {
+        "key": "memories.patterns.condition.audience.group",
+        "name": "Patterns tab: where it shows, who else was there: group",
+        "max_length": 60,
+        "text": "in a group"
+      },
+      {
+        "key": "memories.patterns.condition.audience.in_front_of_others",
+        "name": "Patterns tab: where it shows, who else was there: in front of others",
+        "max_length": 60,
+        "text": "in front of others"
+      },
+      {
+        "key": "memories.patterns.condition.stakes.low",
+        "name": "Patterns tab: where it shows, what was riding on it: low",
+        "max_length": 60,
+        "text": "when little is riding on it"
+      },
+      {
+        "key": "memories.patterns.condition.stakes.high",
+        "name": "Patterns tab: where it shows, what was riding on it: high",
+        "max_length": 60,
+        "text": "when a lot is riding on it"
+      },
+      {
+        "key": "memories.patterns.condition.stance.supportive",
+        "name": "Patterns tab: where it shows, how the other person was towards you: supportive",
+        "max_length": 60,
+        "text": "when the other person is on your side"
+      },
+      {
+        "key": "memories.patterns.condition.stance.neutral",
+        "name": "Patterns tab: where it shows, how the other person was towards you: neutral",
+        "max_length": 60,
+        "text": "when the other person is neither for nor against you"
+      },
+      {
+        "key": "memories.patterns.condition.stance.hostile",
+        "name": "Patterns tab: where it shows, how the other person was towards you: hostile",
+        "max_length": 60,
+        "text": "when the other person is against you"
+      },
+      {
+        "key": "memories.patterns.condition.setting.home",
+        "name": "Patterns tab: where it shows, where it happened: home",
+        "max_length": 60,
+        "text": "at home"
+      },
+      {
+        "key": "memories.patterns.condition.setting.work",
+        "name": "Patterns tab: where it shows, where it happened: work",
+        "max_length": 60,
+        "text": "at work"
+      },
+      {
+        "key": "memories.patterns.condition.setting.social",
+        "name": "Patterns tab: where it shows, where it happened: social",
+        "max_length": 60,
+        "text": "out with friends"
+      },
+      {
+        "key": "memories.patterns.condition.setting.online",
+        "name": "Patterns tab: where it shows, where it happened: online",
+        "max_length": 60,
+        "text": "online"
+      },
+      {
+        "key": "memories.patterns.condition.state_going_in.worn_out",
+        "name": "Patterns tab: where it shows, how you were doing that day: worn out",
+        "max_length": 60,
+        "text": "on days you were worn out"
+      },
+      {
+        "key": "memories.patterns.condition.state_going_in.under_pressure",
+        "name": "Patterns tab: where it shows, how you were doing that day: under pressure",
+        "max_length": 60,
+        "text": "on days you were under pressure"
+      },
+      {
+        "key": "memories.patterns.condition.state_going_in.low",
+        "name": "Patterns tab: where it shows, how you were doing that day: low",
+        "max_length": 60,
+        "text": "on days you were feeling low"
+      },
+      {
+        "key": "memories.patterns.condition.state_going_in.steady",
+        "name": "Patterns tab: where it shows, how you were doing that day: steady",
+        "max_length": 60,
+        "text": "on days you felt steady"
+      },
+      {
+        "key": "memories.patterns.quotes_label",
+        "name": "Patterns tab: label above your quotes",
         "max_length": 40,
-        "placeholders": ["day", "thread"],
-        "text": "{day} · {thread}"
+        "text": "In your own words"
+      },
+      {
+        "key": "memories.patterns.no_thread",
+        "name": "Patterns tab: name for quotes that belong to no part of your life Zeph follows",
+        "max_length": 40,
+        "text": "Other moments"
+      },
+      {
+        "key": "memories.patterns.quote",
+        "name": "Patterns tab: one of your quotes",
+        "max_length": 20,
+        "placeholders": ["quote"],
+        "text": "“{quote}”"
+      },
+      {
+        "key": "memories.patterns.predictions_label",
+        "name": "Patterns tab: label above what Zeph asked you to notice",
+        "max_length": 40,
+        "text": "What Zeph asked you to notice"
+      },
+      {
+        "key": "memories.patterns.asked_on",
+        "name": "Patterns tab: when Zeph asked you to notice something",
+        "max_length": 40,
+        "placeholders": ["day"],
+        "text": "Asked on {day}"
+      },
+      {
+        "key": "memories.patterns.outcome.waiting",
+        "name": "Patterns tab: how it went, not asked yet",
+        "max_length": 80,
+        "text": "Zeph hasn't asked how it went yet."
+      },
+      {
+        "key": "memories.patterns.outcome.came_true",
+        "name": "Patterns tab: how it went, it happened",
+        "max_length": 80,
+        "text": "How it went: it happened as Zeph thought."
+      },
+      {
+        "key": "memories.patterns.outcome.did_not",
+        "name": "Patterns tab: how it went, it didn't happen",
+        "max_length": 80,
+        "text": "How it went: it didn't happen as Zeph thought."
+      },
+      {
+        "key": "memories.patterns.outcome.not_come_up",
+        "name": "Patterns tab: how it went, it hasn't come up",
+        "max_length": 80,
+        "text": "How it went: it hasn't come up yet."
+      },
+      {
+        "key": "memories.patterns.outcome.not_followed_up",
+        "name": "Patterns tab: how it went, Zeph never asked",
+        "max_length": 80,
+        "text": "Zeph didn't get to ask how it went."
       },
       {
         "key": "memories.patterns.delete",
@@ -1966,10 +2209,10 @@
         "text": "No patterns yet"
       },
       {
-        "key": "memories.patterns.empty_body",
+        "key": "memories.patterns.empty_message",
         "name": "Patterns tab: nothing yet, message",
         "max_length": 200,
-        "text": "When Zeph notices the same thing across different parts of your life, and you agree with it, it appears here with what it is based on."
+        "text": "When Zeph tells you about something it has noticed across different parts of your life, it appears here with your own words behind it."
       },
       {
         "key": "memories.helps.heading",
@@ -2137,6 +2380,57 @@
         "name": "Photos tab: nothing yet, message",
         "max_length": 200,
         "text": "When you send Zeph a photo that matters to you, it may keep it here after the Conversation ends."
+      },
+      {
+        "key": "memories.quotes.heading",
+        "name": "Things you said tab: heading",
+        "max_length": 60,
+        "text": "Things you said that Zeph kept"
+      },
+      {
+        "key": "memories.quotes.lead",
+        "name": "Things you said tab: line under the heading",
+        "max_length": 300,
+        "text": "Your exact words that Zeph keeps to notice what you do again and again. They stay after your messages are deleted, until you delete them. Delete one and Zeph stops using it."
+      },
+      {
+        "key": "memories.quotes.quote",
+        "name": "Things you said tab: each quote in quote marks",
+        "max_length": 40,
+        "placeholders": ["quote"],
+        "text": "“{quote}”"
+      },
+      {
+        "key": "memories.quotes.said_on",
+        "name": "Things you said tab: the day you said it",
+        "max_length": 60,
+        "placeholders": ["day"],
+        "text": "You said this on {day}"
+      },
+      {
+        "key": "memories.quotes.note_label",
+        "name": "Things you said tab: label above Zeph's note",
+        "max_length": 40,
+        "text": "Zeph's note"
+      },
+      {
+        "key": "memories.quotes.delete",
+        "name": "Things you said tab: delete button, read out by screen readers",
+        "max_length": 80,
+        "placeholders": ["quote"],
+        "text": "Delete quote: {quote}"
+      },
+      {
+        "key": "memories.quotes.empty_title",
+        "name": "Things you said tab: nothing yet, title",
+        "max_length": 80,
+        "text": "Nothing kept yet"
+      },
+      {
+        "key": "memories.quotes.empty_body",
+        "name": "Things you said tab: nothing yet, message",
+        "max_length": 200,
+        "text": "When something you say helps Zeph notice what you do again and again, it may keep your exact words here after the Conversation ends."
       }
     ]
   },
@@ -2796,7 +3090,7 @@
       },
       {
         "key": "account.switch_save_failed",
-        "name": "Memory and photo switches: couldn’t change it",
+        "name": "Memory, photo and directness settings: couldn’t change it",
         "max_length": 100,
         "text": "We couldn’t change that. Please try again."
       },
@@ -2811,6 +3105,48 @@
         "name": "Look at my photos: what Photo Viewing is; a blank line starts a new paragraph",
         "max_length": 1000,
         "text": "When off, Zeph won't look at or remember your photos. Every photo is still checked for safety, so Zeph can share help if one looks worrying. Nothing from that check is kept.\n\nWhen on, Zeph looks at the photos you send and may keep the ones that matter to you, listed on your Memories page."
+      },
+      {
+        "key": "account.directness.title",
+        "name": "How direct Zeph is: heading and name read out by screen readers",
+        "max_length": 60,
+        "text": "How direct Zeph is"
+      },
+      {
+        "key": "account.directness.help",
+        "name": "How direct Zeph is: what the setting changes",
+        "max_length": 400,
+        "text": "How soon and how plainly Zeph tells you what it thinks is really going on, and how it asks you things. Gentle asks less often and leaves more time between questions; direct asks sooner and more to the point. Whatever you pick, Zeph gives its view when you ask, backs off when you’d rather not answer, and takes extra care when things are hard."
+      },
+      {
+        "key": "account.directness.gentle",
+        "name": "How direct Zeph is: gentle level",
+        "max_length": 20,
+        "text": "Gentle"
+      },
+      {
+        "key": "account.directness.balanced",
+        "name": "How direct Zeph is: balanced level",
+        "max_length": 20,
+        "text": "Balanced"
+      },
+      {
+        "key": "account.directness.direct",
+        "name": "How direct Zeph is: direct level",
+        "max_length": 20,
+        "text": "Direct"
+      },
+      {
+        "key": "account.contested_gathering.title",
+        "name": "Keep noticing after I disagree: heading and name read out by screen readers",
+        "max_length": 60,
+        "text": "Keep noticing after I disagree"
+      },
+      {
+        "key": "account.contested_gathering.explanation",
+        "name": "Keep noticing after I disagree: what the switch does; a blank line starts a new paragraph",
+        "max_length": 1000,
+        "text": "When Zeph tells you something it has noticed about you and you disagree, it never brings it up again unless you do.\n\nWhen on, Zeph still quietly notes what you say that fits it, in case it holds up after all. When off, it notes nothing new for it. Every quote Zeph keeps is listed on your Memories page, where you can delete any of them."
       },
       {
         "key": "account.stickers.heading",
@@ -2911,6 +3247,12 @@
         "max_length": 100,
         "placeholders": ["count"],
         "text": "Messages are otherwise kept for {count} days."
+      },
+      {
+        "key": "account.delete_data.kept_quotes",
+        "name": "Delete my data: quotes kept as evidence, after how long messages are kept",
+        "max_length": 200,
+        "text": "Quotes Zeph keeps as evidence stay until you delete them."
       },
       {
         "key": "account.delete_data.button",
@@ -3265,6 +3607,30 @@
         "name": "What User Memory is, in onboarding and on Account; a blank line starts a new paragraph",
         "max_length": 1000,
         "text": "So you don't have to repeat yourself, I can keep meaningful details: your goals, what helps you, the people you mention.\n\nYou can see what I remember on your Dashboard and delete any of it, or tell me \"forget that\" in chat.\n\nI also keep a few private notes to follow up with you, like something to ask about later. You won't see these, and Delete My Data removes them along with everything else."
+      },
+      {
+        "key": "shared.pattern_noticing.title",
+        "name": "What changed, before Zeph keeps quotes: title, on Home and Memories",
+        "max_length": 60,
+        "text": "Zeph now keeps some of your words."
+      },
+      {
+        "key": "shared.pattern_noticing.body",
+        "name": "What changed, before Zeph keeps quotes: message",
+        "max_length": 400,
+        "text": "To notice what you do again and again, Zeph may keep short quotes of what you say, with a note on what was going on. They stay after your messages are deleted, until you delete them. See them on your Memories page under Things you said. Nothing is kept until you press Got it."
+      },
+      {
+        "key": "shared.pattern_noticing.got_it",
+        "name": "What changed, before Zeph keeps quotes: button",
+        "max_length": 30,
+        "text": "Got it"
+      },
+      {
+        "key": "shared.pattern_noticing.save_failed",
+        "name": "What changed, before Zeph keeps quotes: Got it couldn't be saved",
+        "max_length": 100,
+        "text": "We couldn’t save that. Please try again."
       },
       {
         "key": "shared.memory_off.paused_title",

@@ -37,6 +37,7 @@ from tests.test_check_in_sending import (
     send_check_ins,
     set_up_user_with_check_ins,
 )
+from tests.test_conversation import set_platform_setting
 from tests.test_model_call_log import list_traces, open_trace
 from tests.test_moves_migration import downgrade_to
 from tests.test_post_conversation import processing_answer, quiet_gap
@@ -101,10 +102,11 @@ def test_a_check_in_due_mid_conversation_is_woven_into_the_reply_and_logged(
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
         "ha, love that. how did the board presentation go?"
     ]
-    assert chat_model.call_order[-4:] == [
+    assert chat_model.call_order[-5:] == [
         "understanding",
         "reply_plan",
         "reply",
+        "claim_check",
         "brought_up_check",
     ]
     [check_call] = chat_model.brought_up_check_calls
@@ -128,6 +130,27 @@ def test_a_check_in_due_mid_conversation_is_woven_into_the_reply_and_logged(
     assert next_due_at(engine, maya_id(client, headers)) == due_at + ONE_DAY
     admin = owner_headers(client, auth_verifier)
     assert only_entry(client, admin)["held_back"] is None
+
+
+def test_the_brought_up_check_thinks_when_its_model_always_thinks(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    engine: Engine,
+) -> None:
+    set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    set_platform_setting(engine, "check_in_model", "anthropic/claude-sonnet-5.5")
+    open_a_conversation_until_due(client, chat_model, chat_channel, clock)
+    plan_weaves_and_reply_brings_it_up(chat_model)
+    chat_model.script("ha, love that. how did the board presentation go?")
+
+    send_to_webhook(client, telegram_text_update("now making a big salad"))
+
+    [check_call] = chat_model.brought_up_check_calls
+    assert check_call.model == "anthropic/claude-sonnet-5.5"
+    assert check_call.thinking is True
 
 
 def test_a_due_check_in_reaches_the_reply_as_an_optional_extra_not_an_order(
@@ -226,7 +249,7 @@ def test_the_reply_plan_is_given_the_due_check_in_kinds_and_no_check_in_model_ru
     assert "Something I've been wondering" not in line.text
     assert "now making a big salad" in line.text
     assert chat_model.brought_up_check_calls == []
-    assert chat_model.call_order[-1] == "reply"
+    assert chat_model.call_order[-2:] == ["reply", "claim_check"]
 
 
 def assert_no_check_in_offered(

@@ -12,6 +12,7 @@ import { LoadFailed } from "@/components/LoadFailed";
 import { LoadingPanel } from "@/components/LoadingPanel";
 import { SaveBar } from "@/components/SaveBar";
 import { SavedNote } from "@/components/SavedNote";
+import { Switch } from "@/components/Switch";
 import type {
   AdminSettings,
   CheckInFrequency,
@@ -37,6 +38,12 @@ type TextField = {
   label: string;
 };
 
+type SwitchField = {
+  key: string;
+  label: string;
+  isSwitch: true;
+};
+
 const checkInGapsKey = "check_in_hours_between";
 
 /** One field per Check-in Frequency; together they save the Check-in gaps. */
@@ -56,10 +63,19 @@ const trailingWordsField: TextField = {
   label: "Trailing words",
 };
 
-/** The number settings on this page, grouped by section, with any editors below them. */
-const numberSections: {
+/** The ruled-out topics, edited as one comma-separated text. */
+const ruledOutTopicsField: TextField = {
+  key: "pattern_ruled_out_topics",
+  label: "Ruled-out topics",
+};
+
+/** The settings kept as a list of words and edited as comma-separated text. */
+const wordListKeys = [trailingWordsField.key, ruledOutTopicsField.key];
+
+/** The number and on/off settings on this page, grouped by section, with any editors below them. */
+const fieldSections: {
   heading: string;
-  fields: NumberField[];
+  fields: (NumberField | SwitchField)[];
   editors?: TextField[];
 }[] = [
   {
@@ -157,11 +173,6 @@ const numberSections: {
         unit: "%",
       },
       {
-        key: "pattern_pushed_back_wait_days",
-        label: "Wait after a pushed-back Pattern",
-        unit: "days",
-      },
-      {
         key: "move_outcomes_per_understanding",
         label: "Most Move Outcomes per Understanding",
         unit: "outcomes",
@@ -169,6 +180,237 @@ const numberSections: {
       {
         key: "move_outcomes_closeness_percent",
         label: "Move Outcome closeness bar",
+        unit: "%",
+      },
+    ],
+  },
+  {
+    heading: "Patterns",
+    editors: [ruledOutTopicsField],
+    fields: [
+      {
+        key: "pattern_weak_sign_points",
+        label: "Points for a weak sign",
+        unit: "points",
+      },
+      {
+        key: "pattern_moderate_sign_points",
+        label: "Points for a moderate sign",
+        unit: "points",
+      },
+      {
+        key: "pattern_strong_sign_points",
+        label: "Points for a strong sign",
+        unit: "points",
+      },
+      {
+        key: "pattern_real_story_percent",
+        label: "Real story counts",
+        unit: "%",
+      },
+      {
+        key: "pattern_reported_habit_percent",
+        label: "Reported habit counts",
+        unit: "%",
+      },
+      {
+        key: "pattern_what_if_percent",
+        label: "“What if” answer counts",
+        unit: "%",
+      },
+      {
+        key: "pattern_own_opinion_percent",
+        label: "Own opinion counts",
+        unit: "%",
+      },
+      {
+        key: "pattern_unclear_percent",
+        label: "Unclear counts",
+        unit: "%",
+      },
+      {
+        key: "pattern_half_life_days",
+        label: "Pattern evidence half-life",
+        unit: "days",
+      },
+      {
+        key: "pattern_people_per_situation",
+        label: "Most people per situation",
+        unit: "people",
+      },
+      {
+        key: "narrowing_stories_needed",
+        label: "Stories before a Condition narrows a Pattern",
+        unit: "stories",
+      },
+      {
+        key: "narrowings_per_pattern",
+        label: "Most narrowings per Pattern",
+        unit: "Conditions",
+      },
+      {
+        key: "pattern_suspected_situations",
+        label: "Situations to be suspected",
+        unit: "situations",
+      },
+      {
+        key: "pattern_suspected_points",
+        label: "Score to be suspected",
+        unit: "points",
+      },
+      {
+        key: "pattern_closed_under_points",
+        label: "Score that closes a Pattern",
+        unit: "points",
+      },
+      {
+        key: "pattern_ready_situations",
+        label: "Situations to be ready",
+        unit: "situations",
+      },
+      {
+        key: "pattern_ready_conversations",
+        label: "Conversations to be ready",
+        unit: "chats",
+      },
+      {
+        key: "pattern_ready_points",
+        label: "Score to be ready",
+        unit: "points",
+      },
+      {
+        key: "pattern_ready_against_under_points",
+        label: "Evidence against must stay under",
+        unit: "points",
+      },
+      {
+        key: "pattern_safeguard_quiet_days",
+        label: "Days no Pattern is ready after a Safeguard Event",
+        unit: "days",
+      },
+      {
+        key: "pattern_exclusion_summary_days",
+        label: "Day Summaries read for exclusions",
+        unit: "days",
+      },
+      {
+        key: "patterns_shared_per_week",
+        label: "New Patterns shared a week",
+        unit: "per week",
+      },
+      {
+        key: "pattern_share_wait_days",
+        label: "Days a ready Pattern waits for a moment in chat",
+        unit: "days",
+      },
+      {
+        key: "prediction_follow_up_wait_days",
+        label: "Days before Zeph asks how a Prediction went",
+        unit: "days",
+      },
+      {
+        key: "prediction_follow_up_drop_days",
+        label: "Days after which an unasked Prediction is dropped",
+        unit: "days",
+      },
+      {
+        key: "predictions_to_confirm",
+        label: "Predictions that came true to confirm a Pattern",
+        unit: "came true",
+      },
+      {
+        key: "predictions_to_close",
+        label: "Predictions that didn’t come true to close a Pattern",
+        unit: "didn’t",
+      },
+      {
+        key: "predictions_unanswered_to_stop",
+        label: "Unanswered Predictions in a row before Zeph stops offering",
+        unit: "in a row",
+      },
+      {
+        key: "pattern_confirm_points_after_sharing",
+        label: "Score from new evidence that confirms a shared Pattern",
+        unit: "points",
+      },
+      {
+        key: "agenda_size",
+        label: "Explorations on the Agenda",
+        unit: "at once",
+      },
+      {
+        key: "exploration_wait_days_gentle",
+        label: "Wait after a try with nothing: gentle",
+        unit: "days",
+      },
+      {
+        key: "exploration_wait_days",
+        label: "Wait after a try with nothing: balanced",
+        unit: "days",
+      },
+      {
+        key: "exploration_wait_days_direct",
+        label: "Wait after a try with nothing: direct",
+        unit: "days",
+      },
+      {
+        key: "exploration_rest_after_tries_gentle",
+        label: "Tries with nothing before resting: gentle",
+        unit: "tries",
+      },
+      {
+        key: "exploration_rest_after_tries",
+        label: "Tries with nothing before resting: balanced",
+        unit: "tries",
+      },
+      {
+        key: "exploration_rest_after_tries_direct",
+        label: "Tries with nothing before resting: direct",
+        unit: "tries",
+      },
+      {
+        key: "condition_one_sided_stories",
+        label: "Stories that make a Condition one-sided",
+        unit: "stories",
+      },
+      {
+        key: "thought_experiments_per_pattern_per_week",
+        label: "Thought Experiments per Pattern a week",
+        unit: "a week",
+      },
+      {
+        key: "familiarity_conversations",
+        label: "Conversations to be getting to know",
+        unit: "chats",
+      },
+      {
+        key: "familiarity_life_threads",
+        label: "Life Threads to be getting to know",
+        unit: "threads",
+      },
+      {
+        key: "familiarity_real_stories",
+        label: "Real stories to be getting to know",
+        unit: "stories",
+      },
+      {
+        key: "starter_thought_experiments",
+        label: "Starter Thought Experiments for a new User",
+        unit: "in all",
+      },
+      {
+        key: "starter_thought_experiment_days",
+        label: "Days starter Thought Experiments are offered",
+        unit: "days",
+      },
+      {
+        key: "starter_thought_experiments_per_conversation",
+        label: "Starter Thought Experiments per Conversation",
+        unit: "per chat",
+      },
+      {
+        key: "unmatched_grouping_closeness_percent",
+        label: "Unmatched grouping bar",
         unit: "%",
       },
     ],
@@ -182,9 +424,49 @@ const numberSections: {
         unit: "per chat",
       },
       {
+        key: "curiosities_per_reply",
+        label: "Most Curiosities per reply",
+        unit: "per reply",
+      },
+      {
+        key: "curiosity_held_when_asking_why",
+        label: "Hold a Curiosity when the reply asks why",
+        isSwitch: true,
+      },
+      {
         key: "curiosities_waiting_limit",
         label: "Most Curiosities waiting at once",
         unit: "waiting",
+      },
+      {
+        key: "curiosity_replies_between_gentle",
+        label: "Fewest replies between Curiosities: gentle",
+        unit: "replies",
+      },
+      {
+        key: "curiosity_replies_between",
+        label: "Fewest replies between Curiosities: balanced",
+        unit: "replies",
+      },
+      {
+        key: "curiosity_replies_between_direct",
+        label: "Fewest replies between Curiosities: direct",
+        unit: "replies",
+      },
+      {
+        key: "follow_ups_per_conversation",
+        label: "Most follow-up questions per Conversation",
+        unit: "per chat",
+      },
+      {
+        key: "curiosity_brush_offs_to_back_off",
+        label: "Brush-offs before backing off",
+        unit: "in a row",
+      },
+      {
+        key: "curiosity_back_off_days",
+        label: "Days of doubled spacing",
+        unit: "days",
       },
       {
         key: "curiosity_check_ins_per_week",
@@ -296,20 +578,37 @@ const textFields: TextField[] = [
   },
 ];
 
+/**
+ * Says whether a field is an on/off switch rather than a number.
+ *
+ * @param field - The field.
+ * @returns True for a switch.
+ */
+function isSwitchField(field: NumberField | SwitchField): field is SwitchField {
+  return "isSwitch" in field;
+}
+
+const sectionFields = fieldSections.flatMap((section) => section.fields);
+
 const numberKeys = [
-  ...numberSections.flatMap((section) =>
-    section.fields.map((field) => field.key),
-  ),
+  ...sectionFields
+    .filter((field) => !isSwitchField(field))
+    .map((field) => field.key),
   webSearchLimitField.key,
 ];
 
+const switchKeys = sectionFields
+  .filter(isSwitchField)
+  .map((field) => field.key);
+
 const allKeys = [
   ...numberKeys,
+  ...switchKeys,
   ...textFields.map((field) => field.key),
-  trailingWordsField.key,
+  ...wordListKeys,
 ];
 
-const wholeNumber = /^\d+$/;
+const wholeNumber = /^-?\d+$/;
 
 /**
  * Names the saved setting a field belongs to: each Check-in gap field
@@ -334,6 +633,9 @@ function savedText(settings: AdminSettings, key: string): string {
   const value = settings[key]?.value;
   if (Array.isArray(value)) {
     return value.join(", ");
+  }
+  if (typeof value === "boolean") {
+    return String(value);
   }
   const gapField = checkInGapFields.find((field) => field.key === key);
   if (!gapField) {
@@ -364,11 +666,14 @@ function savedDrafts(settings: AdminSettings): Record<string, string> {
  *
  * @param key - The setting's key.
  * @param value - The typed text.
- * @returns A number, or the text itself.
+ * @returns A number, on or off, or the text itself.
  */
 function settingValue(key: string, value: string): SettingValue {
-  if (key === trailingWordsField.key) {
+  if (wordListKeys.includes(key)) {
     return wordList(value);
+  }
+  if (switchKeys.includes(key)) {
+    return value === "true";
   }
   return numberKeys.includes(key) ? Number(value) : value;
 }
@@ -418,7 +723,7 @@ export function PlatformSettingsForm() {
   const isValid =
     numberKeys.every((key) => wholeNumber.test(values[key] ?? "")) &&
     textFields.every((field) => (values[field.key] ?? "").trim() !== "") &&
-    wordList(values[trailingWordsField.key] ?? "").length > 0;
+    wordListKeys.every((key) => wordList(values[key] ?? "").length > 0);
   const isDirty = changedKeys.length > 0;
 
   function hintFor(key: string, loadedSettings: AdminSettings): string {
@@ -452,6 +757,22 @@ export function PlatformSettingsForm() {
     );
   }
 
+  function switchRow(field: SwitchField, loadedSettings: AdminSettings) {
+    return (
+      <FieldRow
+        key={field.key}
+        title={field.label}
+        caption={hintFor(field.key, loadedSettings)}
+      >
+        <Switch
+          label={field.label}
+          checked={values[field.key] === "true"}
+          onChange={(isOn) => edit(field.key, String(isOn))}
+        />
+      </FieldRow>
+    );
+  }
+
   function textEditor(field: TextField, loadedSettings: AdminSettings) {
     const hintId = `${field.key}-hint`;
     return (
@@ -473,9 +794,9 @@ export function PlatformSettingsForm() {
     );
   }
 
-  function numberSection(
+  function fieldSection(
     heading: string,
-    fields: NumberField[],
+    fields: (NumberField | SwitchField)[],
     loadedSettings: AdminSettings,
     editors: TextField[] = [],
   ) {
@@ -492,7 +813,11 @@ export function PlatformSettingsForm() {
             fields.map((field) => settingKeyFor(field.key)),
           )}
         >
-          {fields.map((field) => numberRow(field, loadedSettings))}
+          {fields.map((field) =>
+            isSwitchField(field)
+              ? switchRow(field, loadedSettings)
+              : numberRow(field, loadedSettings),
+          )}
         </FieldRows>
         {editors.map((field) => textEditor(field, loadedSettings))}
       </section>
@@ -523,15 +848,15 @@ export function PlatformSettingsForm() {
 
   return (
     <>
-      {numberSections.map((section) =>
-        numberSection(
+      {fieldSections.map((section) =>
+        fieldSection(
           section.heading,
           section.fields,
           settings,
           section.editors,
         ),
       )}
-      {numberSection("Web search", [webSearchLimitField], settings)}
+      {fieldSection("Web search", [webSearchLimitField], settings)}
 
       <section aria-label="Wording" className="flex flex-col gap-3">
         <FormSectionHeading title="Wording" />

@@ -22,6 +22,9 @@ from companion.adapters.load_test.switch import (
     allow_load_test_adapter,
 )
 from companion.adapters.load_test.web_search import EmptyWebSearch
+from companion.adapters.openrouter.chat_model import OpenRouterChatModel
+from companion.adapters.openrouter.chat_model import logger as openrouter_logger
+from companion.adapters.openrouter.photo_viewer import OpenRouterPhotoViewer
 from companion.adapters.pgvector.vector_store import PgvectorKnowledgeVectorStore
 from companion.adapters.postgres.eval_repositories import (
     PostgresEvalCaseRepository,
@@ -37,7 +40,7 @@ from companion.adapters.telegram.chat_channel import TelegramChatChannel
 from companion.adapters.timer import ThreadTimer
 from companion.adapters.user_work_queue import ThreadPoolUserWorkQueue
 from companion.app import AppDependencies, create_app
-from companion.config import Settings, load_settings
+from companion.config import MissingSettingsError, Settings, load_settings
 from companion.core.model_call_log import logger as model_call_logger
 from companion.core.ports import (
     AuthAccounts,
@@ -58,10 +61,12 @@ SEED_DIR = Path(__file__).parent / "seed"
 SEED_FILE = SEED_DIR / "platform_settings.yaml"
 HELPLINES_SEED_FILE = SEED_DIR / "helplines.yaml"
 COPY_SEED_FILE = SEED_DIR / "copy.yaml"
+PATTERN_CATALOG_DIR = SEED_DIR / "pattern_catalog"
 MEMORY_CATEGORIES_SEED_FILE = SEED_DIR / "memory_categories.yaml"
 CHECK_IN_KINDS_SEED_FILE = SEED_DIR / "check_in_kinds.yaml"
 NEEDS_SEED_FILE = SEED_DIR / "needs.yaml"
 MOVES_SEED_FILE = SEED_DIR / "moves.yaml"
+THOUGHT_EXPERIMENTS_SEED_FILE = SEED_DIR / "thought_experiments.yaml"
 KNOWLEDGE_SEED_FILE = SEED_DIR / "knowledge" / "knowledge.yaml"
 EVAL_CASES_DIR = SEED_DIR / "evals" / "cases"
 EVAL_IMAGES_DIR = SEED_DIR / "evals" / "images"
@@ -294,6 +299,24 @@ def build_scheduler(settings: Settings) -> Scheduler:
     raise UnknownAdapterError("SCHEDULER_ADAPTER", settings.scheduler_adapter)
 
 
+def required_key(name: str, value: str) -> str:
+    """Check that the key a chosen adapter needs is set.
+
+    Args:
+        name: The key's name in `.env`.
+        value: The key as loaded; empty when not set.
+
+    Returns:
+        The key.
+
+    Raises:
+        MissingSettingsError: If the key is not set.
+    """
+    if not value:
+        raise MissingSettingsError([name])
+    return value
+
+
 def build_chat_model(settings: Settings) -> ChatModel:
     """Build the chat model chosen in `.env`.
 
@@ -305,11 +328,18 @@ def build_chat_model(settings: Settings) -> ChatModel:
 
     Raises:
         UnknownAdapterError: If the chosen adapter does not exist.
+        MissingSettingsError: If the chosen adapter's key is missing.
         LoadTestNotAllowedError: If a load-test adapter is chosen outside a
             load test.
     """
     if settings.chat_model_adapter == "deepseek":
-        return DeepSeekChatModel(settings.deepseek_api_key)
+        return DeepSeekChatModel(
+            required_key("DEEPSEEK_API_KEY", settings.deepseek_api_key)
+        )
+    if settings.chat_model_adapter == "openrouter":
+        return OpenRouterChatModel(
+            required_key("OPENROUTER_API_KEY", settings.openrouter_api_key)
+        )
     if settings.chat_model_adapter == LOAD_TEST_ADAPTER:
         allow_load_test_adapter("CHAT_MODEL_ADAPTER")
         engine = build_database_engine(settings)
@@ -328,11 +358,18 @@ def build_photo_viewer(settings: Settings) -> PhotoViewer:
 
     Raises:
         UnknownAdapterError: If the chosen adapter does not exist.
+        MissingSettingsError: If the chosen adapter's key is missing.
         LoadTestNotAllowedError: If a load-test adapter is chosen outside a
             load test.
     """
     if settings.chat_model_adapter == "deepseek":
-        return DeepSeekPhotoViewer(settings.deepseek_api_key)
+        return DeepSeekPhotoViewer(
+            required_key("DEEPSEEK_API_KEY", settings.deepseek_api_key)
+        )
+    if settings.chat_model_adapter == "openrouter":
+        return OpenRouterPhotoViewer(
+            required_key("OPENROUTER_API_KEY", settings.openrouter_api_key)
+        )
     if settings.chat_model_adapter == LOAD_TEST_ADAPTER:
         allow_load_test_adapter("CHAT_MODEL_ADAPTER")
         return LoadTestPhotoViewer()
@@ -349,6 +386,19 @@ def quiet_http_client_logs() -> None:
         logging.getLogger(logger_name).setLevel(logging.WARNING)
 
 
+def print_info_logs(logger: logging.Logger) -> None:
+    """Print a logger's logs from INFO up.
+
+    Nothing else prints INFO logs, so the logger gets its own handler, once.
+
+    Args:
+        logger: The logger to print.
+    """
+    logger.setLevel(logging.INFO)
+    if not logger.handlers:
+        logger.addHandler(logging.StreamHandler())
+
+
 def show_model_call_developer_logs(enabled: bool) -> None:
     """Print the Model Call Log's developer logs, for local and worktree runs.
 
@@ -358,11 +408,18 @@ def show_model_call_developer_logs(enabled: bool) -> None:
     Args:
         enabled: Whether developer logs are on (`MODEL_CALL_DEVELOPER_LOGS`).
     """
-    if not enabled:
-        return
-    model_call_logger.setLevel(logging.INFO)
-    if not model_call_logger.handlers:
-        model_call_logger.addHandler(logging.StreamHandler())
+    if enabled:
+        print_info_logs(model_call_logger)
+
+
+def show_prompt_cache_logs() -> None:
+    """Print the OpenRouter adapter's INFO logs, which say how the cache was used.
+
+    Each line says how many of a Claude call's prompt tokens came from the
+    prompt cache. The adapter logs no content, so its logs are safe to print
+    everywhere.
+    """
+    print_info_logs(openrouter_logger)
 
 
 def build_production_app() -> FastAPI:
@@ -376,6 +433,7 @@ def build_production_app() -> FastAPI:
     quiet_http_client_logs()
     settings = load_settings()
     show_model_call_developer_logs(settings.model_call_developer_logs)
+    show_prompt_cache_logs()
     engine = build_database_engine(settings)
     dependencies = AppDependencies(
         repositories=build_repositories(settings, engine),

@@ -176,6 +176,24 @@ docker compose start backend web
 
 Reset the bot token when it leaks or might have, not on a schedule. Steps: [RESET_TELEGRAM_TOKEN_GUIDE.md](RESET_TELEGRAM_TOKEN_GUIDE.md) (BotFather revoke → update `.env` → `make restart`).
 
+## OpenRouter keys
+
+Model calls go through OpenRouter with our own provider keys (BYOK, ADR-0028). They must never spend OpenRouter credits. Set `OPENROUTER_API_KEY` in `.env`; `CHAT_MODEL_ADAPTER` defaults to `openrouter`.
+
+Do these once in the OpenRouter account, and again for any provider key added later:
+
+1. In the BYOK (integrations) settings, add each provider key (Anthropic, DeepSeek) and set its "Shared capacity fallback" to "Never use any other provider or key for this key's models".
+2. In the privacy settings, allow providers that may train on inputs. DeepSeek is one, and without this OpenRouter refuses DeepSeek's own servers ("Paid model training violation").
+
+Two things in the code keep calls on our own keys:
+
+- Each call may only be answered by the model's maker (the part of the name before the "/"), because our keys are the makers' keys. A model its maker does not serve fails with an error. For DeepSeek, pick the dated names DeepSeek itself serves (`deepseek/deepseek-v4.1-flash-1017`, `deepseek/deepseek-v4-pro-0813`); the undated names are only served by other hosts. The Claude models Admins can pick (`anthropic/claude-haiku-5.5`, `anthropic/claude-sonnet-5.5`, `anthropic/claude-opus-5.5`, `anthropic/claude-fable-5.2`) are served by Anthropic under those names. Sonnet, Opus and Fable always think: they are named in the Platform Setting `models_that_always_think`, so their thinking switch is on and locked, and their calls are made with thinking on. A new model that always thinks must be added to that list when it is added to `available_models`, or its calls fail while its thinking is off. A model that can't think at all must be named in the Platform Setting `models_that_cannot_think` when it is added to `available_models`; its thinking switch is then off and locked, and its calls are made with thinking off.
+- If a reply was still paid with credits, the backend logs the warning "was paid with OpenRouter credits, not our own key". OpenRouter's activity page shows the same per call (BYOK or not).
+
+To check prompt caching, look for "prompt tokens from the cache" in the backend logs. Each call logs how many prompt tokens it read from the cache and how many it wrote (DeepSeek reports reads only). Two messages within 5 minutes should show a read on the second one. For the Reply only the tools and the fixed start of its instructions are cached (see ADR-0028).
+
+To go back to direct DeepSeek, set `CHAT_MODEL_ADAPTER=deepseek` and `DEEPSEEK_API_KEY`, and run `make restart`.
+
 ## Local and production bots
 
 Production keeps the real Telegram bot; local development uses its own bot, so the two stacks never take the webhook from each other. See [LOCAL_TELEGRAM_BOT_GUIDE.md](LOCAL_TELEGRAM_BOT_GUIDE.md) (ADR-0022).

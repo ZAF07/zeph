@@ -3,16 +3,23 @@ import logging
 import pytest
 from sqlalchemy import create_engine
 
+from companion.adapters.deepseek.chat_model import DeepSeekChatModel
+from companion.adapters.deepseek.photo_viewer import DeepSeekPhotoViewer
+from companion.adapters.openrouter.chat_model import OpenRouterChatModel
+from companion.adapters.openrouter.photo_viewer import OpenRouterPhotoViewer
 from companion.adapters.tavily.web_search import TavilyWebSearch
 from companion.config import MissingSettingsError, load_settings
 from companion.main import (
     UnknownAdapterError,
+    build_chat_model,
     build_embedder,
+    build_photo_viewer,
     build_text_extractor,
     build_vector_store,
     build_web_search,
     quiet_http_client_logs,
     show_model_call_developer_logs,
+    show_prompt_cache_logs,
 )
 
 COMPLETE_ENVIRONMENT = {
@@ -25,7 +32,7 @@ COMPLETE_ENVIRONMENT = {
     "TELEGRAM_WEBHOOK_SECRET": "hook-secret",
     "WEBHOOK_BASE_URL": "https://zeph.ngrok.app",
     "DASHBOARD_URL": "http://localhost:3000",
-    "DEEPSEEK_API_KEY": "sk-deepseek-x",
+    "OPENROUTER_API_KEY": "sk-or-x",
     "TAVILY_API_KEY": "tvly-x",
 }
 
@@ -64,14 +71,54 @@ def test_unknown_web_search_adapter_is_refused() -> None:
         build_web_search(settings)
 
 
-def test_deepseek_key_is_required() -> None:
+def test_the_chat_model_adapter_defaults_to_openrouter() -> None:
+    settings = load_settings(COMPLETE_ENVIRONMENT)
+
+    assert settings.chat_model_adapter == "openrouter"
+    assert isinstance(build_chat_model(settings), OpenRouterChatModel)
+    assert isinstance(build_photo_viewer(settings), OpenRouterPhotoViewer)
+
+
+def test_openrouter_without_its_key_fails_at_startup() -> None:
     environment = dict(COMPLETE_ENVIRONMENT)
-    del environment["DEEPSEEK_API_KEY"]
+    del environment["OPENROUTER_API_KEY"]
+    settings = load_settings(environment)
 
-    with pytest.raises(MissingSettingsError) as error:
-        load_settings(environment)
+    with pytest.raises(MissingSettingsError, match="OPENROUTER_API_KEY"):
+        build_chat_model(settings)
+    with pytest.raises(MissingSettingsError, match="OPENROUTER_API_KEY"):
+        build_photo_viewer(settings)
 
-    assert "DEEPSEEK_API_KEY" in str(error.value)
+
+def test_the_deepseek_choice_builds_the_direct_deepseek_adapters() -> None:
+    settings = load_settings(
+        {
+            **COMPLETE_ENVIRONMENT,
+            "CHAT_MODEL_ADAPTER": "deepseek",
+            "DEEPSEEK_API_KEY": "sk-deepseek-x",
+        }
+    )
+
+    assert isinstance(build_chat_model(settings), DeepSeekChatModel)
+    assert isinstance(build_photo_viewer(settings), DeepSeekPhotoViewer)
+
+
+def test_the_deepseek_choice_without_its_key_fails_at_startup() -> None:
+    settings = load_settings({**COMPLETE_ENVIRONMENT, "CHAT_MODEL_ADAPTER": "deepseek"})
+
+    with pytest.raises(MissingSettingsError, match="DEEPSEEK_API_KEY"):
+        build_chat_model(settings)
+    with pytest.raises(MissingSettingsError, match="DEEPSEEK_API_KEY"):
+        build_photo_viewer(settings)
+
+
+def test_an_unknown_chat_model_adapter_is_refused() -> None:
+    settings = load_settings({**COMPLETE_ENVIRONMENT, "CHAT_MODEL_ADAPTER": "gpt"})
+
+    with pytest.raises(UnknownAdapterError, match="CHAT_MODEL_ADAPTER"):
+        build_chat_model(settings)
+    with pytest.raises(UnknownAdapterError, match="CHAT_MODEL_ADAPTER"):
+        build_photo_viewer(settings)
 
 
 def test_initial_admin_emails_are_split_and_lower_cased() -> None:
@@ -145,6 +192,18 @@ def test_model_call_developer_logs_are_printed_only_when_on(
     show_model_call_developer_logs(True)
     assert model_call_logger.level == logging.INFO
     assert len(model_call_logger.handlers) == 1
+
+
+def test_prompt_cache_logs_are_printed(monkeypatch: pytest.MonkeyPatch) -> None:
+    openrouter_logger = logging.getLogger("companion.adapters.openrouter.chat_model")
+    monkeypatch.setattr(openrouter_logger, "level", logging.NOTSET)
+    monkeypatch.setattr(openrouter_logger, "handlers", [])
+
+    show_prompt_cache_logs()
+    show_prompt_cache_logs()
+
+    assert openrouter_logger.level == logging.INFO
+    assert len(openrouter_logger.handlers) == 1
 
 
 def test_the_message_pool_has_50_threads_unless_set() -> None:

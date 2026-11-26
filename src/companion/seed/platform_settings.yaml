@@ -135,10 +135,26 @@ max_typing_seconds: 5
 
 # The models Admins can pick for each core service.
 available_models:
-  - deepseek-flash
+  - deepseek/deepseek-v4.1-flash-1017
+  - deepseek/deepseek-v4-pro-0813
+  - anthropic/claude-haiku-5.5
+  - anthropic/claude-sonnet-5.5
+  - anthropic/claude-opus-5.5
+  - anthropic/claude-fable-5.2
 
-# The DeepSeek model that writes the Companion's replies.
-response_model: deepseek-flash
+# The models above that can't think. A core service using one runs with
+# thinking off, and Admins can't turn its thinking on.
+models_that_cannot_think: []
+
+# The models above that always think. A core service using one runs with
+# thinking on, and Admins can't turn its thinking off.
+models_that_always_think:
+  - anthropic/claude-sonnet-5.5
+  - anthropic/claude-opus-5.5
+  - anthropic/claude-fable-5.2
+
+# The model that writes the Companion's replies.
+response_model: deepseek/deepseek-v4.1-flash-1017
 response_thinking: false
 
 # The Companion's voice and character. Any change must keep the honesty rules.
@@ -221,7 +237,7 @@ response_prompt: |-
 # as a file) is downloaded from Telegram and looked at once, before the
 # Safeguard, with the prompt below. The Safeguard, the reply and memory read
 # the description; the image itself is never kept.
-photo_model: deepseek-flash
+photo_model: deepseek/deepseek-v4.1-flash-1017
 photo_thinking: false
 
 photo_description_prompt: |-
@@ -295,7 +311,7 @@ photo_retry_count: 2
 photo_album_max_photos: 5
 
 # The model the Safeguard uses to check each incoming message for crisis.
-safeguard_model: deepseek-flash
+safeguard_model: deepseek/deepseek-v4.1-flash-1017
 safeguard_thinking: true
 
 # How the Safeguard classifies each incoming message. The answer must be
@@ -343,7 +359,7 @@ crisis_reply: |-
 # User Memory. When a Conversation ends, post-conversation processing writes a
 # Day Summary, changes the User's Memory Items and picks the photos to
 # keep as Shared Photos in one call.
-memory_processing_model: deepseek-flash
+memory_processing_model: deepseek/deepseek-v4.1-flash-1017
 memory_processing_thinking: true
 
 memory_processing_prompt: |-
@@ -430,7 +446,7 @@ memory_processing_prompt: |-
 # what they said and mean, how they feel and what they want (keeping their
 # words apart from guesses), and what past to look up. It decides nothing
 # about the reply; the Reply Plan does.
-understanding_model: deepseek-flash
+understanding_model: deepseek/deepseek-v4.1-flash-1017
 understanding_thinking: true
 
 understanding_prompt: |-
@@ -498,23 +514,27 @@ understanding_prompt: |-
 # the Moves, which Life Threads and Curiosities to bring up or leave alone,
 # which memories and Knowledge it uses, whether a Shared Photo may be sent
 # and whether to ask why. The reply follows it.
-reply_plan_model: deepseek-flash
+reply_plan_model: deepseek/deepseek-v4.1-flash-1017
 reply_plan_thinking: true
 
 reply_plan_prompt: |-
   You decide what Zeph, an AI companion, does in its next reply to a person.
   You are given the time where they are, how Zeph understood their latest
   message (what they said and mean, how they feel and what they want, each
-  split into what they said, what Zeph guesses and what is unclear), the
-  Needs Zeph can meet, the Moves Zeph can make to help and which Moves each
-  Need allows, how Moves went for them before in moments like this (Move
+  split into what they said, what Zeph guesses and what is unclear), how
+  direct they want Zeph to be with its Read (left out while they are
+  struggling), how well Zeph knows them (their Familiarity: new, getting to
+  know or knows well), the Needs Zeph can meet, the Moves Zeph can make to help and
+  which Moves each Need allows, how Moves went for them before in moments like this (Move
   Outcomes, with their days), their User Portrait, their Goals, the Memory
   Categories Zeph has saved something in, their recent Conversations, the
   Life Threads (ongoing stories in their life) this message reminds Zeph of,
   the Patterns in mind (what Zeph has noticed keeps showing up across their
   life; a suspected one is only Zeph's guess), the things Zeph has been
   wondering about them (Curiosities) whose time has
-  come, the Knowledge documents Zeph can draw on with when each helps, the
+  come and how each Need treats them, what Zeph is exploring about them
+  (the Agenda: suspected Patterns, what it still needs to learn about each
+  and how earlier tries went; only while Zeph explores for them), the Knowledge documents Zeph can draw on with when each helps, the
   Check-in Kinds Zeph may weave in when a Check-in with them is due (they
   asked Zeph to check in now and then), the earlier Reply Plans in this
   Conversation (with where the Conversation was, the Read Zeph formed and
@@ -525,6 +545,19 @@ reply_plan_prompt: |-
   Act on what they said, not on guesses: something only guessed or unclear
   is never treated as known. When what is unclear matters (do they want
   advice or just to vent?), it is fine for the reply to check.
+
+  How well Zeph knows them (their Familiarity) changes how it asks, never
+  how much it cares or whether it forms a Read:
+  - new: Zeph has heard little of their life. Ask broad, open questions
+    about what their days are like and who and what matters to them, and
+    take up the stories they offer. A made-up situation ("what would you do
+    if…") is a light way in. Don't ask as if you already see how they are.
+  - getting to know: Zeph has heard some of their stories. Ask about real
+    things that happened to them, aimed at what the Agenda still wants to
+    learn, more than about made-up situations.
+  - knows well: Zeph has told them a Pattern it sees. Follow up on how that
+    has gone since, and narrow it down: when it happens and when it
+    doesn't.
 
   Decide, fresh for this message:
   - where_we_are: one short line on where the Conversation is now, e.g.
@@ -537,7 +570,14 @@ reply_plan_prompt: |-
     Plans). Go
     beneath what they said to what it is about. Always form one, even when
     it won't be said yet. It is Zeph's view: offer it as a view,
-    never as fact.
+    never as fact. A Read is about this situation, not about who they are:
+    never call it a pattern, and never say they always or usually act some
+    way. The only patterns you may say as patterns are the ones code gives
+    you: "A Pattern you may tell them now" and "Patterns you have told
+    them". When they ask what patterns you see in them and you are given
+    neither, your Read is what you notice in one moment they have told you
+    about lately, said as a view of that moment, and the guidance says
+    Zeph is still getting to know them.
   - say_read: true if the reply should give the Read now. Give it only when
     all three hold:
     1. there is room: not while they are mid-vent, in crisis or in light
@@ -548,6 +588,18 @@ reply_plan_prompt: |-
     When they ask for your view ("what do you think?", "what's going on with
     me?"), give your deepest Read at once, not advice already given and not
     another question. Otherwise false.
+    How direct they want you to be changes how soon and how plainly the Read
+    is said, never whether you form one and never which Pattern you may
+    offer:
+    - gentle: wait until there is clearly room and the moment is right, and
+      put it softly, as a thought they can easily set aside.
+    - balanced: give it as the three conditions above say.
+    - direct: give it sooner: once they have been heard, you needn't wait for
+      a vent to be fully spent, and say it plainly, without hedging. Never
+      cut in mid-vent or in crisis.
+    Say in guidance how to put it. Whatever the setting, when they ask for
+    your view, give it at once. When you aren't told how direct to be,
+    follow the three conditions above.
   - patterns_used: the numbers of the Patterns in mind your Read is built
     on. Use one when this message looks like another time it shows up, so
     your Read can join dots they haven't joined yet. Empty if none fits.
@@ -556,6 +608,34 @@ reply_plan_prompt: |-
     say_read is true and your Read rests on it. Offering it is how Zeph
     learns whether it fits them: their reaction confirms or closes it. Null
     otherwise.
+  - share_pattern: true or false. Only when you are given "A Pattern you
+    may tell them now": code tested it and it is the only Pattern you may
+    say as a pattern. You pick the moment. True when they have room to take
+    it in: the talk is unhurried, they are reflecting or asked what you
+    think of them, or the Pattern is showing up in what they are telling
+    you right now. False while they are venting, upset, busy, in the middle
+    of something else or just being light; it waits for a better moment.
+    A reply that tells them a Pattern does nothing else big: no Curiosity,
+    no asking why. Say in guidance how to lead into it. False when you
+    aren't given one.
+  - raised_pattern: only when you are given "Patterns you told them that
+    they disagreed with": the number of one they bring up themselves in
+    their latest message. Null otherwise, and never bring one up yourself.
+  - named_pattern: only when you are given "Patterns you have told them":
+    the number of one that what they are telling you right now is a clear
+    case of, or that they have just acted against. The reply then links
+    today's story to it in a sentence or two. Use it when joining the dots
+    would help them see something, and they have room for it. Null when
+    nothing they said fits one, when it would be the second time in this
+    Conversation, and while they are venting, upset or in a hurry.
+  - asked_for_patterns: true only when their latest message asks what
+    patterns, habits or tendencies you see in them, or what you have
+    noticed about them as a person ("what patterns do you see in me?",
+    "what have you noticed about me?"). Code then decides what the reply
+    may say: a Pattern you may tell them now is told, the ones you have
+    told them may be recalled, and with neither the reply says Zeph is
+    still getting to know them. False for a question about one situation
+    ("what do you think is going on with my sister?").
   - need: the one Need that fits best, its name exactly as written. If it
     isn't clear, pick the fallback Need.
   - guidance: one sentence on what would fit this moment.
@@ -597,13 +677,39 @@ reply_plan_prompt: |-
     up in something else, bring it up; a long time since it last came up is
     a reason to ask how things are now.
     Usually at most one. Never one marked "don't bring it up".
-    Curiosities go here too, as {"curiosity": <number>, "how": ...}, only
-    when Zeph should ask it in this very reply: "lead" to open with it,
-    usually at the start of a Conversation when they're just saying hi, or
-    "weave" to ask it after answering what they said, when it connects.
-    Otherwise leave it out for a better moment: when they're upset, busy
-    with something else, or it's sensitive and the moment isn't right.
-    Never more than the Conversation has left.
+    A Curiosity goes here too, as {"curiosity": <number>, "how": ...}:
+    "lead" to open with it, usually at the start of a Conversation when
+    they're just saying hi, or "weave" to ask it after answering what they
+    said. One you pick is part of the plan: the reply will ask it. No more
+    per reply than the list of them says, and none when the Conversation has
+    none left. How the Need you picked treats Curiosities decides:
+    - ask by default: pick one, or more when the list allows more and they
+      fit the moment. Zeph is curious about them and asks. Leave it out
+      only for a real reason (they just asked something that needs the
+      whole reply, the reply already asks another question, it's sensitive
+      and the moment is wrong), and give that reason in no_curiosity_why.
+    - test the water: at most one light opener in a Conversation, asked in
+      passing so they can let it go.
+    - only if it fits the moment: pick one only when it connects to what
+      they're talking about, or the chat has reached an easy pause.
+    - never: pick none.
+    A Curiosity aimed at the Agenda was written by code to learn one thing;
+    it comes first in the list. Ask it in your own words, never naming a
+    Pattern or saying what Zeph suspects. The Agenda's earlier tries show
+    what was asked before, by which Approach, and how it went: never ask
+    the same thing by the same Approach again. When it says to ask openly
+    how they were doing, never offer a mood or state yourself.
+    A starter Thought Experiment is a made-up situation code picked because
+    Zeph is new to them; it comes first too. Put it lightly, keeping its
+    words, and hear how they would choose and why, without saying what it
+    is for.
+  - curiosity_taken: when you are shown a Curiosity an earlier reply was
+    meant to ask and Zeph's messages really did ask it, how they took it:
+    "engaged" if they talked about it, "brushed_off" if they changed the
+    subject or gave a short answer, "asked_to_drop" if they asked Zeph not
+    to bring it up. Null if Zeph never asked it, or otherwise.
+  - no_curiosity_why: under a Need that asks by default, when a Curiosity
+    was offered and you picked none, a few words on why. Null otherwise.
   - left_alone: the Life Threads the message touches that Zeph should not
     raise, each with a short reason (e.g. "they're struggling with something
     else", "too painful right now").
@@ -642,6 +748,10 @@ reply_plan_prompt: |-
     "say_read": true | false,
     "patterns_used": [<number>],
     "offer_pattern": <number> | null,
+    "share_pattern": true | false,
+    "raised_pattern": <number> | null,
+    "named_pattern": <number> | null,
+    "asked_for_patterns": true | false,
     "need": "<Need name>",
     "guidance": "...",
     "lead_move": "<Move name>" | null,
@@ -654,6 +764,8 @@ reply_plan_prompt: |-
     "threads_touched": [<number>],
     "bring_up": [{"thread": <number>, "how": "lead" | "weave", "why": "..."},
                  {"curiosity": <number>, "how": "lead" | "weave"}],
+    "no_curiosity_why": "..." | null,
+    "curiosity_taken": "engaged" | "brushed_off" | "asked_to_drop" | null,
     "left_alone": [{"thread": <number>, "reason": "..."}],
     "knowledge": {"documents": [<number>], "search": "<search phrase>"} | null,
     "send_photo": true | false,
@@ -732,10 +844,149 @@ move_outcomes_closeness_percent: 65
 # brought up again unless they raise it.
 life_thread_brushed_off_wait_days: 14
 
-# After the User pushes back on a Pattern Zeph offered as its view, and the
-# Pattern isn't closed, it waits this many days before it comes to mind in a
-# reply again. A closed Pattern never comes to mind.
-pattern_pushed_back_wait_days: 30
+# Scoring Patterns of Pattern Types (ADR-0024). Code scores each of a User's
+# Patterns from its Observations when a Conversation ends, after tagging, and
+# when Observations are deleted. An Observation is worth its sign's points
+# times the percent its kind of evidence keeps, cut to the unclear percent
+# when it names two look-alikes, nothing when anyone would act the same,
+# negative when against, and halved every half-life. Starting values from the
+# pattern-pipeline grill (decision 29, in points: its 1.0 is 100), to be tuned
+# by Evals and real use.
+pattern_weak_sign_points: 30
+pattern_moderate_sign_points: 70
+pattern_strong_sign_points: 140
+pattern_real_story_percent: 100
+pattern_reported_habit_percent: 70
+pattern_what_if_percent: 40
+pattern_own_opinion_percent: 30
+pattern_unclear_percent: 25
+pattern_half_life_days: 75
+
+# A situation is one Life Thread (with none, the same person and setting).
+# Within it, for and against apart, only the strongest Observation per person
+# counts, up to this many people.
+pattern_people_per_situation: 3
+
+# A Condition (audience, stakes, relationship, power, stance, setting, state
+# going in) narrows a Pattern ("in a group, not one-to-one") only when this
+# many clear stories for it say that Condition and the clear evidence against
+# is all under other values. At most this many Conditions narrow one Pattern,
+# those with the most stories; evidence against they don't explain counts in
+# full.
+narrowing_stories_needed: 2
+narrowings_per_pattern: 2
+
+# A noticed Pattern seen in this many situations with at least this score is
+# suspected; one under the floor is closed. States follow the evidence, so a
+# Pattern can move back.
+pattern_suspected_situations: 2
+pattern_suspected_points: 100
+pattern_closed_under_points: -150
+
+# The ready gate: a suspected Pattern may be shared only when code finds all
+# ten checks true (docs/pattern-pipeline/README.md). It must show in this many
+# situations (or more, when its Pattern Type asks for more), with evidence
+# from this many Conversations and at least this score, also from its clear
+# Observations alone, and its evidence against must stay under this many
+# points. Starting values from the pattern-pipeline grill (decision 29).
+pattern_ready_situations: 3
+pattern_ready_conversations: 2
+pattern_ready_points: 300
+pattern_ready_against_under_points: 100
+
+# No Pattern is ready for this many days after a Safeguard Event.
+pattern_safeguard_quiet_days: 14
+
+# The tagging step reads this many of the User's latest Day Summaries, with
+# their open Life Threads, to tell whether a Pattern Type's exclusion applies.
+pattern_exclusion_summary_days: 7
+
+# Sharing a ready Pattern (while the Feature Pattern sharing works): at most
+# this many new Patterns are told to one User in any 7 days, and one the Reply
+# Plan found no good moment for within this many days goes out as a Check-in.
+# Starting values from the pattern-pipeline grill (decision 29).
+patterns_shared_per_week: 1
+pattern_share_wait_days: 5
+
+# Following up a Prediction (while Pattern sharing and Curiosities work):
+# Zeph asks how it went no sooner than this many days after giving it, and a
+# Prediction with no answer after the longer time is dropped. A shared Pattern
+# is confirmed once this many of its Predictions came true, or once the
+# Observations tagged after it was shared reach this score by themselves.
+# Starting values from the pattern-pipeline grill (decision 29); the score is
+# the ready bar, a first guess.
+prediction_follow_up_wait_days: 7
+prediction_follow_up_drop_days: 21
+predictions_to_confirm: 2
+predictions_to_close: 2
+predictions_unanswered_to_stop: 2
+pattern_confirm_points_after_sharing: 300
+
+# Topics no Pattern is drawn or shared from unless the User raised them. The
+# owner's list (25 Nov 2026). A topic added later reaches new Observations
+# only.
+pattern_ruled_out_topics:
+  - abuse
+  - sexual trauma
+  - self-harm or suicide
+  - eating and body image
+  - addiction
+  - sexuality and gender
+  - mental health diagnoses
+
+# The Agenda, while Pattern exploring works: at most this many Explorations
+# (suspected Patterns Zeph is trying to learn more about) are active at once,
+# highest score first. An Exploration tried with nothing useful waits this many
+# days before a different Approach, and rests after this many tries with
+# nothing in a row, until a new Observation for its Pattern wakes it.
+agenda_size: 3
+exploration_wait_days: 3
+exploration_rest_after_tries: 4
+
+# The same two numbers for a User who set how direct Zeph is to gentle or to
+# direct (the two above are for balanced). Gentle waits longer and rests
+# sooner; direct waits less and keeps trying longer. Directness also sets the
+# order of Approaches, in code: gentle never gets "would it have gone
+# differently if…", direct gets it first.
+exploration_wait_days_gentle: 5
+exploration_wait_days_direct: 2
+exploration_rest_after_tries_gentle: 3
+exploration_rest_after_tries_direct: 5
+
+# A Condition (audience, stakes, relationship, power, stance, setting, state
+# going in) is one-sided for a suspected Pattern once this many clear stories
+# for it share one value. Zeph then asks about one value it hasn't seen.
+condition_one_sided_stories: 2
+
+# At most this many Thought Experiments are put to a User about one Pattern in
+# 7 days, counting one still waiting to be asked.
+thought_experiments_per_pattern_per_week: 1
+
+# Familiarity: how well Zeph knows a User, worked out by code each time a
+# Conversation ends. A new User becomes one Zeph is getting to know at this
+# many Conversations, Life Threads and Observations from real stories (0 means
+# none are needed), or at a first suspected Pattern. Zeph knows a User well
+# once a Pattern is shared or confirmed.
+familiarity_conversations: 5
+familiarity_life_threads: 3
+familiarity_real_stories: 0
+
+# Starter Thought Experiments, while Pattern exploring works: a new User is put
+# at most this many, only for this many days after they sign up, and at most
+# this many in one Conversation. They stop once Zeph is getting to know them.
+starter_thought_experiments: 4
+starter_thought_experiment_days: 14
+starter_thought_experiments_per_conversation: 1
+
+# Unmatched Patterns page: each unmatched Pattern has a general description
+# with nothing about the person. Two descriptions at least this close in
+# meaning (cosine similarity, as a percent) count as one entry, whoever they
+# came from. Too low lumps different ways of acting together; too high lists
+# the same one twice. With the bge-small embedder, the same way in other words
+# scores about 74 to 88 and a different way up to about 78. It can't tell
+# opposites apart ("makes jokes" and "stops joking" score about 91), so read
+# an entry's words as the first description grouped under it.
+unmatched_grouping_closeness_percent: 80
 
 # How close in meaning (cosine similarity, as a percent) a Pattern must be to
 # what the User means and their latest texts to come to mind with no Thread.
@@ -751,9 +1002,38 @@ pattern_closeness_percent: 52
 # Conversation.
 curiosities_per_conversation: 1
 
+# How many Curiosities one reply may ask. curiosities_per_conversation still
+# caps it.
+curiosities_per_reply: 1
+
+# When on, a reply that asks why the User feels as they do asks no Curiosity
+# too, and the Curiosity stays due. When off, the reply can ask both.
+curiosity_held_when_asking_why: true
+
 # How many of a User's Curiosities can wait at once. When a Conversation's end
 # makes more, the oldest waiting ones are closed.
 curiosities_waiting_limit: 10
+
+# The fewest replies, counted across Conversations, between two Curiosities
+# raised in replies.
+curiosity_replies_between: 3
+
+# The same number for a User who set how direct Zeph is to gentle or to direct
+# (the one above is for balanced). It doubles while Zeph backs off, as below.
+curiosity_replies_between_gentle: 4
+curiosity_replies_between_direct: 2
+
+# How many replies in one Conversation may make a Move that asks a question
+# (Get curious): follow-ups on what the User is telling now. They don't use
+# the Curiosity limit above.
+follow_ups_per_conversation: 3
+
+# After this many Curiosities brushed off in a row (asked to drop counts), no
+# Curiosity is offered for the rest of the Conversation, and the fewest replies
+# between Curiosities doubles for curiosity_back_off_days from the last
+# brush-off. One engaged answer ends it.
+curiosity_brush_offs_to_back_off: 2
+curiosity_back_off_days: 3
 
 # How many "Something I've been wondering" Check-ins a User can get in any 7
 # days. That Check-in Kind asks one of their Curiosities whose day has come.
@@ -772,7 +1052,7 @@ knowledge_closeness_percent: 60
 
 # Drafts a Knowledge document's "when it helps" description when it is made
 # ready without one. Admins can rewrite it on the document's page.
-knowledge_when_it_helps_model: deepseek-flash
+knowledge_when_it_helps_model: deepseek/deepseek-v4.1-flash-1017
 knowledge_when_it_helps_thinking: false
 knowledge_when_it_helps_prompt: |-
   You help Zeph, an AI companion, decide when a document from its Knowledge
@@ -864,14 +1144,22 @@ reply_settings_instructions: >-
   You can change some of the person's settings with your tools when they
   clearly ask: pause or resume Check-ins, how often you check in, quiet hours,
   turning your memory of them on or off, turning on or off whether you look
-  at their photos, forgetting one thing you remember, their time zone, and
+  at their photos, how direct you are with your view of what is going on
+  for them and with the questions you ask them, whether you keep quietly
+  noting what fits something you noticed
+  about them and they disagreed with (only when you have that tool),
+  forgetting one thing you remember, their time zone, and
   deleting their data. When they ask for one of these, even casually ("once a
   week is plenty", "stop remembering things about me", "stop looking at my
-  photos"), call the tool straight away; don't ask whether to go ahead first.
+  photos", "just tell me straight", "go easier on me when you say what you
+  think", "you can just ask me straight", "you ask a lot, ease up", "stop
+  looking for that, it isn't me"), call the tool straight
+  away; don't ask whether to go ahead first.
   Deleting their data has its own confirmation step after the tool. Only
   change what they asked for. If it isn't clear what they want changed or to
-  what, ask a short question instead of guessing. After a change, say plainly
-  in your reply what you changed. You can't delete their account, change
+  what, ask a short question instead of guessing. Never say you changed a
+  setting without calling its tool. After a change, say plainly in your
+  reply what you changed. You can't delete their account, change
   their country or disconnect Telegram: say kindly that those are on the
   Dashboard, under Account and privacy, and change nothing.
 
@@ -966,7 +1254,7 @@ sticker_tool_description: >-
 # When a Conversation ends and User Memory works for the User, this call
 # starts and adds to their Life Threads, and records how they took each
 # Thread the Companion brought up.
-life_thread_keeping_model: deepseek-flash
+life_thread_keeping_model: deepseek/deepseek-v4.1-flash-1017
 life_thread_keeping_thinking: true
 
 life_thread_keeping_prompt: |-
@@ -1024,7 +1312,7 @@ life_thread_keeping_prompt: |-
 # the User deletes a Memory Item, Life Thread, Pattern, Move Outcome or
 # Summary, so the Portrait no longer holds it. It is never shown the old
 # Portrait.
-portrait_model: deepseek-flash
+portrait_model: deepseek/deepseek-v4.1-flash-1017
 portrait_thinking: true
 
 portrait_prompt: |-
@@ -1057,7 +1345,7 @@ portrait_prompt: |-
 # When a Conversation ends and User Memory and Curiosities work for the User,
 # this call writes things Zeph wants to ask them later, records how they took
 # the ones Zeph asked, and closes ones no longer relevant.
-curiosity_keeping_model: deepseek-flash
+curiosity_keeping_model: deepseek/deepseek-v4.1-flash-1017
 curiosity_keeping_thinking: true
 
 curiosity_keeping_prompt: |-
@@ -1071,36 +1359,42 @@ curiosity_keeping_prompt: |-
   recently, the next Move Zeph had in mind but never made, and the
   Conversation.
 
-  - Write a new Curiosity for something worth asking about later: an event
-    coming up, a decision they're weighing, something left unfinished.
-    Never write one to check something that keeps showing up across their
-    stories: that is a Pattern, kept elsewhere, and Zeph checks it by
-    offering its view. Give what to ask (a short question in Zeph's voice),
-    why Zeph wonders, the first day it makes sense to ask ("not_before", as
+  - Every new Curiosity has an aim: what Zeph is trying to learn by asking.
+    There are four, described below: "commitment", "look_back", "guess"
+    and "next_move". Never write a Curiosity that has none of these aims;
+    one without an aim is not saved. Never write one to check something
+    that keeps showing up across their stories: that is a Pattern, kept
+    elsewhere, and Zeph checks it by offering its view. For each, give its
+    aim ("aim"), what to ask (a short question in Zeph's voice), why Zeph
+    wonders, the first day it makes sense to ask ("not_before", as
     YYYY-MM-DD, e.g. the day after their presentation; null for any day),
     how sensitive it is ("low", "medium" or "high"), and the number of the
     Memory Item ("memory_item") or Life Thread ("thread") it comes from, if
     one. Usually none or one per Conversation; never one about something
     already asked recently or already waiting.
-  - A commitment they agreed to in this Conversation ("I'll call mum
-    tonight"), never one Zeph only suggested: a follow-up on how it went
-    ("did you get to call your mum?"), with not_before at least the day
-    after it was due and its Life Thread's number, if one. Write one for
-    each new commitment, on top of the usual one or so, unless they
+  - "commitment": a commitment they agreed to in this Conversation ("I'll
+    call mum tonight"), never one Zeph only suggested: a follow-up on how
+    it went ("did you get to call your mum?"), with not_before at least the
+    day after it was due and its Life Thread's number, if one. Write one
+    for each new commitment, on top of the usual one or so, unless they
     already said how it went.
-  - A next Move is a kind of help Zeph meant to give later in the
-    Conversation (e.g. "Plan steps, once they've picked a host") but the
+  - "next_move": a next Move is a kind of help Zeph meant to give later in
+    the Conversation (e.g. "Plan steps, once they've picked a host") but the
     Conversation ended first. If it's still worth following up, write it as
     a new Curiosity about where they've got to, not about the help itself
     (e.g. "did they get the app deployed?", "did they decide what 'done'
     means for internal testing?"). Leave it out if the Conversation shows it
     no longer fits, e.g. they sorted it themselves or didn't want that help.
-  - Something they vented about where Zeph only listened: a gentle
-    look-back once it has had time to settle, asking how they see it now
-    (e.g. "how are you feeling about the thing with your boss now?"), with
-    not_before at least the next day and sensitivity at least medium.
-  - A Curiosity can hold a guess: something Zeph suspects about them but
-    isn't sure of. Getting to know them means noticing what they hint at
+  - "look_back": looking back at something from this Conversation once it
+    has happened or had time to settle. An event that was coming up or a
+    decision they were weighing: how it went ("how did the presentation
+    go?"), with not_before the day after it. Something they vented about
+    where Zeph only listened: how they see it now (e.g. "how are you
+    feeling about the thing with your boss now?"), with not_before at
+    least the next day and sensitivity at least medium.
+  - "guess": a Curiosity can hold a guess: something Zeph suspects about
+    them but isn't sure of. Getting to know them means noticing what they
+    hint at
     but never say outright: their job, who someone is to them, where
     someone lives, a routine. When the Conversation hints at one of these
     and what Zeph remembers doesn't already say it, write a guess (e.g.
@@ -1124,10 +1418,12 @@ curiosity_keeping_prompt: |-
   nothing new:
   {
     "curiosities": [
-      {"ask": "...", "why": "...", "not_before": "YYYY-MM-DD" | null,
+      {"aim": "commitment" | "look_back" | "next_move",
+       "ask": "...", "why": "...", "not_before": "YYYY-MM-DD" | null,
        "sensitivity": "low" | "medium" | "high",
        "memory_item": <number> | null, "thread": <number> | null},
-      {"ask": "...", "why": "...", "not_before": "YYYY-MM-DD" | null,
+      {"aim": "guess",
+       "ask": "...", "why": "...", "not_before": "YYYY-MM-DD" | null,
        "sensitivity": "...", "guess": "...",
        "how_sure": "low" | "medium" | "high",
        "memory_item": <number> | null, "thread": <number> | null},
@@ -1144,7 +1440,7 @@ curiosity_keeping_prompt: |-
 # the situation, how the User felt, whether it helped and why. It runs only
 # when the Conversation's Understandings made a Move. Users see these under
 # "What helps you" on the Memories page.
-move_outcome_keeping_model: deepseek-flash
+move_outcome_keeping_model: deepseek/deepseek-v4.1-flash-1017
 move_outcome_keeping_thinking: true
 
 move_outcome_keeping_prompt: |-
@@ -1181,70 +1477,310 @@ move_outcome_keeping_prompt: |-
     ]
   }
 
+# When a Conversation ends and User Memory and Pattern noticing work for the
+# User, after Life Threads are kept, this call reads the Conversation into
+# the Pattern Catalog as Observations. It sees the Threads the Conversation
+# touched, every Pattern Type in the catalog, the lists each tag comes from
+# and the Conversation. Code keeps only the Observations whose Pattern Type
+# and sign exist, whose quote is word for word in the User's own texts and
+# whose tags come from the lists. Nothing reaches a reply.
+pattern_tagging_model: deepseek/deepseek-v4.1-flash-1017
+pattern_tagging_thinking: true
+
+pattern_tagging_prompt: |-
+  You read a Conversation between a person and Zeph, an AI companion, and
+  note what the person said that is evidence about them, using a fixed
+  catalog of Pattern Types. A Pattern Type is a way of acting in a kind of
+  situation (if this happens, they do that, to get or protect something).
+  Each has signs for it and signs against it.
+
+  You are given today's date, the Life Threads (ongoing stories in their
+  life) this Conversation touched, each with a number; the Pattern Catalog;
+  the lists each tag comes from; the unclear stories Zeph asked about in
+  this Conversation, if any, each with a number; the Thought Experiments
+  (made-up situations) Zeph put to them in this Conversation, if any, each
+  with a number; their open Life Threads and latest Day Summaries (what is
+  going on in their life now); the ruled-out topics; the Patterns Zeph has
+  told them and the Predictions it gave them, if any; and the Conversation.
+
+  Write one Observation for each thing the person said that matches a sign
+  of a Pattern Type, for it or against it. Only what the person said counts,
+  never what Zeph said, and only what this Conversation shows. Most
+  Conversations have few Observations or none; an empty list is a good
+  answer when nothing fits. Never stretch a sign to fit, and never note a
+  Pattern Type that isn't in the catalog.
+
+  For each Observation:
+  - pattern_types: the ID of the Pattern Type it matches. When it fits two
+    look-alikes and you can't tell which, give both IDs, the one whose sign
+    it matches first. Never more than two.
+  - sign: the ID of the sign it matches, from the first Pattern Type.
+  - direction: "for" when it matches one of the signs for, "against" when it
+    matches one of the signs against.
+  - quote: the person's own words, copied exactly from one of their texts,
+    as short as still makes sense. Don't fix spelling, shorten words or join
+    two texts.
+  - context: one line on what was going on, in your words, that makes sense
+    read on its own months later. Never write he, she, him, her, his, hers,
+    himself or herself about anyone: you can't know the person's gender, so
+    call them "they", and name others by name or role (e.g. "Mei", "their
+    mother").
+  - about: who it is about, e.g. "Mei, their sister", or "themselves".
+  - thread: the number of the Life Thread it belongs to; null if none fits.
+  - relationship, power, setting, stance: the other person and the
+    situation, each from its list; null when there is no one else or it
+    isn't clear. Power is where the other person stands next to them.
+    Stance is how the other person was towards them.
+  - audience, stakes, state_going_in: three more things about the
+    situation, each from its list. Fill one in only when the person's own
+    words in this Conversation say it; otherwise null. Never guess one from
+    the kind of story, and never fill one in just because it seems likely.
+    Give one value each: when their words give two, the one the story leans
+    on, or null when you can't tell.
+    - audience is who else was there: "one-to-one" (just them and the other
+      person), "group" (several people taking part), "in front of others"
+      (people watching who aren't part of it, such as a presentation or a
+      row in public). A story with one other person in it is not
+      "one-to-one" unless they say no one else was there ("just the two of
+      us", "on the phone").
+    - stakes is whether something that matters to them could be lost, such
+      as a job, a relationship, money or standing: "high" when they say
+      what could be lost, "low" when they say little or nothing rode on it.
+      A small matter is not "low" and an awkward one is not "high" unless
+      they say so.
+    - state_going_in is how they were before it happened, in their own
+      words: "worn out" (tired, drained, no sleep), "under pressure"
+      (stressed, rushed, a lot on), "low" (down, a bad day), "steady" (fine,
+      rested, calm). It is never how they felt during it or afterwards, and
+      never how they seem while telling the story: "I was shattered after"
+      is null.
+  - evidence: "real_story" for something that happened, "reported_habit"
+    for what they say they usually do, "what_if_answer" for their answer to
+    a made-up situation, "own_opinion" for their view of themselves.
+  - thought_experiment: the number of the Thought Experiment it answers,
+    when it is their answer to one Zeph put to them; null otherwise. Its
+    evidence is then "what_if_answer". A real story they tell while
+    answering is a "real_story" with null here.
+  - ruled_out_topic: the ruled-out topic it is about, copied from the list;
+    null when it is about none of them.
+  - raised_by_user: true when the person brought that topic up themselves,
+    false when they spoke of it only because Zeph asked or brought it up.
+    false when ruled_out_topic is null.
+
+  Note it even when anyone would act the same in that situation: tag the
+  situation as it was and leave the weighing to others.
+
+  An unclear story is one noted earlier under two look-alike Pattern Types.
+  When the person's answer in this Conversation makes clear which of the two
+  it was, put it under "settled" with its number, that Pattern Type's ID
+  and the sign of it the story matches, in the same direction. Settle one
+  only when their answer really tells; otherwise leave it out. "settled" is
+  an empty list when there is nothing to settle.
+
+  Each Pattern Type lists its exclusions: times in a life (such as grief or
+  a crisis) when it must not be judged. Under "exclusions", name each
+  exclusion that applies to the person now, going by their open Life
+  Threads, their latest Day Summaries and this Conversation: the Pattern
+  Type's ID and the exclusion copied exactly. Name one only when it is
+  plainly going on now, not for something long past. Check every Pattern
+  Type, also those with no Observation. "exclusions" is an empty list when
+  none applies. Still write every Observation as usual while an exclusion
+  applies: others decide what it counts for.
+
+  You may be given Patterns Zeph has told them, numbered. When this
+  Conversation shows how they took one, put it under "reactions" with its
+  number and one of: "agreed" (they said it fits, or answered it with an
+  example of their own), "pushed_back" (they said it isn't true of them, or
+  isn't the reason), "brushed_off" (Zeph said it and they passed over it or
+  changed the subject). A reaction is their answer to the Pattern itself,
+  when Zeph said it or they bring it up: a new story that only happens to
+  fit it is an Observation, not a reaction. Read only what they said
+  themselves; a polite "hm, maybe" is brushed_off, not agreed. Leave a
+  Pattern out when this Conversation doesn't touch it. "reactions" is an
+  empty list when there is none.
+
+  You may be given Predictions Zeph gave them, numbered: one thing each to
+  notice in their own life, to test a Pattern. When the person says in this
+  Conversation how one went, put it under "prediction_outcomes" with its
+  number and one of: "came_true" (the moment came and it went as the
+  Prediction said), "did_not" (the moment came and it went differently),
+  "not_come_up" (they say the moment hasn't come yet, or they haven't had
+  the chance to notice). Read only what they said themselves about what
+  happened: agreeing that it sounds likely is not "came_true", and silence
+  is not "not_come_up". Leave a Prediction out when they don't say how it
+  went. "prediction_outcomes" is an empty list when there is none.
+
+  Answer with JSON only, in exactly this shape:
+  {
+    "observations": [
+      {"pattern_types": ["<ID>"], "sign": "<ID>",
+       "direction": "for" | "against", "quote": "...", "context": "...",
+       "about": "...", "thread": <number> | null,
+       "relationship": "..." | null, "power": "..." | null,
+       "setting": "..." | null, "stance": "..." | null,
+       "audience": "..." | null, "stakes": "..." | null,
+       "state_going_in": "..." | null,
+       "evidence": "...", "thought_experiment": <number> | null,
+       "ruled_out_topic": "..." | null, "raised_by_user": true | false}
+    ],
+    "settled": [
+      {"unclear": <number>, "pattern_type": "<ID>", "sign": "<ID>"}
+    ],
+    "exclusions": [
+      {"pattern_type": "<ID>", "exclusion": "..."}
+    ],
+    "reactions": [
+      {"pattern": <number>, "reaction": "agreed" | "pushed_back" | "brushed_off"}
+    ],
+    "prediction_outcomes": [
+      {"prediction": <number>,
+       "outcome": "came_true" | "did_not" | "not_come_up"}
+    ]
+  }
+
+# The ready gate's one model call. When a Conversation ends and a suspected
+# Pattern passes every check code can make, this call argues the other side:
+# is there a better explanation of the same evidence? It can only block. A
+# yes, an unreadable answer or a failed call leaves the Pattern suspected; it
+# is asked again only once new evidence for that Pattern is tagged.
+pattern_other_side_model: deepseek/deepseek-v4.1-flash-1017
+pattern_other_side_thinking: true
+
+pattern_other_side_prompt: |-
+  Zeph, an AI companion, is about to tell a person a Pattern it sees in
+  them: a way they act in a kind of situation, for a reason. Your job is to
+  argue the other side before it does. A wrong Pattern told to someone as
+  true can hurt them, so look hard for a better explanation.
+
+  You are given today's date, the Pattern with what it is and its if / then
+  / function, its look-alikes (other Patterns easily mistaken for it, with
+  what tells them apart), what anyone would do in such situations, where it
+  was already shown not to happen, and the evidence: each thing the person
+  said, with its day, whether it counts for or against, the kind of
+  evidence, who it was about and what was going on.
+
+  Ask yourself:
+  - Does one of the look-alikes explain this evidence at least as well?
+  - Is this just what anyone would do in these situations?
+  - Does the evidence show what they did but not why, so the reason is a
+    guess?
+  - Is it all really one story, one person or one rough stretch of time?
+  - Does the evidence against outweigh the evidence for?
+
+  Say there is a better explanation only when one of these truly holds for
+  this evidence, not merely because it is possible. When the Pattern is the
+  best explanation of what they said, say there is none.
+
+  Answer with JSON only, in exactly this shape:
+  {"better_explanation": true | false, "why": "<one line>"}
+
+# The matching pass, run by an Admin command (`make match-patterns`), never by
+# a reply or a Conversation end. For each Pattern with no Pattern Type that
+# wasn't matched yet, this call says which Pattern Type it fits, or none.
+# Code keeps the answer only when the Pattern Type is in the catalog, then
+# tags the Conversations behind the Pattern's evidence again against it
+# (ADR-0024).
+pattern_matching_model: deepseek/deepseek-v4.1-flash-1017
+pattern_matching_thinking: true
+
+pattern_matching_prompt: |-
+  You check whether a Pattern that Zeph, an AI companion, noticed about a
+  person fits one of a fixed set of Pattern Types. A Pattern is a way the
+  person thinks, feels, acts or chooses that keeps showing up across their
+  life, written freely, with its evidence. A Pattern Type is a way of acting
+  in a kind of situation, for a reason: "if this happens, they tend to do
+  that, to protect or get something".
+
+  You are given the Pattern Types, each with its ID, and the Pattern with
+  its evidence.
+
+  Say which one Pattern Type the Pattern fits. It fits only when the
+  situation, what they do and why all match the Pattern Type; being about
+  the same part of life is not enough. Mind each Pattern Type's look-alikes
+  and what anyone would do. When it fits none, or you can't tell between
+  two, say none: a wrong match is worse than no match.
+
+  Answer with JSON only, in exactly this shape:
+  {"pattern_type": "<ID>" | null}
+
 # When a Conversation ends and User Memory works for the User, after Life
-# Threads are kept, this call keeps their Patterns: what keeps showing up
-# across their Threads (ADR-0020). It sees the Threads the Conversation
-# touched, their other Threads closest in meaning (up to
-# pattern_keeping_threads), every Pattern kept so far and the days behind
-# the evidence of Patterns linked to those Threads (up to
-# pattern_keeping_days): messages while they are kept, Day Summaries after.
-pattern_keeping_model: deepseek-flash
+# Threads are kept, this call notes their unmatched Patterns: what keeps
+# showing up across their Threads and fits no Pattern Type (ADR-0024). Code
+# starts, confirms and closes Patterns of Pattern Types from Observations;
+# this call never does. It sees the Threads the Conversation touched, their
+# other Threads closest in meaning (up to pattern_keeping_threads), the
+# Pattern Types Zeph already looks for, every Pattern with no Pattern Type
+# kept so far and the days behind the evidence of Patterns linked to those
+# Threads (up to pattern_keeping_days): messages while they are kept, Day
+# Summaries after.
+pattern_keeping_model: deepseek/deepseek-v4.1-flash-1017
 pattern_keeping_thinking: true
 pattern_keeping_threads: 8
 pattern_keeping_days: 14
 
 pattern_keeping_prompt: |-
-  You keep the Patterns of a person who talks with Zeph, an AI companion. A
-  Pattern is a way they think, feel, act or choose that keeps showing up
-  across different parts of their life, most often something they haven't
-  put into words themselves (e.g. "when something grabs them, everything
-  else goes quiet: eating, people, patience", or "keeps choosing freedom
-  over security"). What they keep choosing shows what they value, and goals
-  they only show by what they do count too. A single fact is not a Pattern,
-  and nor is one story.
+  You note the unmatched Patterns of a person who talks with Zeph, an AI
+  companion. A Pattern is a way they think, feel, act or choose that keeps
+  showing up across different parts of their life, most often something they
+  haven't put into words themselves (e.g. "when something grabs them,
+  everything else goes quiet: eating, people, patience", or "keeps choosing
+  freedom over security"). What they keep choosing shows what they value, and
+  goals they only show by what they do count too. A single fact is not a
+  Pattern, and nor is one story.
+
+  Zeph already looks for a fixed set of Pattern Types, and another step
+  notes the evidence for those. Your job is only what fits none of them: an
+  unmatched Pattern.
 
   You are given today's date, the Life Threads (ongoing stories in their
   life) this Conversation touched and their other Threads closest in
-  meaning, each with a number; the Patterns kept so far, each with a number,
-  its state and its evidence; the days behind that evidence, as messages or
-  as Day Summaries; and the Conversation that just ended, with the day it
-  started.
+  meaning, each with a number; the Pattern Types Zeph already looks for; the
+  Patterns kept so far, each with a number, its state and its evidence; the
+  days behind that evidence, as messages or as Day Summaries; and the
+  Conversation that just ended, with the day it started.
 
   You may:
-  - Add evidence to a Pattern that showed up again.
-  - Start a suspected Pattern, only when the same way shows up in two or
-    more different Threads you were given, with evidence from each.
-  - When Zeph offered a view from a Pattern, new or kept, in this
-    Conversation, say how they took it: "agreed", "pushed_back" or
-    "brushed_off". Confirm it ("confirmed") only when they agreed it is
-    them. Close it ("closed") only when they pushed back by rejecting it
-    outright; a softer push back or brushing it off leaves it as it is.
-  Never change a closed Pattern, and never start one that repeats a Pattern
-  already kept. Each piece of evidence names its Thread, the day it
-  happened (YYYY-MM-DD; for what happened in this Conversation, the day it
-  started) and one line on what happened, written to make
-  sense on its own months from now. Write about "they". Don't diagnose or
-  judge. Use only what you are given.
+  - Add evidence to an unmatched Pattern that showed up again.
+  - Start an unmatched Pattern, only when the same way shows up in two or
+    more different Threads you were given, with evidence from each, and it
+    fits none of the Pattern Types.
+  Never start one that fits a Pattern Type, even loosely, or that repeats a
+  Pattern already kept. Never change a confirmed or closed Pattern. Each
+  piece of evidence names its Thread, the day it happened (YYYY-MM-DD; for
+  what happened in this Conversation, the day it started) and one line on
+  what happened, written to make sense on its own months from now. Write
+  about "they". Don't diagnose or judge. Use only what you are given.
+
+  Each unmatched Pattern also gets a general description. It is read by
+  people who must never learn who it is about, and is compared with other
+  people's. Write one for every Pattern you start, and for every Pattern
+  kept so far that is marked "needs a general description", even when you
+  have no new evidence for it. It is one short sentence on the way of
+  acting only, in words that could be true of anyone, starting with a verb
+  (e.g. "Makes jokes when things get serious", "Lets everything else slip
+  while absorbed in something"). It is never about the person: no names, no
+  particular people, jobs or places, no dates or numbers, no quotes, and
+  nothing about what happened. Only its first letter is a capital.
 
   Answer with JSON only, in exactly this shape, leaving out Patterns with
-  nothing new, and "reaction" and "state" when no view was offered:
+  nothing new and no general description to write:
   {
     "patterns": [
       {"pattern": "a sentence or two",
-       "evidence": [{"thread": <number>, "day": "YYYY-MM-DD", "line": "..."}],
-       "reaction": "agreed" | "pushed_back" | "brushed_off",
-       "state": "confirmed" | "closed"},
+       "general": "one short sentence",
+       "evidence": [{"thread": <number>, "day": "YYYY-MM-DD", "line": "..."}]},
       {"pattern": <number>,
-       "evidence": [{"thread": <number>, "day": "YYYY-MM-DD", "line": "..."}],
-       "reaction": "agreed" | "pushed_back" | "brushed_off",
-       "state": "confirmed" | "closed"}
+       "evidence": [{"thread": <number>, "day": "YYYY-MM-DD", "line": "..."}]},
+      {"pattern": <number of one that needs a general description>,
+       "general": "one short sentence",
+       "evidence": []}
     ]
   }
 
 # Personal Stickers. When a Conversation ends and the person sent stickers in
 # it, this model picks the ones whose meaning was clear and writes when to use
 # each. It runs only while the Personal Stickers Feature works for them.
-personal_sticker_keeping_model: deepseek-flash
+personal_sticker_keeping_model: deepseek/deepseek-v4.1-flash-1017
 personal_sticker_keeping_thinking: false
 
 personal_sticker_keeping_prompt: |-
@@ -1278,7 +1814,7 @@ personal_stickers_limit: 30
 # Check-ins. On each scheduler tick, this model decides for each User who is
 # due: a Check-in Kind and message, or to skip. It gets the Persona and this
 # prompt.
-check_in_model: deepseek-flash
+check_in_model: deepseek/deepseek-v4.1-flash-1017
 check_in_thinking: true
 
 check_in_prompt: |-
@@ -1324,15 +1860,28 @@ check_in_hours_between:
 check_in_reply_window_hours: 24
 
 # Eval Runs. Model Prices are SGD per 1,000,000 tokens read ("in") and
-# written ("out"): DeepSeek's peak, cache-miss prices on 15 Nov 2026 at
-# 1 USD ≈ 1.28 SGD. A model with no price shows tokens only. A run that uses
-# more tokens than the limit ends Stopped over limit.
+# written ("out"): DeepSeek's peak, cache-miss prices on 15 Nov 2026 and
+# Anthropic's prices on 24 and 25 Nov 2026, at 1 USD ≈ 1.28 SGD. A model with no
+# price shows tokens only. A run that uses more tokens than the limit ends
+# Stopped over limit.
 model_prices:
-  deepseek-flash:
+  deepseek/deepseek-v4.1-flash-1017:
     in: 0.38
     out: 1.54
-  deepseek-v4-pro:
+  deepseek/deepseek-v4-pro-0813:
     in: 1.69
     out: 5.07
+  anthropic/claude-haiku-5.5:
+    in: 0.13
+    out: 0.64
+  anthropic/claude-sonnet-5.5:
+    in: 2.56
+    out: 12.8
+  anthropic/claude-opus-5.5:
+    in: 5.12
+    out: 25.6
+  anthropic/claude-fable-5.2:
+    in: 10.24
+    out: 51.2
 
 eval_run_token_limit: 1000000

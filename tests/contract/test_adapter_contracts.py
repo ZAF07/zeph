@@ -1,3 +1,4 @@
+import logging
 import os
 import threading
 from pathlib import Path
@@ -12,6 +13,8 @@ from companion.adapters.deepseek.chat_model import DeepSeekChatModel
 from companion.adapters.deepseek.photo_viewer import DeepSeekPhotoViewer
 from companion.adapters.evals.stand_ins import InlineUserWorkQueue
 from companion.adapters.fastembed.embedder import FastEmbedEmbedder
+from companion.adapters.openrouter.chat_model import OpenRouterChatModel
+from companion.adapters.openrouter.photo_viewer import OpenRouterPhotoViewer
 from companion.adapters.postgres.tables import EMBEDDING_SIZE
 from companion.adapters.tavily.web_search import TavilyWebSearch
 from companion.adapters.telegram.chat_channel import TelegramChatChannel
@@ -21,6 +24,12 @@ from companion.core.ports import ChatTool, UserWorkQueue
 from tests.fakes import FakeUserWorkQueue
 
 pytestmark = pytest.mark.contract
+
+OPENROUTER_LOGGER = "companion.adapters.openrouter.chat_model"
+
+WEEKEND_LIST_PHOTO = (
+    Path(__file__).parents[2] / "src/companion/seed/evals/images/weekend-list.jpg"
+)
 
 
 def required_env(key: str) -> str:
@@ -94,15 +103,144 @@ def test_deepseek_thinks_only_when_asked(model: str) -> None:
     assert answer(thinking=False) is None
 
 
+def test_openrouter_generates_a_deepseek_reply() -> None:
+    chat_model = OpenRouterChatModel(required_env("OPENROUTER_API_KEY"))
+
+    reply = chat_model.generate(
+        model="deepseek/deepseek-v4.1-flash-1017",
+        thinking=False,
+        instructions="Reply with one short friendly sentence.",
+        history=[ChatLine(role=ChatRole.USER, text="hi there")],
+    )
+
+    assert reply.text.strip()
+    assert reply.tokens_in > 0
+    assert reply.tokens_out > 0
+
+
+@pytest.mark.parametrize(
+    "model", ["deepseek/deepseek-v4.1-flash-1017", "anthropic/claude-haiku-5.5"]
+)
+def test_openrouter_returns_reasoning_when_thinking_is_on(model: str) -> None:
+    """The question takes a few steps, as Claude skips thinking on easy ones."""
+    chat_model = OpenRouterChatModel(required_env("OPENROUTER_API_KEY"))
+
+    reply = chat_model.generate(
+        model=model,
+        thinking=True,
+        instructions="Answer with one number.",
+        history=[
+            ChatLine(
+                role=ChatRole.USER,
+                text=(
+                    "A farmer has chickens and rabbits: 37 heads and 106 legs "
+                    "in all. Then a third of the rabbits (rounded down) are "
+                    "swapped for the same number of chickens. How many legs "
+                    "are there now?"
+                ),
+            )
+        ],
+    )
+
+    assert "96" in reply.text
+    assert reply.reasoning
+
+
+def test_openrouter_reads_a_claude_models_instructions_from_the_cache_the_second_time(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The instructions are long, as Claude caches only a prompt of some size."""
+    chat_model = OpenRouterChatModel(required_env("OPENROUTER_API_KEY"))
+    house_rules = "\n".join(
+        f"House rule {number}: always greet guest number {number} by name."
+        for number in range(1, 601)
+    )
+
+    with caplog.at_level(logging.INFO, logger=OPENROUTER_LOGGER):
+        for _ in range(2):
+            chat_model.generate(
+                model="anthropic/claude-haiku-5.5",
+                thinking=False,
+                instructions=f"Reply with one short sentence.\n{house_rules}",
+                history=[ChatLine(role=ChatRole.USER, text="hi there")],
+            )
+
+    _, second_call = [
+        message
+        for message in caplog.messages
+        if "prompt tokens from the cache" in message
+    ]
+    cached_tokens = int(second_call.split(" read ")[1].split(" of ")[0])
+    assert cached_tokens > 0, second_call
+
+
+@pytest.mark.parametrize(
+    "model", ["deepseek/deepseek-v4.1-flash-1017", "anthropic/claude-haiku-5.5"]
+)
+def test_openrouter_calls_an_offered_tool_and_uses_its_result(model: str) -> None:
+    chat_model = OpenRouterChatModel(required_env("OPENROUTER_API_KEY"))
+    queries: list[str] = []
+
+    def run_search(arguments: dict[str, object]) -> str:
+        queries.append(str(arguments.get("query", "")))
+        return "Result: the secret word of the day is 'lantern'."
+
+    reply = chat_model.generate(
+        model=model,
+        thinking=True,
+        instructions=(
+            "Always use the web_search tool before answering. "
+            "Then answer in one short sentence."
+        ),
+        history=[ChatLine(role=ChatRole.USER, text="What's the secret word today?")],
+        tools=[
+            ChatTool(
+                name="web_search",
+                description="Search the web.",
+                parameters={
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}},
+                    "required": ["query"],
+                },
+                run=run_search,
+            )
+        ],
+    )
+
+    assert queries
+    assert "lantern" in reply.text.lower()
+    assert reply.tool_calls
+
+
 def test_deepseek_describes_a_photo() -> None:
     photo_viewer = DeepSeekPhotoViewer(required_env("DEEPSEEK_API_KEY"))
-    image_file = Path(__file__).parents[2] / "evals/images/weekend-list.jpg"
 
     answer = photo_viewer.look(
         model="deepseek-flash",
         thinking=False,
         instructions="Write out the handwritten list in the photo.",
-        photo=PhotoImage(content=image_file.read_bytes(), media_type="image/jpeg"),
+        photo=PhotoImage(
+            content=WEEKEND_LIST_PHOTO.read_bytes(), media_type="image/jpeg"
+        ),
+    )
+
+    assert "compost" in answer.text.lower()
+    assert answer.tokens_in > 0
+
+
+@pytest.mark.parametrize(
+    "model", ["deepseek/deepseek-v4.1-flash-1017", "anthropic/claude-haiku-5.5"]
+)
+def test_openrouter_describes_a_photo(model: str) -> None:
+    photo_viewer = OpenRouterPhotoViewer(required_env("OPENROUTER_API_KEY"))
+
+    answer = photo_viewer.look(
+        model=model,
+        thinking=False,
+        instructions="Write out the handwritten list in the photo.",
+        photo=PhotoImage(
+            content=WEEKEND_LIST_PHOTO.read_bytes(), media_type="image/jpeg"
+        ),
     )
 
     assert "compost" in answer.text.lower()

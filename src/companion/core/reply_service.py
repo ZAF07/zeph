@@ -1,11 +1,17 @@
+from dataclasses import replace
+
+from companion.core.agenda import AgendaReader
 from companion.core.conversations import ConversationService, ReplyPartlySentError
 from companion.core.curiosities import CuriosityRaiser
 from companion.core.knowledge_retrieval import KnowledgeRetrieval
 from companion.core.life_threads import ThreadReminder
 from companion.core.memory_retrieval import MemoryRetrieval
-from companion.core.models import MessageToAnswer, UserSnapshot
+from companion.core.model_call_log import ModelCallLog
+from companion.core.models import MessageToAnswer, ShareVia, UserSnapshot
 from companion.core.move_outcomes import MoveOutcomeFinder
+from companion.core.pattern_sharing import PatternSharing
 from companion.core.patterns import PatternReminder
+from companion.core.predictions import PredictionKeeper
 from companion.core.recent_messages import RecentMessagesReader
 from companion.core.reply_attempt import ReplyAttempt
 from companion.core.reply_gate import ReplyGate, Stopped
@@ -40,7 +46,10 @@ class ReplyService:
     Plan chose are recalled; then the reply is composed, in its strict
     priority order, a small check asks whether it brought up the Check-in
     it was offered, and it is delivered, and the Threads and Curiosities it
-    brought up are marked raised. A struggling User is
+    brought up are marked raised. While Pattern sharing works, the Reply
+    Plan is also offered a ready Pattern to tell them, and a small check
+    after the reply is sent says whether it was told; only then is it
+    shared. A struggling User is
     offered none of their Shared Photos back unless they asked for one.
     Every step reads the User from the same snapshot.
     """
@@ -60,6 +69,10 @@ class ReplyService:
         woven_check_ins: WovenCheckIns,
         recent_messages: RecentMessagesReader,
         pattern_reminder: PatternReminder,
+        agenda: AgendaReader,
+        pattern_sharing: PatternSharing,
+        prediction_keeper: PredictionKeeper,
+        model_call_log: ModelCallLog,
     ) -> None:
         """Set up the service.
 
@@ -69,7 +82,7 @@ class ReplyService:
             thread_reminder: Finds the Life Threads each Message touches and
                 marks those brought up.
             curiosity_raiser: Lists the Curiosities whose day has come and
-                marks those brought up.
+                marks raised those the reply really asked.
             move_outcome_finder: Finds the User's past Move Outcomes that fit
                 each Message.
             understanding: Reads each Message before the reply is planned.
@@ -84,6 +97,13 @@ class ReplyService:
             recent_messages: Reads the messages every step of the reply sees.
             pattern_reminder: Finds the Patterns that come to mind for each
                 Message.
+            agenda: Reads the User's Agenda for the Reply Plan.
+            pattern_sharing: Offers a ready Pattern to share and records
+                when it was.
+            prediction_keeper: Keeps the new Prediction a reply gave a
+                shared Pattern.
+            model_call_log: Records whether the Curiosity was really asked
+                and the Pattern shared, on the Reply Plan's shape.
         """
         self._reply_gate = reply_gate
         self._conversations = conversations
@@ -98,6 +118,10 @@ class ReplyService:
         self._woven_check_ins = woven_check_ins
         self._recent_messages = recent_messages
         self._pattern_reminder = pattern_reminder
+        self._agenda = agenda
+        self._pattern_sharing = pattern_sharing
+        self._prediction_keeper = prediction_keeper
+        self._model_call_log = model_call_log
 
     def handle(
         self, message: MessageToAnswer, snapshot: UserSnapshot, attempt: ReplyAttempt
@@ -112,7 +136,10 @@ class ReplyService:
         extra. One the brought-up check finds the reply left out, or offered
         to a reply that fails or is dropped before any of it is sent, is
         taken back, so it stays due; once part of a reply that brought it up
-        is sent, it counts as sent and is never woven in again.
+        is sent, it counts as sent and is never woven in again. A ready
+        Pattern the Reply Plan chose to tell them moves to shared only once
+        the reply is sent and the check after it says it was told;
+        otherwise it stays ready.
 
         Args:
             message: The Message to answer, its texts already saved and
@@ -141,7 +168,14 @@ class ReplyService:
         patterns = self._pattern_reminder.remind(
             snapshot, message.conversation_id, understanding.form.means, reminded
         )
-        due = self._curiosity_raiser.due(snapshot, message.conversation_id)
+        due = self._curiosity_raiser.due(
+            snapshot,
+            message.conversation_id,
+            understanding.form.struggling,
+            self._prediction_keeper.follow_ups_due_early(
+                snapshot, [item.thread for item in reminded]
+            ),
+        )
         move_outcomes = self._move_outcome_finder.find(
             snapshot, message.conversation_id
         )
@@ -155,6 +189,14 @@ class ReplyService:
             move_outcomes,
             self._woven_check_ins.kinds_to_offer(snapshot, understanding.form),
             patterns,
+            self._agenda.read(snapshot, understanding.form.struggling),
+            self._pattern_sharing.pattern_to_offer(
+                snapshot, understanding.form.struggling
+            ),
+            self._pattern_sharing.contested_patterns(snapshot),
+            self._pattern_sharing.told_patterns(
+                snapshot, understanding.form.struggling
+            ),
         )
         plan = planned.reply_plan.form
         attempt.raise_if_dropped()
@@ -214,4 +256,26 @@ class ReplyService:
                 self._woven_check_ins.take_back(snapshot, offered)
             raise
         self._thread_reminder.mark_raised(message.conversation_id, plan.bring_up)
-        self._curiosity_raiser.mark_raised(message.conversation_id, plan.curiosities)
+        self._curiosity_raiser.record_reaction(due, plan.curiosity_taken)
+        asked = self._curiosity_raiser.mark_asked(
+            snapshot, message.conversation_id, plan.curiosities, reply.texts
+        )
+        self._prediction_keeper.record_given(
+            snapshot, [item.curiosity_id for item in asked], reply.texts
+        )
+        if planned.shape is None:
+            return
+        shape = planned.shape
+        if plan.curiosities:
+            shape = replace(shape, curiosity_asked=bool(asked))
+        if planned.pattern_to_share is not None:
+            shared = self._pattern_sharing.record_if_shared(
+                snapshot,
+                planned.pattern_to_share,
+                reply.texts,
+                ShareVia.CHAT,
+                message.conversation_id,
+            )
+            shape = replace(shape, pattern_shared=shared)
+        if shape != planned.shape:
+            self._model_call_log.record_reply_plan_shape(snapshot, shape)

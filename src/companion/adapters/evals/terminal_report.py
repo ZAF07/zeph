@@ -6,8 +6,13 @@ from companion.core.evals.models import (
     CaseResult,
     Check,
     Cost,
+    Estimate,
     EvalName,
     EvalRunOverview,
+)
+from companion.core.evals.whole_pipeline_eval import (
+    TARGET_PERCENT_OF_READY_TRUE,
+    missed_line,
 )
 
 EVAL_TITLES = {
@@ -19,6 +24,8 @@ EVAL_TITLES = {
     EvalName.UNDERSTANDING: "Understanding",
     EvalName.MOVE_OUTCOME: "Move Outcome",
     EvalName.DAY_SUMMARY: "Day Summary",
+    EvalName.TAGGING: "Tagging",
+    EvalName.WHOLE_PIPELINE: "Whole pipeline",
 }
 OUTCOME_MARKS = {
     CaseOutcome.PASS: "PASS",
@@ -236,6 +243,45 @@ def understanding_calls_line(results: Sequence[CaseResult]) -> str:
     )
 
 
+def whole_pipeline_score(results: Sequence[CaseResult]) -> str:
+    """Write the Whole-pipeline score: how many ready Patterns were true.
+
+    Args:
+        results: The Whole-pipeline results.
+
+    Returns:
+        E.g. "Whole pipeline: 4 of 5 ready Patterns true (80%, target 70%);
+        4 of 7 true Patterns found".
+    """
+    facts = [r.result.facts["whole_pipeline"] for r in checked(results)]
+    ready = [pattern for fact in facts for pattern in fact["patterns"]]
+    true_ready = sum(pattern["is_true"] for pattern in ready)
+    true_count = sum(fact["true_count"] for fact in facts)
+    missed = sum(len(fact["missed"]) for fact in facts)
+    percent = f"{round(100 * true_ready / len(ready))}%" if ready else "none ready"
+    return (
+        f"Whole pipeline: {true_ready} of {len(ready)} ready Patterns true "
+        f"({percent}, target {TARGET_PERCENT_OF_READY_TRUE}%); "
+        f"{true_count - missed} of {true_count} true Patterns found"
+    )
+
+
+def missed_lines(result: CaseResult) -> list[str]:
+    """Write the true Patterns a Whole-pipeline case missed, and where they stopped.
+
+    Args:
+        result: The Case Result.
+
+    Returns:
+        One line per missed Pattern, e.g. "    missed CONF.AVOID.BELONG:
+        suspected, stopped by situations".
+    """
+    return [
+        f"    missed {missed_line(missed)}"
+        for missed in result.result.facts["whole_pipeline"]["missed"]
+    ]
+
+
 SCORES: dict[EvalName, Callable[[Sequence[CaseResult]], str]] = {
     EvalName.PERSONA: checks_score("Persona", "rules kept"),
     EvalName.KNOWLEDGE: checks_score("Knowledge", "steps right"),
@@ -244,6 +290,8 @@ SCORES: dict[EvalName, Callable[[Sequence[CaseResult]], str]] = {
     EvalName.UNDERSTANDING: checks_score("Understanding", "checks and rules passed"),
     EvalName.MOVE_OUTCOME: checks_score("Move Outcome", "checks and rules passed"),
     EvalName.DAY_SUMMARY: checks_score("Day Summary", "questions matched"),
+    EvalName.TAGGING: cases_score("Tagging"),
+    EvalName.WHOLE_PIPELINE: whole_pipeline_score,
 }
 
 
@@ -264,6 +312,8 @@ def eval_lines(name: EvalName, results: Sequence[CaseResult]) -> list[str]:
         lines.append(f"  {understanding_calls_line(results)}")
     for result in checked(results):
         lines += case_lines(result)
+        if name == EvalName.WHOLE_PIPELINE:
+            lines += missed_lines(result)
     return [*lines, *errors_lines(results)]
 
 
@@ -285,6 +335,25 @@ def cost_line(cost: Cost) -> str:
             f"; {models} {'has' if one else 'have'} no price set, "
             f"so {'its' if one else 'their'} tokens aren't counted"
         )
+    return line
+
+
+def estimate_line(estimate: Estimate) -> str:
+    """Write what a run is likely to cost, printed before it is queued.
+
+    Args:
+        estimate: The run's estimate, at the live Model Prices.
+
+    Returns:
+        E.g. "Estimate: 40 cases, about S$0.4100 at the live prices (40 never
+        run, so a rough figure)", naming any model with no price set.
+    """
+    cases = f"{estimate.case_count} case{'' if estimate.case_count == 1 else 's'}"
+    line = f"Estimate: {cases}, about S${estimate.cost.sgd:.4f} at the live prices"
+    if estimate.rough_case_count:
+        line += f" ({estimate.rough_case_count} never run, so a rough figure)"
+    if estimate.cost.unpriced_models:
+        line += f"; no price set for {', '.join(estimate.cost.unpriced_models)}"
     return line
 
 

@@ -5,6 +5,7 @@ from sqlalchemy import (
     Column,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     Identity,
     Index,
@@ -39,6 +40,7 @@ users = Table(
     Column("ai_notice_acknowledged_at", DateTime(timezone=True)),
     Column("user_memory_enabled", Boolean, nullable=False, server_default="true"),
     Column("photo_viewing_enabled", Boolean, nullable=False, server_default="true"),
+    Column("directness", Text, nullable=False, server_default="balanced"),
     Column("onboarding_completed_at", DateTime(timezone=True)),
     Column("role", Text, nullable=False, server_default="user"),
     Column("check_ins_enabled", Boolean, nullable=False, server_default="false"),
@@ -63,6 +65,11 @@ users = Table(
     Column("settings_changed_in_chat", JSONB, nullable=False, server_default="{}"),
     Column("settings_changed_by_admin", JSONB, nullable=False, server_default="{}"),
     Column("data_deletion_requested_at", DateTime(timezone=True)),
+    Column("pattern_noticing_told_at", DateTime(timezone=True)),
+    Column("familiarity", Text, nullable=False, server_default="new"),
+    Column(
+        "contested_gathering_enabled", Boolean, nullable=False, server_default="true"
+    ),
 )
 
 telegram_connections = Table(
@@ -161,6 +168,16 @@ copy_slots = Table(
     Column("updated_by", Uuid, ForeignKey("users.id", ondelete="SET NULL")),
 )
 
+pattern_types = Table(
+    "pattern_types",
+    metadata,
+    Column("pattern_type_id", Text, primary_key=True),
+    Column("version", Text, primary_key=True),
+    Column("content", JSONB, nullable=False),
+    Column("is_current", Boolean, nullable=False),
+    Column("loaded_at", DateTime(timezone=True), nullable=False),
+)
+
 helplines = Table(
     "helplines",
     metadata,
@@ -214,6 +231,7 @@ needs = Table(
     Column("how_to_reply", Text, nullable=False),
     Column("sort_order", Integer, nullable=False),
     Column("is_fallback", Boolean, nullable=False, server_default="false"),
+    Column("curiosities", Text, nullable=False, server_default="only_if_it_fits"),
     Index(
         "needs_one_fallback",
         "is_fallback",
@@ -477,6 +495,38 @@ curiosities = Table(
     Column("reaction", Text),
     Column("guess", Text),
     Column("how_sure", Text),
+    Column("aim", Text, nullable=False),
+    Column(
+        "exploration_id",
+        Uuid,
+        ForeignKey("explorations.id", ondelete="CASCADE"),
+        index=True,
+    ),
+    Column(
+        "source_observation_id",
+        Uuid,
+        ForeignKey("observations.id", ondelete="CASCADE"),
+        index=True,
+    ),
+    Column(
+        "thought_experiment_id",
+        Uuid,
+        ForeignKey("thought_experiments.id"),
+        index=True,
+    ),
+    Column("not_after", Date),
+    Column(
+        "pattern_id",
+        Uuid,
+        ForeignKey("patterns.id", ondelete="CASCADE"),
+        index=True,
+    ),
+    Column(
+        "prediction_id",
+        Uuid,
+        ForeignKey("predictions.id", ondelete="CASCADE"),
+        index=True,
+    ),
     Index("ix_curiosities_user_id_state", "user_id", "state"),
 )
 
@@ -513,14 +563,141 @@ patterns = Table(
         nullable=False,
         index=True,
     ),
-    Column("pattern", Text, nullable=False),
+    Column("pattern", Text),
+    Column("pattern_type_id", Text),
     Column("state", Text, nullable=False),
     Column("started_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
-    Column("last_offered_at", DateTime(timezone=True)),
-    Column("last_reaction", Text),
     Column("confirmed_at", DateTime(timezone=True)),
+    Column("matched_pattern_type_id", Text),
+    Column("general_description", Text),
+    Column(
+        "unmatched_entry_id",
+        Uuid,
+        ForeignKey("unmatched_entries.id", ondelete="SET NULL"),
+        index=True,
+    ),
     Column("embedding", Vector(EMBEDDING_SIZE)),
+    Column("blocked_by", Text),
+    Column("narrowings", JSONB, nullable=False, server_default="[]"),
+    Column("other_side_asked_at", DateTime(timezone=True)),
+    Column("other_side_found_better", Boolean),
+    Column("shared_at", DateTime(timezone=True)),
+    Column("shared_wording", Text),
+    UniqueConstraint(
+        "user_id", "pattern_type_id", name="uq_patterns_user_id_pattern_type_id"
+    ),
+)
+
+patterns_never_again = Table(
+    "patterns_never_again",
+    metadata,
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("pattern_type_id", Text, primary_key=True),
+    Column("marked_at", DateTime(timezone=True), nullable=False),
+)
+
+predictions = Table(
+    "predictions",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column(
+        "pattern_id",
+        Uuid,
+        ForeignKey("patterns.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("wording", Text, nullable=False),
+    Column("made_at", DateTime(timezone=True), nullable=False),
+    Column("outcome", Text),
+    Column("outcome_at", DateTime(timezone=True)),
+    Column(
+        "outcome_conversation_id",
+        Uuid,
+        ForeignKey("conversations.id", ondelete="SET NULL"),
+    ),
+    Column("wording_number", Integer),
+)
+
+pattern_reactions = Table(
+    "pattern_reactions",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column(
+        "pattern_id",
+        Uuid,
+        ForeignKey("patterns.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("reaction", Text, nullable=False),
+    Column(
+        "conversation_id", Uuid, ForeignKey("conversations.id", ondelete="SET NULL")
+    ),
+    Column("reacted_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "pattern_id",
+        "conversation_id",
+        name="uq_pattern_reactions_pattern_id_conversation_id",
+    ),
+)
+
+unmatched_entries = Table(
+    "unmatched_entries",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("description", Text, nullable=False),
+    Column("embedding", Vector(EMBEDDING_SIZE), nullable=False),
+    Column("mark", Text, nullable=False),
+    Column("folded_into_pattern_type_id", Text),
+    Column("users_when_marked", Integer),
+    Column("marked_at", DateTime(timezone=True)),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+)
+
+pattern_moves = Table(
+    "pattern_moves",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("position", BigInteger, Identity(), nullable=False, unique=True),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("pattern_id", Uuid, nullable=False),
+    Column("pattern_type_id", Text, nullable=False),
+    Column("from_state", Text),
+    Column("to_state", Text, nullable=False),
+    Column("cause", Text, nullable=False),
+    Column("conversation_id", Uuid),
+    Column("points", Float, nullable=False),
+    Column("situations", Integer, nullable=False),
+    Column("moved_at", DateTime(timezone=True), nullable=False),
+    Column("blocked_by", Text),
+    Column("reason", Text),
 )
 
 pattern_evidence = Table(
@@ -544,6 +721,176 @@ pattern_evidence = Table(
     ),
     Column("day", Date, nullable=False),
     Column("line", Text, nullable=False),
+)
+
+observations = Table(
+    "observations",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("position", BigInteger, Identity(), nullable=False, unique=True),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column(
+        "conversation_id",
+        Uuid,
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("pattern_type_id", Text, nullable=False),
+    Column("pattern_type_version", Text, nullable=False),
+    Column("sign_id", Text, nullable=False),
+    Column("direction", Text, nullable=False),
+    Column("quote", Text, nullable=False),
+    Column("context", Text, nullable=False),
+    Column("day", Date, nullable=False),
+    Column(
+        "life_thread_id",
+        Uuid,
+        ForeignKey("life_threads.id", ondelete="CASCADE"),
+        index=True,
+    ),
+    Column("about", Text, nullable=False),
+    Column("relationship", Text),
+    Column("power", Text),
+    Column("setting", Text),
+    Column("stance", Text),
+    Column("audience", Text),
+    Column("stakes", Text),
+    Column("state_going_in", Text),
+    Column("evidence_kind", Text, nullable=False),
+    Column("second_pattern_type_id", Text),
+    Column("second_pattern_type_version", Text),
+    Column("situational", Boolean, nullable=False),
+    Column("tagged_at", DateTime(timezone=True), nullable=False),
+    Column("excluded", Boolean, nullable=False, server_default="false"),
+    Column("ruled_out_topic", Text),
+    Column("raised_by_user", Boolean, nullable=False, server_default="false"),
+)
+
+deleted_quotes = Table(
+    "deleted_quotes",
+    metadata,
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "conversation_id",
+        Uuid,
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("text_hash", Text, primary_key=True),
+    Column("span_start", Integer, primary_key=True),
+    Column("span_end", Integer, primary_key=True),
+    Column("deleted_at", DateTime(timezone=True), nullable=False),
+)
+
+pattern_exclusion_flags = Table(
+    "pattern_exclusion_flags",
+    metadata,
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("pattern_type_id", Text, primary_key=True),
+    Column("exclusion", Text, primary_key=True),
+    Column("evidence", Text, nullable=False),
+    Column("flagged_at", DateTime(timezone=True), nullable=False),
+)
+
+explorations = Table(
+    "explorations",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column(
+        "pattern_id",
+        Uuid,
+        ForeignKey("patterns.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    ),
+    Column("pattern_type_id", Text, nullable=False),
+    Column("state", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("rested_at", DateTime(timezone=True)),
+    Column("woke_at", DateTime(timezone=True)),
+)
+
+exploration_tries = Table(
+    "exploration_tries",
+    metadata,
+    Column(
+        "curiosity_id",
+        Uuid,
+        ForeignKey("curiosities.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "exploration_id",
+        Uuid,
+        ForeignKey("explorations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("need", Text, nullable=False),
+    Column("approach", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column(
+        "observation_id",
+        Uuid,
+        ForeignKey("observations.id", ondelete="SET NULL"),
+    ),
+    Column("condition", Text),
+    Column("condition_value", Text),
+    Column("outcome", Text),
+    Column(
+        "thought_experiment_id",
+        Uuid,
+        ForeignKey("thought_experiments.id"),
+        index=True,
+    ),
+)
+
+thought_experiments = Table(
+    "thought_experiments",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("wording", Text, nullable=False),
+    Column("pattern_type_id", Text, nullable=False),
+    Column("other_pattern_type_id", Text, nullable=False),
+    Column("sensitivity", Text, nullable=False),
+    Column("starter", Boolean, nullable=False),
+    Column("is_on", Boolean, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("archived_at", DateTime(timezone=True)),
+    Column("seed_key", Text, unique=True),
 )
 
 patterns_in_mind = Table(
@@ -693,6 +1040,7 @@ check_in_kinds = Table(
     Column("sort_order", Integer, nullable=False),
     Column("sends_shared_photo", Boolean, nullable=False),
     Column("raises_curiosity", Boolean, nullable=False),
+    Column("shares_pattern", Boolean, nullable=False),
 )
 
 check_ins = Table(
@@ -778,6 +1126,7 @@ model_calls = Table(
     Column("understanding_shape", JSONB(none_as_null=True)),
     Column("check_in_shape", JSONB(none_as_null=True)),
     Column("reply_plan_shape", JSONB(none_as_null=True)),
+    Column("tagging_shape", JSONB(none_as_null=True)),
 )
 
 eval_cases = Table(
@@ -911,4 +1260,5 @@ eval_model_calls = Table(
     Column("understanding_shape", JSONB(none_as_null=True)),
     Column("check_in_shape", JSONB(none_as_null=True)),
     Column("reply_plan_shape", JSONB(none_as_null=True)),
+    Column("tagging_shape", JSONB(none_as_null=True)),
 )

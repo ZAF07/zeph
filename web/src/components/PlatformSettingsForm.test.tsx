@@ -90,15 +90,80 @@ const settings: AdminSettings = {
     52,
     "How close in meaning a Pattern must be for Recall to bring it to mind with no Thread.",
   ),
-  pattern_pushed_back_wait_days: seeded(
-    30,
-    "Days before a Pattern the User pushed back on comes to mind for the Reply Plan again.",
+  pattern_weak_sign_points: seeded(30),
+  pattern_moderate_sign_points: seeded(70),
+  pattern_strong_sign_points: seeded(140),
+  pattern_real_story_percent: seeded(100),
+  pattern_reported_habit_percent: seeded(70),
+  pattern_what_if_percent: seeded(40),
+  pattern_own_opinion_percent: seeded(30),
+  pattern_unclear_percent: seeded(25),
+  pattern_half_life_days: seeded(
+    75,
+    "After this many days an Observation counts half.",
   ),
+  pattern_people_per_situation: seeded(3),
+  narrowing_stories_needed: seeded(2),
+  narrowings_per_pattern: seeded(2),
+  pattern_suspected_situations: seeded(2),
+  pattern_suspected_points: seeded(100),
+  pattern_closed_under_points: seeded(-150),
+  agenda_size: seeded(
+    3,
+    "How many of a User's suspected Patterns Zeph explores at once.",
+  ),
+  exploration_wait_days_gentle: seeded(5),
+  exploration_wait_days: seeded(3),
+  exploration_wait_days_direct: seeded(2),
+  exploration_rest_after_tries_gentle: seeded(3),
+  exploration_rest_after_tries: seeded(4),
+  exploration_rest_after_tries_direct: seeded(5),
+  condition_one_sided_stories: seeded(2),
+  thought_experiments_per_pattern_per_week: seeded(1),
+  pattern_ready_situations: seeded(3),
+  pattern_ready_conversations: seeded(2),
+  pattern_ready_points: seeded(300, "The lowest score to be shared."),
+  pattern_ready_against_under_points: seeded(100),
+  pattern_safeguard_quiet_days: seeded(14),
+  pattern_exclusion_summary_days: seeded(7),
+  patterns_shared_per_week: seeded(1),
+  pattern_share_wait_days: seeded(5),
+  prediction_follow_up_wait_days: seeded(7),
+  prediction_follow_up_drop_days: seeded(21),
+  predictions_to_confirm: seeded(2),
+  predictions_to_close: seeded(2),
+  predictions_unanswered_to_stop: seeded(2),
+  pattern_confirm_points_after_sharing: seeded(300),
+  pattern_ruled_out_topics: seeded(
+    ["abuse", "self-harm or suicide"],
+    "Topics no Pattern is drawn or shared from unless the User raised them.",
+  ),
+  familiarity_conversations: seeded(5),
+  familiarity_life_threads: seeded(3),
+  familiarity_real_stories: seeded(0),
+  starter_thought_experiments: seeded(4),
+  starter_thought_experiment_days: seeded(14),
+  starter_thought_experiments_per_conversation: seeded(1),
+  unmatched_grouping_closeness_percent: seeded(80),
   move_outcomes_per_understanding: seeded(3),
   move_outcomes_closeness_percent: seeded(65),
   curiosities_per_conversation: seeded(1),
+  curiosities_per_reply: seeded(
+    1,
+    "Most Curiosities raised per Conversation still caps it.",
+  ),
+  curiosity_held_when_asking_why: seeded(
+    true,
+    "When on, a reply that asks why asks no Curiosity too.",
+  ),
   curiosities_waiting_limit: seeded(10),
   curiosity_check_ins_per_week: seeded(1),
+  curiosity_replies_between_gentle: seeded(4),
+  curiosity_replies_between: seeded(3),
+  curiosity_replies_between_direct: seeded(2),
+  follow_ups_per_conversation: seeded(3),
+  curiosity_brush_offs_to_back_off: seeded(2),
+  curiosity_back_off_days: seeded(3),
   knowledge_closeness_percent: seeded(60),
   photo_retry_count: seeded(2),
   photo_album_max_photos: seeded(5),
@@ -322,31 +387,6 @@ describe("PlatformSettingsForm", () => {
     });
   });
 
-  it("shows and saves the wait after a pushed-back Pattern, with its hint", async () => {
-    const user = userEvent.setup();
-    renderWithQueries(<PlatformSettingsForm />);
-    const wait = await screen.findByLabelText(
-      "Wait after a pushed-back Pattern",
-    );
-    expect(wait).toHaveValue(30);
-    expect(
-      screen.getByText(
-        "Days before a Pattern the User pushed back on comes to mind for the Reply Plan again.",
-      ),
-    ).toBeVisible();
-    expect(screen.getByRole("region", { name: "Memory" })).toContainElement(
-      wait,
-    );
-
-    await user.clear(wait);
-    await user.type(wait, "45");
-    await user.click(screen.getByRole("button", { name: "Save settings" }));
-
-    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
-      pattern_pushed_back_wait_days: 45,
-    });
-  });
-
   it("shows and saves the Pattern closeness bar, with its hint", async () => {
     const user = userEvent.setup();
     renderWithQueries(<PlatformSettingsForm />);
@@ -416,6 +456,160 @@ describe("PlatformSettingsForm", () => {
       curiosities_per_conversation: 2,
       curiosities_waiting_limit: 20,
       curiosity_check_ins_per_week: 3,
+    });
+  });
+
+  it("shows and saves the Curiosities per reply and holding one back, with hints", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const perReply = await screen.findByLabelText("Most Curiosities per reply");
+    const held = screen.getByRole("switch", {
+      name: "Hold a Curiosity when the reply asks why",
+    });
+    expect(perReply).toHaveValue(1);
+    expect(held).toHaveAttribute("aria-checked", "true");
+    expect(
+      screen.getByText(
+        "Most Curiosities raised per Conversation still caps it.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("When on, a reply that asks why asks no Curiosity too."),
+    ).toBeInTheDocument();
+
+    await user.clear(perReply);
+    await user.type(perReply, "2");
+    await user.click(held);
+    expect(held).toHaveAttribute("aria-checked", "false");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      curiosities_per_reply: 2,
+      curiosity_held_when_asking_why: false,
+    });
+  });
+
+  it("shows and saves the Curiosity pace and backing off", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const between = await screen.findByLabelText(
+      "Fewest replies between Curiosities: balanced",
+    );
+    const betweenForDirect = screen.getByLabelText(
+      "Fewest replies between Curiosities: direct",
+    );
+    const followUps = screen.getByLabelText(
+      "Most follow-up questions per Conversation",
+    );
+    const brushOffs = screen.getByLabelText("Brush-offs before backing off");
+    const days = screen.getByLabelText("Days of doubled spacing");
+    expect(
+      screen.getByLabelText("Fewest replies between Curiosities: gentle"),
+    ).toHaveValue(4);
+    expect(between).toHaveValue(3);
+    expect(betweenForDirect).toHaveValue(2);
+    expect(followUps).toHaveValue(3);
+    expect(brushOffs).toHaveValue(2);
+    expect(days).toHaveValue(3);
+
+    await user.clear(between);
+    await user.type(between, "4");
+    await user.clear(betweenForDirect);
+    await user.type(betweenForDirect, "1");
+    await user.clear(followUps);
+    await user.type(followUps, "2");
+    await user.clear(brushOffs);
+    await user.type(brushOffs, "3");
+    await user.clear(days);
+    await user.type(days, "5");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      curiosity_replies_between: 4,
+      curiosity_replies_between_direct: 1,
+      follow_ups_per_conversation: 2,
+      curiosity_brush_offs_to_back_off: 3,
+      curiosity_back_off_days: 5,
+    });
+  });
+
+  it("shows and saves the Pattern scoring numbers, a negative floor too", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const halfLife = await screen.findByLabelText("Pattern evidence half-life");
+    const floor = screen.getByLabelText("Score that closes a Pattern");
+    expect(halfLife).toHaveValue(75);
+    expect(floor).toHaveValue(-150);
+    expect(screen.getByLabelText("Points for a strong sign")).toHaveValue(140);
+    expect(screen.getByLabelText("Unclear counts")).toHaveValue(25);
+    expect(screen.getByLabelText("Situations to be suspected")).toHaveValue(2);
+    expect(
+      screen.getByLabelText("Stories before a Condition narrows a Pattern"),
+    ).toHaveValue(2);
+    expect(screen.getByLabelText("Most narrowings per Pattern")).toHaveValue(2);
+    expect(
+      screen.getByText("After this many days an Observation counts half."),
+    ).toBeInTheDocument();
+
+    await user.clear(halfLife);
+    await user.type(halfLife, "60");
+    await user.clear(floor);
+    await user.type(floor, "-200");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      pattern_half_life_days: 60,
+      pattern_closed_under_points: -200,
+    });
+  });
+
+  it("shows and saves the Agenda numbers in the Patterns section", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const size = await screen.findByLabelText("Explorations on the Agenda");
+    const wait = screen.getByLabelText(
+      "Wait after a try with nothing: balanced",
+    );
+    const waitForGentle = screen.getByLabelText(
+      "Wait after a try with nothing: gentle",
+    );
+    const rest = screen.getByLabelText(
+      "Tries with nothing before resting: balanced",
+    );
+    expect(size).toHaveValue(3);
+    expect(waitForGentle).toHaveValue(5);
+    expect(wait).toHaveValue(3);
+    expect(
+      screen.getByLabelText("Wait after a try with nothing: direct"),
+    ).toHaveValue(2);
+    expect(
+      screen.getByLabelText("Tries with nothing before resting: gentle"),
+    ).toHaveValue(3);
+    expect(rest).toHaveValue(4);
+    expect(
+      screen.getByLabelText("Tries with nothing before resting: direct"),
+    ).toHaveValue(5);
+    expect(screen.getByRole("region", { name: "Patterns" })).toContainElement(
+      size,
+    );
+    expect(
+      screen.getByText(
+        "How many of a User's suspected Patterns Zeph explores at once.",
+      ),
+    ).toBeInTheDocument();
+
+    await user.clear(size);
+    await user.type(size, "2");
+    await user.clear(waitForGentle);
+    await user.type(waitForGentle, "7");
+    await user.clear(rest);
+    await user.type(rest, "5");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      agenda_size: 2,
+      exploration_wait_days_gentle: 7,
+      exploration_rest_after_tries: 5,
     });
   });
 
@@ -594,6 +788,41 @@ describe("PlatformSettingsForm", () => {
     });
   });
 
+  it("shows and saves the ready bars and the ruled-out topics under Patterns", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const points = await screen.findByLabelText("Score to be ready");
+    const topics = screen.getByLabelText(/Ruled-out topics/);
+    const patterns = screen.getByRole("region", { name: "Patterns" });
+    expect(points).toHaveValue(300);
+    expect(topics).toHaveValue("abuse, self-harm or suicide");
+    expect(patterns).toContainElement(points);
+    expect(patterns).toContainElement(topics);
+    expect(screen.getByLabelText("Situations to be ready")).toHaveValue(3);
+    expect(screen.getByLabelText("Conversations to be ready")).toHaveValue(2);
+    expect(
+      screen.getByLabelText("Evidence against must stay under"),
+    ).toHaveValue(100);
+    expect(
+      screen.getByLabelText("Days no Pattern is ready after a Safeguard Event"),
+    ).toHaveValue(14);
+    expect(
+      screen.getByLabelText("Day Summaries read for exclusions"),
+    ).toHaveValue(7);
+    expect(screen.getByText("The lowest score to be shared.")).toBeVisible();
+
+    await user.clear(points);
+    await user.type(points, "350");
+    await user.clear(topics);
+    await user.type(topics, "abuse, money");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      pattern_ready_points: 350,
+      pattern_ruled_out_topics: ["abuse", "money"],
+    });
+  });
+
   it("won't save an empty trailing words list", async () => {
     const user = userEvent.setup();
     renderWithQueries(<PlatformSettingsForm />);
@@ -698,7 +927,9 @@ describe("PlatformSettingsForm", () => {
     expect(
       await screen.findByLabelText("Per-user daily web search limit"),
     ).toHaveValue(10);
-    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("switch", { name: /web search/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("saves a new daily web search limit as a number", async () => {

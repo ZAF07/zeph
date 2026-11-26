@@ -12,13 +12,14 @@ import { LoadFailed } from "@/components/LoadFailed";
 import { LoadingPanel } from "@/components/LoadingPanel";
 import { MemoryOffNotice } from "@/components/MemoryOffNotice";
 import { PageHero } from "@/components/PageHero";
+import { PatternNoticingNotice } from "@/components/PatternNoticingNotice";
 import { PillLink } from "@/components/PillLink";
 import { RecentlyRemembered } from "@/components/RecentlyRemembered";
 import { currentTime } from "@/lib/clock";
 import { readCopy, type Copy } from "@/lib/copy";
 import { greeting, lastTalkedText } from "@/lib/home";
 import { memoryOffNote } from "@/lib/memory-off-note";
-import { queryKeys } from "@/lib/queries";
+import { queryKeys, useMe } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 const cardRow = "flex flex-wrap gap-6";
@@ -28,10 +29,12 @@ const cardRow = "flex flex-wrap gap-6";
  * the Telegram and Check-ins cards, the Memory line, what the User is working
  * toward (the Memory line becomes the "Memory is off" notice while it is
  * off), what Zeph recently remembered, the Plan card (to build) and the AI
- * notice. Every word is Copy.
+ * notice. Until the User presses Got it, the notice saying Zeph now keeps
+ * some of their words sits under the greeting. Every word is Copy.
  *
- * @param props - `copy` is Home's Copy and the Shared Memory-off notes,
- *   read on the server.
+ * @param props - `copy` is Home's Copy, the Shared Memory-off notes and the
+ *   Shared notice saying Zeph now keeps some of their words, read on the
+ *   server.
  * @returns The page, loading panels, or an error with Try again.
  */
 export function DashboardHome({ copy }: { copy: Copy }) {
@@ -41,6 +44,7 @@ export function DashboardHome({ copy }: { copy: Copy }) {
     queryKey: queryKeys.home,
     queryFn: () => apiClient.getHome(),
   });
+  const me = useMe().data;
 
   const now = currentTime();
   const home = homeQuery.data;
@@ -84,6 +88,7 @@ export function DashboardHome({ copy }: { copy: Copy }) {
           ) : null
         }
       />
+      {me ? <PatternNoticingNotice me={me} copy={copy} /> : null}
       {home.telegram_connection ? null : (
         <AttentionCard
           title={text("not_connected.title")}

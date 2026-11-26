@@ -91,6 +91,16 @@ describe("describeSettingValue", () => {
     ).toBe("Be heard\nWhen it fits: venting\nHow to reply: listen");
     expect(
       describeSettingValue({
+        name: "Be heard",
+        when_it_fits: "venting",
+        how_to_reply: "listen",
+        curiosities: "never",
+      }),
+    ).toBe(
+      "Be heard\nWhen it fits: venting\nHow to reply: listen\nCuriosities: Never",
+    );
+    expect(
+      describeSettingValue({
         name: "Research",
         when_it_fits: "they need options",
         how_to_do_it: "search",

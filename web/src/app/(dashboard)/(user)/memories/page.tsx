@@ -32,6 +32,16 @@ export default async function MemoriesPage() {
     return <CopyLoadFailed />;
   }
   return (
-    <Memories copy={pickCopy(copy, ["memories.", "shared.memory_off."])} />
+    <Memories
+      copy={pickCopy(copy, [
+        "memories.",
+        "shared.memory_off.",
+        "shared.pattern_noticing.",
+        "account.contested_gathering.",
+        "account.not_available",
+        "account.changed_in_chat",
+        "account.switch_save_failed",
+      ])}
+    />
   );
 }

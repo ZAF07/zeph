@@ -1,0 +1,93 @@
+# One Pattern Type of the Pattern Catalog (ADR-0025). Loaded when the backend
+# starts. Any change needs a new `version`: a stored version never changes,
+# so a change that keeps its version is refused and the last catalog stays.
+
+id: CTRL.OPEN.FREEDOM
+version: 0.2.0
+area: control
+name: Keeping options open and putting off committing
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
+
+definition: >-
+  When a choice would close off other options, the person puts it off,
+  keeps several open or commits only loosely. Being tied down feels like
+  losing freedom, so not choosing feels safer, even when waiting costs them.
+
+if: A commitment would close off other options
+then: Delays deciding and keeps options open
+function: To protect their freedom
+
+frameworks:
+  - Reactance theory (Brehm)
+  - Maximising in choices (Schwartz)
+  - Self-determination theory, autonomy need (Deci and Ryan)
+  - Schwartz self-direction and stimulation values
+
+signs:
+  - id: I1
+    text: Answers an invitation with "maybe" and decides on the day
+    strength: moderate
+    part: behaviour
+  - id: I2
+    text: Feels trapped or restless once something is fixed in the diary
+    strength: strong
+    part: inside
+  - id: I3
+    text: Keeps two or more options going long past the point of choosing
+    strength: strong
+    part: behaviour
+  - id: I4
+    text: Pays a cost, such as a higher price or a lost place, rather than commit early
+    strength: moderate
+    part: behaviour
+  - id: I5
+    text: Describes long-term plans as a cage
+    strength: weak
+    part: inside
+
+signs_against:
+  - id: D1
+    text: Commits early to a plan and feels settled, not trapped
+    strength: strong
+    part: inside
+  - id: D2
+    text: Delays only when they truly lack the information to choose
+    strength: moderate
+    part: situation
+
+look_alikes:
+  - pattern_type: APPR.CONFIRM.CHOICE
+    tells_apart: >-
+      Doesn't commit at all; the other commits, then looks for reassurance
+  - pattern_type: REL.DISTANCE.INDEP
+    tells_apart: >-
+      Protects freedom around choices and plans; the other protects room
+      from a person getting closer
+
+anyone_would: Waiting to decide while an important fact is still unknown
+
+exclusions:
+  - text: A choice forced by money trouble, illness or a visa
+    evidence: ignored
+
+approved_wording: >-
+  You seem to keep your options open for as long as you can, as if choosing
+  one would take something away from you.
+# Three Predictions, each testing a different side of the Pattern. Code gives
+# the first when the Pattern is shared, then one the User hasn't had.
+prediction_wordings:
+  - >-
+    Next time you're asked to commit to {plan}, notice what you feel just
+    before you answer, and whether "maybe" comes out first.
+  - >-
+    Next time you do commit to {plan}, notice how you feel in the day after:
+    settled, or looking for a way out.
+  - >-
+    Next time a choice is small and easy to undo, like {choice}, notice
+    whether you decide quickly.
+
+numbers:
+  situations_needed: 3
+  base_rate: 0.2

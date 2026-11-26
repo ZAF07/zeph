@@ -4,6 +4,7 @@ import type {
   LifeThread,
   MemoryGroup,
   MoveOutcome,
+  KeptQuote,
   Pattern,
   SharedPhoto,
   UserPortrait,
@@ -88,47 +89,178 @@ const lifeThreads: LifeThread[] = [
   },
 ];
 
-/** Alex's two Patterns, as drawn in `Memories--tab-patterns.html`. */
+/** Alex's four Patterns, as drawn in `Memories--tab-patterns.html`. */
 const patterns: Pattern[] = [
   {
     id: "design-pattern-1",
+    state: "shared",
     pattern:
-      "Treats rest as something to be earned, and feels he is falling behind whenever he stops.",
-    agreed_at: "2026-11-12T20:00:00+08:00",
-    evidence: [
+      "You seem to treat rest as something to be earned, and feel you are falling behind whenever you stop.",
+    where_it_shows: [],
+    told_at: "2026-11-12T20:00:00+08:00",
+    quote_groups: [
       {
-        day: "2026-11-12",
-        thread: "Pushing hard at work",
-        line: "Worked through the weekend so that nobody could say he had slowed down.",
+        life_thread: "Pushing hard at work",
+        quotes: [
+          {
+            quote: "If I stop now, everyone will see I can't keep up.",
+            day: "2026-11-12",
+          },
+          {
+            quote:
+              "I worked the whole weekend so nobody could say I'd slowed down.",
+            day: "2026-11-08",
+          },
+        ],
       },
       {
-        day: "2026-11-09",
-        thread: "The van idea",
-        line: "Called a few months of travelling reckless before anyone else could.",
+        life_thread: "Time with his father",
+        quotes: [
+          {
+            quote: "I felt guilty the whole afternoon I took off.",
+            day: "2026-11-02",
+          },
+        ],
       },
+    ],
+    predictions: [
       {
-        day: "2026-11-02",
-        thread: "Time with his father",
-        line: "Felt guilty about taking an afternoon off to visit.",
+        wording:
+          "Next time you take an evening off, notice whether you start listing what you should be doing instead.",
+        made_at: "2026-11-12T20:00:00+08:00",
+        outcome: null,
       },
     ],
   },
   {
     id: "design-pattern-2",
-    pattern: "Names the worst version of a plan first, before anyone else can.",
-    agreed_at: "2026-11-09T20:00:00+08:00",
-    evidence: [
+    state: "confirmed",
+    pattern:
+      "You seem to name the worst version of a plan first, before anyone else can.",
+    where_it_shows: [
       {
-        day: "2026-11-09",
-        thread: "The van idea",
-        line: "Asked whether the trip was just an escape before saying what he hoped to find.",
-      },
-      {
-        day: "2026-10-28",
-        thread: "The new job",
-        line: "Listed the ways the job could go wrong in the first week.",
+        condition: "relationship",
+        shows_with: ["family", "friend"],
+        not_with: ["colleague"],
       },
     ],
+    told_at: "2026-11-01T20:00:00+08:00",
+    quote_groups: [
+      {
+        life_thread: "The van idea",
+        quotes: [
+          {
+            quote: "It's probably just me running away, I know.",
+            day: "2026-11-09",
+          },
+        ],
+      },
+      {
+        life_thread: "The new job",
+        quotes: [
+          {
+            quote: "I'll tell you now, I'm going to mess up the first week.",
+            day: "2026-10-28",
+          },
+        ],
+      },
+    ],
+    predictions: [
+      {
+        wording:
+          "Next time someone asks about the van trip, notice whether you call it reckless before they can.",
+        made_at: "2026-11-06T20:00:00+08:00",
+        outcome: "came_true",
+      },
+      {
+        wording:
+          "Next time you share a plan with your father, notice whether you start with what could go wrong.",
+        made_at: "2026-11-01T20:00:00+08:00",
+        outcome: "came_true",
+      },
+    ],
+  },
+  {
+    id: "design-pattern-3",
+    state: "contested",
+    pattern:
+      "You seem to protect closeness by keeping disagreements small, even when they matter to you.",
+    where_it_shows: [],
+    told_at: "2026-11-05T20:00:00+08:00",
+    quote_groups: [
+      {
+        life_thread: "Time with his father",
+        quotes: [
+          {
+            quote: "I just said it was fine, it wasn't worth the argument.",
+            day: "2026-11-04",
+          },
+        ],
+      },
+      {
+        life_thread: null,
+        quotes: [
+          { quote: "I went along with it, like always.", day: "2026-11-03" },
+        ],
+      },
+    ],
+    predictions: [
+      {
+        wording:
+          "Next time your father asks for something you'd rather not do, notice whether you say yes before you've decided.",
+        made_at: "2026-11-05T20:00:00+08:00",
+        outcome: null,
+      },
+    ],
+  },
+  {
+    id: "design-pattern-4",
+    state: "closed",
+    pattern:
+      "You seem to check that things are still alright with people after a disagreement.",
+    where_it_shows: [],
+    told_at: "2026-10-20T20:00:00+08:00",
+    quote_groups: [
+      {
+        life_thread: "The new job",
+        quotes: [
+          {
+            quote: "I messaged her twice to check we were okay.",
+            day: "2026-10-18",
+          },
+        ],
+      },
+    ],
+    predictions: [
+      {
+        wording:
+          "Next time you disagree with someone at work, notice whether you message them afterwards to check.",
+        made_at: "2026-10-20T20:00:00+08:00",
+        outcome: "did_not",
+      },
+    ],
+  },
+];
+
+/** Alex's kept quotes, as drawn in `Memories--tab-quotes.html`. */
+const keptQuotes: KeptQuote[] = [
+  {
+    id: "design-quote-1",
+    quote: "If I stop now, everyone will see I can't keep up.",
+    context: "Talking about working through the weekend.",
+    day: "2026-11-12",
+  },
+  {
+    id: "design-quote-2",
+    quote: "It's probably just me running away again.",
+    context: "Talking about the van trip he has been planning.",
+    day: "2026-11-09",
+  },
+  {
+    id: "design-quote-3",
+    quote: "I felt like I hadn't earned the afternoon off.",
+    context: "After visiting his father on a weekday.",
+    day: "2026-11-02",
   },
 ];
 
@@ -181,6 +313,7 @@ export const memoriesFixtures: Partial<ApiClient> = {
   getUserPortrait: async () => portrait,
   listLifeThreads: async () => lifeThreads,
   listPatterns: async () => patterns,
+  listKeptQuotes: async () => keptQuotes,
   listMoveOutcomes: async () => moveOutcomes,
   listDaySummaries: async () => summaries,
   listSharedPhotos: async () => sharedPhotos,

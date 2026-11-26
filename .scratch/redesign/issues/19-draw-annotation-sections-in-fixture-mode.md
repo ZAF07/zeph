@@ -27,3 +27,5 @@ Decide how to draw them, then do it page by page:
 - [ ] Web checks pass: `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`
 
 ## Comments
+
+- 24 Nov 2026: still failing on height on `main`: `AdminCheckInKinds` (0.08%, 1147 vs 2270), `AdminCheckInKinds--all-folded` (0.14%, 800 vs 1915), `AdminCheckInLog` (0.11%, 837 vs 1470), `AdminModelCallTrace` (0.02%, 1357 vs 2274), `AdminPersona` (0.71%, 800 vs 1968). `AdminPrompts` passed this time. `AdminUsers` also fails but has no annotation section; filed as issue 21.

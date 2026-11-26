@@ -44,6 +44,16 @@ export const evalDetails: Record<EvalName, { label: string; checks: string }> =
       checks:
         "Writes a Day Summary from a made-up day with the live memory processing prompt. The Judge then answers each question from the Summary alone, and the case passes only if every answer matches.",
     },
+    tagging: {
+      label: "Tagging",
+      checks:
+        "Runs the real tagging step on a made-up Conversation, with the whole Pattern Catalog. The case passes only when the Observations code keeps are exactly the ones expected.",
+    },
+    whole_pipeline: {
+      label: "Whole pipeline",
+      checks:
+        "A made-up User with hidden true Patterns has several Conversations through the real reply path and Conversation-end steps. The case passes only when every Pattern that became ready or was shared is a true one. It costs far more than the other Evals, so check the estimate before you start.",
+    },
   };
 
 /** Every Eval, in the order shown. */

@@ -8,6 +8,7 @@ const saved: NeedInput = {
   when_it_fits: "They ask what to do.",
   how_to_reply: "One idea.",
   ruled_out_move_ids: ["calm", "push"],
+  curiosities: "only_if_it_fits",
 };
 
 describe("isNeedChanged", () => {
@@ -27,6 +28,10 @@ describe("isNeedChanged", () => {
         saved,
       ),
     ).toBe(true);
+  });
+
+  it("sees a changed Curiosities choice", () => {
+    expect(isNeedChanged({ ...saved, curiosities: "never" }, saved)).toBe(true);
   });
 
   it("sees a changed text", () => {

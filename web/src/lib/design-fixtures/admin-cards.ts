@@ -9,6 +9,7 @@ const checkInKinds: CheckInKindOverview[] = [
       "Just checking how you are. Light, no agenda, easy to ignore without guilt.",
     sends_shared_photo: false,
     raises_curiosity: false,
+    shares_pattern: false,
     sent_last_30_days: 58,
   },
   {
@@ -18,6 +19,7 @@ const checkInKinds: CheckInKindOverview[] = [
       "On something the user shared, like a decision or a hard day. Only when there is something specific to return to.",
     sends_shared_photo: false,
     raises_curiosity: false,
+    shares_pattern: false,
     sent_last_30_days: 41,
   },
   {
@@ -26,6 +28,7 @@ const checkInKinds: CheckInKindOverview[] = [
     description: "A brief invitation to notice where you are right now.",
     sends_shared_photo: false,
     raises_curiosity: false,
+    shares_pattern: false,
     sent_last_30_days: 22,
   },
   {
@@ -34,6 +37,7 @@ const checkInKinds: CheckInKindOverview[] = [
     description: "An idea that might fit what is on the user’s mind.",
     sends_shared_photo: false,
     raises_curiosity: false,
+    shares_pattern: false,
     sent_last_30_days: 37,
   },
   {
@@ -43,6 +47,7 @@ const checkInKinds: CheckInKindOverview[] = [
       "One of the photos the user shared, sent back with a word about it.",
     sends_shared_photo: true,
     raises_curiosity: false,
+    shares_pattern: false,
     sent_last_30_days: 9,
   },
   {
@@ -52,6 +57,7 @@ const checkInKinds: CheckInKindOverview[] = [
       "A question about something the user mentioned, asked when the time is right.",
     sends_shared_photo: false,
     raises_curiosity: true,
+    shares_pattern: false,
     sent_last_30_days: 14,
   },
 ];

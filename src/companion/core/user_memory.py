@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Callable
 from uuid import UUID, uuid4
 
 from companion.core.errors import NotFoundError
@@ -12,17 +13,28 @@ from companion.core.models import (
     MemoryItem,
     MemorySource,
     MoveOutcome,
-    Pattern,
+    Observation,
+    PatternMoveCause,
+    PatternState,
     User,
     UserPortrait,
 )
+from companion.core.observations import deleted_quotes_of, users_own_texts
+from companion.core.pattern_catalog import PatternCatalogService
+from companion.core.pattern_scoring import PatternScorer
 from companion.core.platform_settings import (
     ONBOARDING_NAME_MEMORY_CATEGORY,
     ONBOARDING_REASONS_MEMORY_CATEGORY,
 )
 from companion.core.ports import Clock, Repositories
+from companion.core.ready_gate import ReadyKeeper
+from companion.core.told_patterns import ToldPattern, told_patterns, was_told
 
 logger = logging.getLogger(__name__)
+
+STATES_NEVER_NOTED_AGAIN_ONCE_DELETED = frozenset(
+    {PatternState.CONTESTED, PatternState.CLOSED}
+)
 
 
 class MemoryNotFoundError(NotFoundError):
@@ -50,15 +62,35 @@ class MoveOutcomeNotFoundError(MemoryNotFoundError):
 
 
 class PatternNotFoundError(MemoryNotFoundError):
-    """Raised when a User has no confirmed Pattern with that ID."""
+    """Raised when a User has no Pattern they were told with that ID."""
 
     shown_message = "Pattern not found"
+
+
+class KeptQuoteNotFoundError(MemoryNotFoundError):
+    """Raised when a User has no kept quote (Observation) with that ID."""
+
+    shown_message = "Quote not found"
 
 
 class UserPortraitNotFoundError(MemoryNotFoundError):
     """Raised when a User has no User Portrait."""
 
     shown_message = "User Portrait not found"
+
+
+def newest_first(observations: list[Observation]) -> list[Observation]:
+    """Order Observations by their day, newest first, the latest tagged first on a day.
+
+    Args:
+        observations: The Observations, oldest tagged first.
+
+    Returns:
+        The same Observations, newest first.
+    """
+    return sorted(
+        reversed(observations), key=lambda observation: observation.day, reverse=True
+    )
 
 
 class UserMemoryService:
@@ -72,7 +104,13 @@ class UserMemoryService:
     """
 
     def __init__(
-        self, repositories: Repositories, features: FeatureService, clock: Clock
+        self,
+        repositories: Repositories,
+        features: FeatureService,
+        pattern_catalog: PatternCatalogService,
+        pattern_scorer: PatternScorer,
+        ready_keeper: ReadyKeeper,
+        clock: Clock,
     ) -> None:
         """Set up the service.
 
@@ -80,10 +118,18 @@ class UserMemoryService:
             repositories: Where User Memory, Memory Categories and settings
                 are stored.
             features: Says whether User Memory works for the User.
+            pattern_catalog: Reads the words a Pattern is told in.
+            pattern_scorer: Scores the User's Patterns again once
+                Observations are deleted.
+            ready_keeper: Takes back a ready Pattern that no longer passes
+                once Observations are deleted.
             clock: Tells the current time.
         """
         self._repositories = repositories
         self._features = features
+        self._pattern_catalog = pattern_catalog
+        self._pattern_scorer = pattern_scorer
+        self._ready_keeper = ready_keeper
         self._clock = clock
 
     def list_groups(self, user_id: UUID) -> list[MemoryGroup]:
@@ -172,7 +218,10 @@ class UserMemoryService:
         """Delete one of a User's Life Threads, so it is never brought up again.
 
         Its evidence in Patterns goes with it, and so does a Pattern left
-        with no evidence.
+        with no evidence. So do its Observations, whose quotes are never
+        kept again, and the User's Patterns of Pattern Types are scored
+        again at once. The User is locked while it is deleted, as scoring
+        locks them.
 
         Args:
             user_id: The User's ID.
@@ -182,38 +231,134 @@ class UserMemoryService:
             LifeThreadNotFoundError: If the User has no such Life Thread.
         """
         with self._repositories.transaction() as transaction:
+            transaction.lock_user(user_id)
             in_transaction = transaction.repositories
+            self._note_deleted_quotes(
+                in_transaction,
+                user_id,
+                lambda observation: observation.thread_id == thread_id,
+            )
             if not in_transaction.life_threads.delete(user_id, thread_id):
                 raise LifeThreadNotFoundError
             in_transaction.patterns.delete_without_evidence(user_id)
+        self._score_patterns_again(user_id)
         self._rewrite_portrait(user_id)
 
-    def list_confirmed_patterns(self, user_id: UUID) -> list[Pattern]:
-        """List the Patterns a User agreed with, newest agreed first.
+    def list_told_patterns(self, user_id: UUID) -> list[ToldPattern]:
+        """List the Patterns Zeph has told a User about, as they see them.
 
-        Suspected and closed Patterns are never shown to the User.
+        Patterns Zeph hasn't told them, and unmatched ones, are never shown.
 
         Args:
             user_id: The User's ID.
 
         Returns:
-            The confirmed Patterns, each with its evidence oldest first.
+            The Patterns being tested, then confirmed, disagreed with and
+            closed after being told, each with its quotes by Life Thread
+            and its Predictions.
         """
-        return self._repositories.patterns.list_confirmed(user_id)
+        patterns = self._repositories.patterns.list_of_pattern_types(user_id)
+        if not any(was_told(pattern) for pattern in patterns):
+            return []
+        return told_patterns(
+            patterns,
+            {
+                entry.pattern_type.id: entry.pattern_type
+                for entry in self._pattern_catalog.catalog()
+            },
+            self._repositories.observations.list_for_user(user_id),
+            self._repositories.patterns.list_predictions(user_id),
+            self._repositories.life_threads.list_for_user(user_id),
+        )
 
     def delete_pattern(self, user_id: UUID, pattern_id: UUID) -> None:
-        """Delete one of a User's confirmed Patterns, so it is never used again.
+        """Delete a Pattern Zeph told a User about, so it is gone at once.
+
+        The Observations whose first Pattern Type is its own go with it,
+        so the quotes it showed never bring it back, and those quotes are
+        never kept again. Deleting one they disagreed with, or that
+        didn't hold up, also marks its Pattern Type so it is never noted
+        or shared for them again; its Predictions and
+        the User's reactions to it go too. The
+        User is locked while it is deleted, as scoring locks them, and
+        their other Patterns are scored again at once.
 
         Args:
             user_id: The User's ID.
             pattern_id: The Pattern's ID.
 
         Raises:
-            PatternNotFoundError: If the User has no such confirmed Pattern.
+            PatternNotFoundError: If the User has no such Pattern they were
+                told.
         """
-        if not self._repositories.patterns.delete_confirmed(user_id, pattern_id):
-            raise PatternNotFoundError
+        with self._repositories.transaction() as transaction:
+            transaction.lock_user(user_id)
+            in_transaction = transaction.repositories
+            told = [
+                pattern
+                for pattern in in_transaction.patterns.list_of_pattern_types(user_id)
+                if pattern.id == pattern_id and was_told(pattern)
+            ]
+            if not told:
+                raise PatternNotFoundError
+            self._note_deleted_quotes(
+                in_transaction,
+                user_id,
+                lambda observation: (
+                    observation.pattern_type_id == told[0].pattern_type_id
+                ),
+            )
+            in_transaction.observations.delete_of_pattern_type(
+                user_id, told[0].pattern_type_id
+            )
+            if told[0].state in STATES_NEVER_NOTED_AGAIN_ONCE_DELETED:
+                in_transaction.patterns.mark_never_again(
+                    user_id, told[0].pattern_type_id, self._clock.now()
+                )
+            in_transaction.patterns.save_moves([], [], [pattern_id], [])
+        self._score_patterns_again(user_id)
         self._rewrite_portrait(user_id)
+
+    def list_kept_quotes(self, user_id: UUID) -> list[Observation]:
+        """List the quotes Zeph keeps as evidence for a User, newest day first.
+
+        Listed whatever User Memory says, so a User can always see their own
+        words; the Dashboard shows only each quote, its context line and day.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The User's Observations, newest first.
+        """
+        return newest_first(self._repositories.observations.list_for_user(user_id))
+
+    def delete_kept_quote(self, user_id: UUID, observation_id: UUID) -> None:
+        """Delete one of a User's kept quotes, and score their Patterns again at once.
+
+        The User is locked while it is deleted, as scoring locks them, so a
+        Conversation end already scoring finishes first and the scoring after
+        the deletion never counts it. A record that it was deleted is kept,
+        without its words, so tagging its day again never keeps it again.
+
+        Args:
+            user_id: The User's ID.
+            observation_id: The kept quote's (Observation's) ID.
+
+        Raises:
+            KeptQuoteNotFoundError: If the User has no such kept quote.
+        """
+        with self._repositories.transaction() as transaction:
+            transaction.lock_user(user_id)
+            in_transaction = transaction.repositories
+            self._note_deleted_quotes(
+                in_transaction,
+                user_id,
+                lambda observation: observation.id == observation_id,
+            )
+            if not in_transaction.observations.delete(user_id, observation_id):
+                raise KeptQuoteNotFoundError
+        self._score_patterns_again(user_id)
 
     def list_move_outcomes(self, user_id: UUID) -> list[MoveOutcome]:
         """List a User's Move Outcomes, newest made first.
@@ -265,6 +410,58 @@ class UserMemoryService:
         """
         if not self._repositories.user_portraits.clear(user_id, self._clock.now()):
             raise UserPortraitNotFoundError
+
+    def _note_deleted_quotes(
+        self,
+        repositories: Repositories,
+        user_id: UUID,
+        is_being_deleted: Callable[[Observation], bool],
+    ) -> None:
+        """Keep a record that the User deleted some kept quotes.
+
+        Args:
+            repositories: The repositories, inside the deleting transaction.
+            user_id: The User's ID.
+            is_being_deleted: Says which of their Observations are about
+                to be deleted.
+        """
+        going = [
+            observation
+            for observation in repositories.observations.list_for_user(user_id)
+            if is_being_deleted(observation)
+        ]
+        texts_by_conversation = {
+            conversation_id: users_own_texts(
+                repositories.conversations.list_messages(conversation_id)
+            )
+            for conversation_id in {
+                observation.conversation_id for observation in going
+            }
+        }
+        repositories.observations.note_deleted_quotes(
+            deleted_quotes_of(going, texts_by_conversation, self._clock.now())
+        )
+
+    def _score_patterns_again(self, user_id: UUID) -> None:
+        """Score the User's Patterns of Pattern Types again, after Observations went.
+
+        A ready Pattern that no longer passes its checks goes back too.
+
+        A failure is logged instead of raised: the deletion already happened.
+
+        Args:
+            user_id: The User's ID.
+        """
+        user = self._repositories.users.get(user_id)
+        if user is None:
+            return
+        try:
+            settings = self._repositories.platform_settings.load()
+            cause = PatternMoveCause.OBSERVATIONS_DELETED
+            self._pattern_scorer.score(user, settings, cause)
+            self._ready_keeper.look(user, settings, cause)
+        except Exception:
+            logger.exception("Could not score Patterns after a deletion")
 
     def _rewrite_portrait(self, user_id: UUID) -> None:
         """Ask for the User's Portrait to be written again, after a deletion.

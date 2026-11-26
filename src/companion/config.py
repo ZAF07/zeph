@@ -45,7 +45,8 @@ class Settings(BaseSettings):
     webhook_base_url: str
     dashboard_url: str
 
-    deepseek_api_key: str
+    openrouter_api_key: str = ""
+    deepseek_api_key: str = ""
     tavily_api_key: str
     initial_admin_emails: str = ""
 
@@ -53,7 +54,7 @@ class Settings(BaseSettings):
     auth_verifier_adapter: str = "clerk"
     repositories_adapter: str = "postgres"
     clock_adapter: str = "system"
-    chat_model_adapter: str = "deepseek"
+    chat_model_adapter: str = "openrouter"
     embedder_adapter: str = "fastembed"
     vector_store_adapter: str = "pgvector"
     text_extractor_adapter: str = "pypdf"

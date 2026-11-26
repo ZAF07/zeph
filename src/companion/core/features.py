@@ -31,7 +31,7 @@ class FeatureDetails:
         description: A short line on what it does.
         on_by_default: Whether it is on for everyone before an Admin
             changes it.
-        needs_stickers: Whether it works only while Stickers works too.
+        needs: The Feature it works only while, if any.
         in_reply_note: Whether replies are told when it isn't available,
             so they can say so if the User asks for it.
         reply_note_name: What replies are told it is called when it isn't
@@ -42,7 +42,7 @@ class FeatureDetails:
     name: str
     description: str
     on_by_default: bool = True
-    needs_stickers: bool = False
+    needs: Feature | None = None
     in_reply_note: bool = True
     reply_note_name: str | None = None
 
@@ -129,7 +129,7 @@ FEATURES: tuple[FeatureDetails, ...] = (
             "Turning it off deletes nothing."
         ),
         on_by_default=False,
-        needs_stickers=True,
+        needs=Feature.STICKERS,
         in_reply_note=False,
     ),
     FeatureDetails(
@@ -143,7 +143,53 @@ FEATURES: tuple[FeatureDetails, ...] = (
         ),
         in_reply_note=False,
     ),
+    FeatureDetails(
+        feature=Feature.PATTERN_NOTICING,
+        name="Pattern noticing",
+        description=(
+            "When a Conversation ends, Zeph notes what the User said that is "
+            "evidence for or against a Pattern Type in the Pattern Catalog, "
+            "with their exact words. It is silent: nothing reaches a reply. "
+            "It works only while User Memory works. Turning it off deletes "
+            "nothing."
+        ),
+        on_by_default=False,
+        in_reply_note=False,
+    ),
+    FeatureDetails(
+        feature=Feature.PATTERN_EXPLORING,
+        name="Pattern exploring",
+        description=(
+            "Zeph keeps an Agenda of what it is trying to learn about a User's "
+            "suspected Patterns and asks aimed Curiosities to learn it, coming "
+            "back later by a different Approach when an answer says little. It "
+            "works "
+            "only while Pattern noticing works. Turning it off deletes nothing."
+        ),
+        on_by_default=False,
+        needs=Feature.PATTERN_NOTICING,
+        in_reply_note=False,
+    ),
+    FeatureDetails(
+        feature=Feature.PATTERN_SHARING,
+        name="Pattern sharing",
+        description=(
+            "Zeph tells a User a Pattern once code finds it ready, as its "
+            "view, with their own quotes and one Prediction to test, in chat "
+            "or as a Check-in. It works only while Pattern exploring works. "
+            "Turning it off shares nothing and ready Patterns wait."
+        ),
+        on_by_default=False,
+        needs=Feature.PATTERN_EXPLORING,
+        in_reply_note=False,
+    ),
 )
+
+NEEDED_FEATURE_OFF_REASONS = {
+    Feature.STICKERS: FeatureReason.STICKERS_OFF,
+    Feature.PATTERN_NOTICING: FeatureReason.PATTERN_NOTICING_OFF,
+    Feature.PATTERN_EXPLORING: FeatureReason.PATTERN_EXPLORING_OFF,
+}
 
 
 class FeatureNotAvailableError(NotAllowedError):
@@ -419,7 +465,8 @@ def feature_statuses(
 ) -> list[FeatureStatus]:
     """Work out each Feature's status for a User from their switches.
 
-    A Feature that needs Stickers doesn't work while Stickers doesn't.
+    A Feature that needs another doesn't work while that one doesn't; each
+    is listed after the one it needs, so a chain of them holds too.
 
     Args:
         user: The User, for their own switches; None if there is no such User.
@@ -439,13 +486,13 @@ def feature_statuses(
         )
         for everyone_switch in everyone_switches
     }
-    stickers_work = statuses[Feature.STICKERS].works
-    return [
-        stickers_off_applied(statuses[details.feature])
-        if details.needs_stickers and not stickers_work
-        else statuses[details.feature]
-        for details in FEATURES
-    ]
+    resolved: dict[Feature, FeatureStatus] = {}
+    for details in FEATURES:
+        status = statuses[details.feature]
+        if details.needs is not None and not resolved[details.needs].works:
+            status = needed_feature_off_applied(status, details.needs)
+        resolved[details.feature] = status
+    return list(resolved.values())
 
 
 def own_switch_on(user: User | None, feature: Feature) -> bool | None:
@@ -515,16 +562,17 @@ def status_for(
     )
 
 
-def stickers_off_applied(status: FeatureStatus) -> FeatureStatus:
-    """Turn a Feature that needs Stickers off, because Stickers doesn't work.
+def needed_feature_off_applied(status: FeatureStatus, needed: Feature) -> FeatureStatus:
+    """Turn a Feature off because a Feature it needs doesn't work.
 
     Args:
         status: The Feature's status from its own switches.
+        needed: The Feature it needs.
 
     Returns:
-        The status marked as not working because Stickers is off; unchanged
-        when it doesn't work anyway.
+        The status marked as not working because that Feature is off;
+        unchanged when it doesn't work anyway.
     """
     if not status.works:
         return status
-    return replace(status, works=False, reason=FeatureReason.STICKERS_OFF)
+    return replace(status, works=False, reason=NEEDED_FEATURE_OFF_REASONS[needed])

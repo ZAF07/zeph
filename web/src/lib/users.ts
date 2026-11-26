@@ -1,4 +1,4 @@
-import type { UserRole } from "@/lib/api-client";
+import type { Familiarity, PatternState, UserRole } from "@/lib/api-client";
 
 /**
  * Names a User for admin messages: their name, else their email.
@@ -21,4 +21,58 @@ export function displayNameOf(user: {
  */
 export function roleLabel(role: UserRole): string {
   return role === "admin" ? "Admin" : "User";
+}
+
+const familiarityLabels: Record<Familiarity, string> = {
+  new: "New",
+  getting_to_know: "Getting to know",
+  knows_well: "Knows well",
+};
+
+/**
+ * Says how well Zeph knows a User in plain words.
+ *
+ * @param familiarity - The User's Familiarity.
+ * @returns "New", "Getting to know" or "Knows well".
+ */
+export function familiarityLabel(familiarity: Familiarity): string {
+  return familiarityLabels[familiarity];
+}
+
+/** Every Pattern state but confirmed, in order, with its row's label. */
+const otherPatternStates: { state: PatternState; label: string }[] = [
+  { state: "noticed", label: "Noticed Patterns" },
+  { state: "suspected", label: "Suspected Patterns" },
+  { state: "ready", label: "Ready Patterns" },
+  { state: "shared", label: "Shared Patterns" },
+  { state: "contested", label: "Contested Patterns" },
+  { state: "closed", label: "Closed Patterns" },
+  { state: "unmatched", label: "Unmatched Patterns" },
+];
+
+/** A User with no Patterns in any state. */
+export const noPatterns: Record<PatternState, number> = {
+  noticed: 0,
+  suspected: 0,
+  ready: 0,
+  shared: 0,
+  confirmed: 0,
+  contested: 0,
+  closed: 0,
+  unmatched: 0,
+};
+
+/**
+ * Lists a User's Pattern counts for the states other than confirmed, which
+ * has its own row, leaving out any state they have none in.
+ *
+ * @param counts - How many Patterns they have in each state.
+ * @returns A label and count for each state with at least one, in order.
+ */
+export function otherPatternCounts(
+  counts: Record<PatternState, number>,
+): { label: string; value: string }[] {
+  return otherPatternStates
+    .filter(({ state }) => counts[state] > 0)
+    .map(({ state, label }) => ({ label, value: String(counts[state]) }));
 }

@@ -15,8 +15,18 @@ from companion.adapters.http.dashboard_api import build_dashboard_api_router
 from companion.adapters.http.errors import add_core_error_handlers
 from companion.adapters.http.eval_api import build_eval_api_router
 from companion.adapters.http.eval_case_api import build_eval_case_api_router
+from companion.adapters.http.pattern_catalog_api import (
+    build_pattern_catalog_api_router,
+)
+from companion.adapters.http.thought_experiment_api import (
+    build_thought_experiment_api_router,
+)
+from companion.adapters.http.unmatched_review_api import (
+    build_unmatched_review_api_router,
+)
 from companion.adapters.telegram.webhook import build_telegram_webhook_router
 from companion.core.admin_users import AdminUserService
+from companion.core.agenda import AgendaKeeper, AgendaReader
 from companion.core.chat_settings import SettingsTools
 from companion.core.check_in_kinds import CheckInKindService
 from companion.core.check_in_schedule import CheckInScheduleService
@@ -36,6 +46,7 @@ from companion.core.evals.ports import (
 )
 from companion.core.evals.runs import EvalRunService
 from companion.core.evals.setting_overrides import SettingOverrideService
+from companion.core.familiarity import FamiliarityKeeper
 from companion.core.features import FeatureService
 from companion.core.helplines import HelplineService
 from companion.core.home import HomeService
@@ -51,7 +62,11 @@ from companion.core.model_call_log import ModelCallLog
 from companion.core.move_outcomes import MoveOutcomeFinder, MoveOutcomeKeeper
 from companion.core.moves import MoveService
 from companion.core.needs import NeedService
+from companion.core.observations import PatternTagger
 from companion.core.past_day import PastDayTool
+from companion.core.pattern_catalog import PatternCatalogService
+from companion.core.pattern_scoring import PatternScorer
+from companion.core.pattern_sharing import PatternSharing
 from companion.core.patterns import PatternKeeper, PatternReminder
 from companion.core.personal_stickers import (
     PersonalStickerKeeper,
@@ -76,6 +91,8 @@ from companion.core.ports import (
     WebSearch,
 )
 from companion.core.post_conversation import PostConversationProcessor
+from companion.core.predictions import PredictionKeeper
+from companion.core.ready_gate import ReadyGate, ReadyKeeper
 from companion.core.recent_messages import RecentMessagesReader
 from companion.core.reply_gate import ReplyGate
 from companion.core.reply_plan import ReplyPlanService
@@ -83,11 +100,14 @@ from companion.core.reply_service import ReplyService
 from companion.core.response_composition import ResponseComposer
 from companion.core.safeguard import Safeguard
 from companion.core.scheduled_work import ScheduledWork
+from companion.core.starter_thought_experiments import StarterThoughtExperimentKeeper
 from companion.core.sticker_adding import StickerAdding
 from companion.core.stickers import StickerLibraryService, StickerTools
 from companion.core.telegram_connection import TelegramConnectionService
+from companion.core.thought_experiments import ThoughtExperimentService
 from companion.core.typing_keeper import TypingKeeper
 from companion.core.understanding import UnderstandingService
+from companion.core.unmatched_review import UnmatchedGrouper, UnmatchedReviewService
 from companion.core.usage import UsageLimiter, UsageRecordingChatModel
 from companion.core.user_data import ChatDataDeletion, UserDataService
 from companion.core.user_memory import UserMemoryService
@@ -176,8 +196,22 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     feature_service = FeatureService(
         dependencies.repositories, dependencies.clock, dependencies.dashboard_url
     )
+    pattern_catalog_service = PatternCatalogService(
+        dependencies.repositories.pattern_catalog
+    )
+    pattern_scorer = PatternScorer(
+        dependencies.repositories, pattern_catalog_service, dependencies.clock
+    )
+    ready_keeper = ReadyKeeper(
+        dependencies.repositories, pattern_catalog_service, dependencies.clock
+    )
     user_memory_service = UserMemoryService(
-        dependencies.repositories, feature_service, dependencies.clock
+        dependencies.repositories,
+        feature_service,
+        pattern_catalog_service,
+        pattern_scorer,
+        ready_keeper,
+        dependencies.clock,
     )
     usage_limiter = UsageLimiter(dependencies.repositories, dependencies.clock)
     model_call_log = ModelCallLog(
@@ -193,6 +227,22 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         model_call_log,
         dependencies.clock,
     )
+    ready_gate = ReadyGate(
+        dependencies.repositories, ready_keeper, chat_model, dependencies.clock
+    )
+    pattern_sharing = PatternSharing(
+        dependencies.repositories,
+        ready_keeper,
+        pattern_catalog_service,
+        chat_model,
+        dependencies.clock,
+    )
+    prediction_keeper = PredictionKeeper(
+        dependencies.repositories,
+        pattern_catalog_service,
+        chat_model,
+        dependencies.clock,
+    )
     user_snapshots = UserSnapshotLoader(dependencies.repositories, dependencies.clock)
     check_in_service = CheckInService(
         repositories=dependencies.repositories,
@@ -202,6 +252,8 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         usage_limiter=usage_limiter,
         chat_channel=typing_keeper,
         clock=dependencies.clock,
+        pattern_sharing=pattern_sharing,
+        prediction_keeper=prediction_keeper,
     )
     user_service = UserService(
         dependencies.repositories.users,
@@ -272,8 +324,16 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             clock=dependencies.clock,
         ),
         curiosity_raiser=CuriosityRaiser(
-            repositories=dependencies.repositories, clock=dependencies.clock
+            repositories=dependencies.repositories,
+            chat_model=chat_model,
+            clock=dependencies.clock,
         ),
+        agenda=AgendaReader(
+            dependencies.repositories, pattern_catalog_service, dependencies.clock
+        ),
+        pattern_sharing=pattern_sharing,
+        prediction_keeper=prediction_keeper,
+        model_call_log=model_call_log,
         move_outcome_finder=MoveOutcomeFinder(
             repositories=dependencies.repositories, embedder=dependencies.embedder
         ),
@@ -313,6 +373,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                     check_ins=check_in_service,
                     user_memory=user_memory_service,
                     data_deletion=chat_data_deletion,
+                    chat_model=chat_model,
                 ),
                 StickerTools(dependencies.repositories),
                 sticker_adding,
@@ -354,6 +415,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     portrait_writer = PortraitWriter(
         repositories=dependencies.repositories,
         user_snapshots=user_snapshots,
+        pattern_catalog=pattern_catalog_service,
         chat_model=chat_model,
         clock=dependencies.clock,
     )
@@ -374,11 +436,37 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 embedder=dependencies.embedder,
                 clock=dependencies.clock,
             ),
+            pattern_tagger=PatternTagger(
+                repositories=dependencies.repositories,
+                pattern_catalog=pattern_catalog_service,
+                chat_model=chat_model,
+                model_call_log=model_call_log,
+                clock=dependencies.clock,
+            ),
+            pattern_scorer=pattern_scorer,
+            ready_gate=ready_gate,
+            pattern_sharing=pattern_sharing,
+            prediction_keeper=prediction_keeper,
             pattern_keeper=PatternKeeper(
                 repositories=dependencies.repositories,
+                pattern_catalog=pattern_catalog_service,
+                unmatched_grouper=UnmatchedGrouper(
+                    dependencies.repositories,
+                    dependencies.embedder,
+                    dependencies.clock,
+                ),
                 chat_model=chat_model,
                 embedder=dependencies.embedder,
                 clock=dependencies.clock,
+            ),
+            agenda_keeper=AgendaKeeper(
+                repositories=dependencies.repositories,
+                pattern_catalog=pattern_catalog_service,
+                clock=dependencies.clock,
+            ),
+            familiarity_keeper=FamiliarityKeeper(dependencies.repositories),
+            starter_keeper=StarterThoughtExperimentKeeper(
+                repositories=dependencies.repositories, clock=dependencies.clock
             ),
             curiosity_keeper=CuriosityKeeper(
                 repositories=dependencies.repositories,
@@ -443,6 +531,30 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             copy_service=CopyService(
                 dependencies.repositories.copy, dependencies.clock
             ),
+        )
+    )
+    app.include_router(
+        build_pattern_catalog_api_router(
+            current_admin=current_admin,
+            pattern_catalog_service=pattern_catalog_service,
+        )
+    )
+    app.include_router(
+        build_thought_experiment_api_router(
+            current_admin=current_admin,
+            thought_experiment_service=ThoughtExperimentService(
+                dependencies.repositories, pattern_catalog_service, dependencies.clock
+            ),
+            pattern_catalog_service=pattern_catalog_service,
+        )
+    )
+    app.include_router(
+        build_unmatched_review_api_router(
+            current_admin=current_admin,
+            unmatched_review_service=UnmatchedReviewService(
+                dependencies.repositories, pattern_catalog_service, dependencies.clock
+            ),
+            pattern_catalog_service=pattern_catalog_service,
         )
     )
     app.include_router(

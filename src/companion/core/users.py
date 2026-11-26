@@ -198,17 +198,32 @@ class UserService:
         self._user_memory.remember_onboarding(saved)
         return saved
 
+    def mark_pattern_noticing_told(self, user: User) -> User:
+        """Save that the User pressed "Got it" on the Pattern noticing notice.
+
+        From then on Zeph may keep their quotes as evidence while Pattern
+        noticing works; pressing it again keeps the first time.
+
+        Args:
+            user: The User.
+
+        Returns:
+            The saved User.
+        """
+        return self._users.mark_pattern_noticing_told(user.id, self._clock.now())
+
     def update_preferences(
         self,
         user: User,
         changes: PreferenceChanges,
         changed_by: ChangedBy = ChangedBy.DASHBOARD,
     ) -> User:
-        """Change a User's name, own Feature switches, country or time zone.
+        """Change a User's name, own switches, directness, country or time zone.
 
-        Only the User Memory and Photo Viewing settings and time zone are
-        marked as changed in chat or on the Dashboard, and only when their
-        value really changes.
+        Only the User Memory and Photo Viewing settings, directness, noting
+        evidence on a Pattern they disagreed with and time zone are marked
+        as changed in chat or on the Dashboard, and only when their value
+        really changes.
 
         Args:
             user: The User making the change.
@@ -231,6 +246,13 @@ class UserService:
         if changes.photo_viewing_enabled not in (None, user.photo_viewing_enabled):
             self._features.require_available(user.id, Feature.PHOTO_VIEWING)
             changed.append(ChatSetting.PHOTO_VIEWING)
+        if changes.directness not in (None, user.directness):
+            changed.append(ChatSetting.DIRECTNESS)
+        if changes.contested_gathering_enabled not in (
+            None,
+            user.contested_gathering_enabled,
+        ):
+            changed.append(ChatSetting.CONTESTED_GATHERING)
         check_ins = user.check_ins
         if changes.time_zone not in (None, user.time_zone):
             changed.append(ChatSetting.TIME_ZONE)
@@ -247,6 +269,16 @@ class UserService:
                 changes.photo_viewing_enabled
                 if changes.photo_viewing_enabled is not None
                 else user.photo_viewing_enabled
+            ),
+            directness=(
+                changes.directness
+                if changes.directness is not None
+                else user.directness
+            ),
+            contested_gathering_enabled=(
+                changes.contested_gathering_enabled
+                if changes.contested_gathering_enabled is not None
+                else user.contested_gathering_enabled
             ),
             country=(
                 check_country(changes.country)

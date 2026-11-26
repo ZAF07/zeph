@@ -19,7 +19,11 @@ from companion.core.models import (
     UnderstandingForm,
     UserSnapshot,
 )
-from companion.core.platform_settings import CHECK_IN_GAPS, CHECK_IN_MODEL
+from companion.core.platform_settings import (
+    CHECK_IN_GAPS,
+    CHECK_IN_MODEL,
+    thinking_for_model,
+)
 from companion.core.ports import Clock, Repositories
 from companion.core.usage import UsageRecordingChatModel
 
@@ -91,19 +95,17 @@ def kinds_to_weave_in(kinds: Sequence[CheckInKind]) -> list[CheckInKind]:
     """List the Check-in Kinds a reply may weave in.
 
     Kinds with fixed behaviour are left out: a reply already raises
-    Curiosities and sends Shared Photos back by its own rules.
+    Curiosities, sends Shared Photos back and shares a ready Pattern by
+    its own rules.
 
     Args:
         kinds: Every Check-in Kind, in order.
 
     Returns:
-        The Kinds that send no Shared Photo and ask no Curiosity.
+        The Kinds that send no Shared Photo, ask no Curiosity and share no
+        Pattern.
     """
-    return [
-        kind
-        for kind in kinds
-        if not kind.sends_shared_photo and not kind.raises_curiosity
-    ]
+    return [kind for kind in kinds if not kind.has_fixed_behaviour]
 
 
 @dataclass(frozen=True)
@@ -235,9 +237,10 @@ class WovenCheckIns:
     ) -> bool:
         """Ask a small model call whether the reply brought the Check-in up.
 
-        It uses the Check-in model without thinking, and its shape goes
-        into the Model Call Log. It never raises: a failed call counts as
-        left out, so the Check-in is only logged when it is known to be sent.
+        It uses the Check-in model, without thinking unless that model
+        always thinks, and its shape goes into the Model Call Log. It never
+        raises: a failed call counts as left out, so the Check-in is only
+        logged when it is known to be sent.
 
         Args:
             snapshot: The User being answered.
@@ -247,12 +250,13 @@ class WovenCheckIns:
         Returns:
             True if the reply brought it up.
         """
+        model = snapshot.settings.get(CHECK_IN_MODEL)
         try:
             answer = self._chat_model.generate(
                 snapshot=snapshot,
                 step=ModelStep.CHECK_IN,
-                model=snapshot.settings.get(CHECK_IN_MODEL),
-                thinking=False,
+                model=model,
+                thinking=thinking_for_model(snapshot.settings, model, wanted=False),
                 instructions=BROUGHT_UP_CHECK_PROMPT,
                 history=[
                     ChatLine(

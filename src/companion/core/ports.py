@@ -7,6 +7,8 @@ from uuid import UUID
 
 from companion.core.models import (
     AccountIdentity,
+    AgendaChanges,
+    CatalogPattern,
     ChannelSticker,
     ChatLine,
     CheckIn,
@@ -21,11 +23,18 @@ from companion.core.models import (
     ConversationMessage,
     CopySeedSlot,
     CopySlot,
+    CountedUnmatchedEntry,
     Curiosity,
     CuriosityChanges,
     DailyUsage,
     DaySummary,
+    DeletedQuote,
     EmbeddedChunk,
+    ExclusionFlag,
+    Exploration,
+    ExplorationTry,
+    Familiarity,
+    FamiliarityCounts,
     Feature,
     FeatureSwitch,
     Helpline,
@@ -57,11 +66,16 @@ from companion.core.models import (
     Need,
     NeedDetails,
     NextDueTimeChange,
+    Observation,
     Pattern,
+    PatternMove,
     PatternToSave,
+    PatternTypeVersion,
     PersonalSticker,
     PhotoImage,
     PlatformSettings,
+    Prediction,
+    ReactionToPattern,
     ReplyPlan,
     ReplyPlanShape,
     RiskType,
@@ -70,9 +84,13 @@ from companion.core.models import (
     SharedPhoto,
     StickerImage,
     StoredSetting,
+    TaggingShape,
     TelegramConnection,
+    ThoughtExperiment,
+    ThoughtExperimentDetails,
     Understanding,
     UnderstandingShape,
+    UnmatchedEntry,
     User,
     UserOverview,
     UserPage,
@@ -287,18 +305,27 @@ class ChatModel(Protocol):
         instructions: str,
         history: list[ChatLine],
         tools: Sequence[ChatTool] = (),
+        message_instructions: str = "",
     ) -> ModelAnswer:
         """Generate the next reply, calling tools first if the model wants to.
 
         A model that can't do the thinking asked for does the closest it can
         and logs a warning; it never fails for it.
 
+        The model reads `instructions` and then `message_instructions` as one
+        text (see `join_instructions`). They are given apart so a provider's
+        prompt cache can keep `instructions`, which stay the same from call
+        to call, and read them back on the next call.
+
         Args:
-            model: The model to use, e.g. "deepseek-flash".
+            model: The model to use, e.g. "deepseek/deepseek-v4.1-flash-1017".
             thinking: Whether the model should think before it answers.
-            instructions: What the model should be and do (Persona and prompt).
+            instructions: What the model should be and do (Persona and
+                prompt): the part that stays the same from call to call.
             history: The Conversation so far, oldest first.
             tools: The tools the model may call; none by default.
+            message_instructions: The instructions made for this one call,
+                read after `instructions`; "" by default.
 
         Returns:
             The reply text and the tokens it took.
@@ -318,7 +345,7 @@ class PhotoViewer(Protocol):
         and logs a warning; it never fails for it.
 
         Args:
-            model: The model to use, e.g. "deepseek-flash".
+            model: The model to use, e.g. "deepseek/deepseek-v4.1-flash-1017".
             thinking: Whether the model should think before it answers.
             instructions: What to write about the photo.
             photo: The photo's image.
@@ -584,6 +611,39 @@ class UserRepository(Protocol):
 
         Returns:
             True if they were deleted; False if there was no such User.
+        """
+        ...
+
+    def mark_pattern_noticing_told(self, user_id: UUID, told_at: datetime) -> User:
+        """Save that a User was told about Pattern noticing, the first time only.
+
+        Args:
+            user_id: The User's ID.
+            told_at: When they pressed "Got it".
+
+        Returns:
+            The saved User.
+        """
+        ...
+
+    def familiarity_counts(self, user_id: UUID) -> FamiliarityCounts:
+        """Count what the Companion has of a User, for their Familiarity.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            Their Conversations, Life Threads, Observations from real
+            stories and Patterns in each state.
+        """
+        ...
+
+    def save_familiarity(self, user_id: UUID, familiarity: Familiarity) -> None:
+        """Save how well the Companion knows a User.
+
+        Args:
+            user_id: The User's ID.
+            familiarity: Their Familiarity now.
         """
         ...
 
@@ -1115,6 +1175,18 @@ class ReplyPlanRepository(Protocol):
         """
         ...
 
+    def count_since(self, user_id: UUID, since: datetime) -> int:
+        """Count the Reply Plans made for a User after a time, in any Conversation.
+
+        Args:
+            user_id: The User's ID.
+            since: The time; Reply Plans made at it or before are left out.
+
+        Returns:
+            How many there are.
+        """
+        ...
+
 
 class LifeThreadRepository(Protocol):
     """Stores each User's Life Threads, found by name or by meaning."""
@@ -1269,28 +1341,131 @@ class LifeThreadRepository(Protocol):
         ...
 
 
+class ObservationRepository(Protocol):
+    """Stores each User's Observations, which outlive Message Retention (ADR-0027)."""
+
+    def add_many(self, observations: Sequence[Observation]) -> None:
+        """Save new Observations, all together.
+
+        Args:
+            observations: The Observations; none saves nothing.
+        """
+        ...
+
+    def settle(self, settled: Sequence[Observation]) -> None:
+        """Save unclear Observations made clear, with the Pattern Type now named.
+
+        Args:
+            settled: The Observations, each with one Pattern Type and its
+                sign; none saves nothing.
+        """
+        ...
+
+    def list_for_user(self, user_id: UUID) -> list[Observation]:
+        """List a User's Observations, oldest tagged first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Observations.
+        """
+        ...
+
+    def delete(self, user_id: UUID, observation_id: UUID) -> bool:
+        """Delete one of a User's Observations.
+
+        Args:
+            user_id: The User's ID.
+            observation_id: The Observation's ID.
+
+        Returns:
+            True if it was deleted; False if the User has no such Observation.
+        """
+        ...
+
+    def delete_of_pattern_type(self, user_id: UUID, pattern_type_id: str) -> None:
+        """Delete a User's Observations whose first Pattern Type is the one given.
+
+        An unclear Observation that names it second is kept: it belongs
+        first to another Pattern.
+
+        Args:
+            user_id: The User's ID.
+            pattern_type_id: The Pattern Type's ID.
+        """
+        ...
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's Observations, exclusion flags and deleted-quote records.
+
+        Args:
+            user_id: The User's ID.
+        """
+        ...
+
+    def note_deleted_quotes(self, deleted: Sequence[DeletedQuote]) -> None:
+        """Keep a record of quotes a User deleted, so none is kept again.
+
+        Args:
+            deleted: The records; one already kept is left as it is.
+        """
+        ...
+
+    def list_deleted_quotes(
+        self, user_id: UUID, conversation_id: UUID
+    ) -> list[DeletedQuote]:
+        """List the records of quotes a User deleted from one Conversation.
+
+        Args:
+            user_id: The User's ID.
+            conversation_id: The Conversation the quotes were said in.
+
+        Returns:
+            The records; none when they deleted no quote from it.
+        """
+        ...
+
+    def replace_exclusion_flags(
+        self, user_id: UUID, flags: Sequence[ExclusionFlag]
+    ) -> None:
+        """Save the exclusions that apply to a User now, in place of the old ones.
+
+        Args:
+            user_id: The User's ID.
+            flags: The exclusions that apply now; none clears them.
+        """
+        ...
+
+    def list_exclusion_flags(self, user_id: UUID) -> list[ExclusionFlag]:
+        """List the exclusions that apply to a User now.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The flags from the last time their Observations were tagged.
+        """
+        ...
+
+
 class PatternRepository(Protocol):
-    """Stores each User's Patterns with their evidence, found by meaning."""
+    """Stores each User's Patterns, and the log of their moves.
+
+    A Pattern with no Pattern Type (an unmatched one) has its own words and
+    evidence and is found by meaning; only those are read by the methods
+    that return a `Pattern`. A Pattern of
+    a Pattern Type is fed by Observations and moved by code.
+    """
 
     def list_for_user(self, user_id: UUID) -> list[Pattern]:
-        """List a User's Patterns, oldest started first, with their evidence.
+        """List a User's Patterns with no Pattern Type, oldest started first.
 
         Args:
             user_id: The User's ID.
 
         Returns:
             The Patterns, each with its evidence oldest first.
-        """
-        ...
-
-    def list_confirmed(self, user_id: UUID) -> list[Pattern]:
-        """List the Patterns a User agreed with, newest agreed first.
-
-        Args:
-            user_id: The User's ID.
-
-        Returns:
-            The confirmed Patterns, each with its evidence oldest first.
         """
         ...
 
@@ -1360,24 +1535,177 @@ class PatternRepository(Protocol):
         """
         ...
 
-    def delete_confirmed(self, user_id: UUID, pattern_id: UUID) -> bool:
-        """Delete one of a User's confirmed Patterns, with its evidence.
+    def list_not_matched(self) -> list[Pattern]:
+        """List every User's Patterns with no Pattern Type and none matched.
+
+        Returns:
+            The Patterns, each User's together, oldest started first, each
+            with its evidence oldest first.
+        """
+        ...
+
+    def save_match(self, pattern_id: UUID, pattern_type_id: str) -> None:
+        """Save the Pattern Type a Pattern with none of its own was found to fit.
+
+        The Pattern keeps its words, state and evidence.
+
+        Args:
+            pattern_id: The Pattern's ID.
+            pattern_type_id: The Pattern Type's ID.
+        """
+        ...
+
+    def list_of_pattern_types(self, user_id: UUID) -> list[CatalogPattern]:
+        """List a User's Patterns of Pattern Types, oldest started first.
 
         Args:
             user_id: The User's ID.
-            pattern_id: The Pattern's ID.
 
         Returns:
-            True if it was deleted; False if the User has no such confirmed
-            Pattern.
+            The Patterns.
+        """
+        ...
+
+    def save_moves(
+        self,
+        added: Sequence[CatalogPattern],
+        changed: Sequence[CatalogPattern],
+        deleted_ids: Sequence[UUID],
+        moves: Sequence[PatternMove],
+    ) -> None:
+        """Save what scoring or the ready gate changed in a User's Patterns, at once.
+
+        Args:
+            added: Patterns noticed for the first time.
+            changed: Patterns that moved or that the ready gate judged, with
+                their state, blocking check, narrowings, when the other
+                side was last argued and when they were shared.
+            deleted_ids: Patterns with no Observations left; their moves stay.
+            moves: The moves, added to the log in order.
+        """
+        ...
+
+    def list_moves(self, user_id: UUID) -> list[PatternMove]:
+        """List every move of a User's Patterns, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The moves, including those of Patterns since deleted.
+        """
+        ...
+
+    def count_shared_since(
+        self, user_ids: Sequence[UUID], since: datetime
+    ) -> dict[UUID, int]:
+        """Count the Patterns shared with many Users since a time, in one query.
+
+        It counts the logged moves to shared, so a Pattern deleted since
+        still counts.
+
+        Args:
+            user_ids: The Users' IDs.
+            since: Only Patterns shared after this are counted.
+
+        Returns:
+            Each User's count; a User with none is left out.
+        """
+        ...
+
+    def list_users_with_pattern_ready_by(
+        self, user_ids: Sequence[UUID], ready_by: datetime
+    ) -> set[UUID]:
+        """Find which of many Users have a Pattern ready since a time, in one query.
+
+        Args:
+            user_ids: The Users' IDs.
+            ready_by: Only a Pattern that became ready at or before this
+                counts.
+
+        Returns:
+            The IDs of the Users with such a Pattern.
+        """
+        ...
+
+    def add_prediction(self, prediction: Prediction) -> None:
+        """Save a Prediction given for a shared Pattern.
+
+        Args:
+            prediction: The Prediction.
+        """
+        ...
+
+    def save_prediction_outcomes(self, settled: Sequence[Prediction]) -> None:
+        """Save how some Predictions went.
+
+        Args:
+            settled: The Predictions, each with its outcome and when it
+                was read or set.
+        """
+        ...
+
+    def list_predictions(self, user_id: UUID) -> list[Prediction]:
+        """List the Predictions given to a User, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Predictions.
+        """
+        ...
+
+    def add_reactions(self, reactions: Sequence[ReactionToPattern]) -> None:
+        """Save how a User took Patterns in one Conversation.
+
+        A Pattern keeps one reaction per Conversation: a second one read
+        from the same Conversation is left out.
+
+        Args:
+            reactions: The reactions.
+        """
+        ...
+
+    def list_reactions(self, user_id: UUID) -> list[ReactionToPattern]:
+        """List how a User took the Patterns they were told, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The reactions.
         """
         ...
 
     def delete_for_user(self, user_id: UUID) -> None:
-        """Delete every one of a User's Patterns.
+        """Delete a User's Patterns, the log of their moves and "never again" marks.
 
         Args:
             user_id: The User's ID.
+        """
+        ...
+
+    def mark_never_again(
+        self, user_id: UUID, pattern_type_id: str, marked_at: datetime
+    ) -> None:
+        """Mark a Pattern Type as never to be noted or shared for a User again.
+
+        Args:
+            user_id: The User's ID.
+            pattern_type_id: The Pattern Type's ID.
+            marked_at: When it was marked; one already marked stays as it is.
+        """
+        ...
+
+    def list_never_again(self, user_id: UUID) -> frozenset[str]:
+        """List the Pattern Types never to be noted or shared for a User again.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            Their IDs; none when the User marked none.
         """
         ...
 
@@ -1514,6 +1842,203 @@ class UserPortraitRepository(Protocol):
         ...
 
 
+class ExplorationRepository(Protocol):
+    """Stores each User's Explorations and their tries, which are never shown.
+
+    An Exploration goes with its Pattern, and a try with its aimed Curiosity.
+    Saving the Agenda also adds and closes aimed Curiosities, so an
+    Exploration's changes, tries and Curiosities are saved in one step.
+    """
+
+    def list_for_user(self, user_id: UUID) -> list[Exploration]:
+        """List a User's Explorations, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Explorations.
+        """
+        ...
+
+    def list_tries(self, user_id: UUID) -> list[ExplorationTry]:
+        """List every try of a User's, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The tries.
+        """
+        ...
+
+    def save_agenda(self, changes: AgendaChanges) -> None:
+        """Save what keeping a User's Agenda changed, in one step.
+
+        A new aimed Curiosity whose Observation was deleted meanwhile is not
+        added, nor is its try.
+
+        Args:
+            changes: The changes.
+        """
+        ...
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete every one of a User's Explorations and their tries.
+
+        Args:
+            user_id: The User's ID.
+        """
+        ...
+
+
+class UnmatchedEntryRepository(Protocol):
+    """Stores what keeps turning up that fits no Pattern Type, for Admins.
+
+    An entry holds a general description and an Admin's mark, and no User.
+    Unmatched Patterns are grouped under it by `patterns.unmatched_entry_id`.
+    """
+
+    def join_or_add(
+        self,
+        new_entry: UnmatchedEntry,
+        embedding: list[float],
+        min_closeness: float,
+        created_at: datetime,
+    ) -> UUID:
+        """Find the entry a general description belongs under, or add one.
+
+        Done one at a time across the whole platform, so two Conversations
+        ending at the same moment never add two entries for the same thing.
+
+        Args:
+            new_entry: The entry to add when none is close enough, holding
+                the general description.
+            embedding: The general description embedded.
+            min_closeness: How close in meaning an entry must be to be
+                joined, from 0 to 1.
+            created_at: When the new entry is added.
+
+        Returns:
+            The ID of the closest entry at least that close, the oldest
+            first when two are as close; the new entry's ID if it was added.
+        """
+        ...
+
+    def list_counted(self) -> list[CountedUnmatchedEntry]:
+        """List the entries that appear for at least one User.
+
+        A User counts once for an entry, however many of their unmatched
+        Patterns are grouped under it; a Pattern the matching command
+        linked to a Pattern Type doesn't count.
+
+        Returns:
+            The entries, most Users first, then oldest first.
+        """
+        ...
+
+    def get_counted(self, entry_id: UUID) -> CountedUnmatchedEntry | None:
+        """Get one entry with how many Users it appears for now.
+
+        Args:
+            entry_id: The entry's ID.
+
+        Returns:
+            The entry, also when it appears for no User; None if there is
+            no such entry.
+        """
+        ...
+
+    def save_mark(self, entry: UnmatchedEntry) -> None:
+        """Save an entry's mark.
+
+        Args:
+            entry: The entry with its new mark, the Pattern Type it is
+                folded into, the Users it appeared for and when.
+        """
+        ...
+
+
+class ThoughtExperimentRepository(Protocol):
+    """Stores the Thought Experiments Admins manage. None is ever deleted."""
+
+    def list_all(self) -> list[ThoughtExperiment]:
+        """List every Thought Experiment, archived ones too, oldest first.
+
+        Returns:
+            The Thought Experiments.
+        """
+        ...
+
+    def get(self, thought_experiment_id: UUID) -> ThoughtExperiment | None:
+        """Find one Thought Experiment.
+
+        Args:
+            thought_experiment_id: Its ID.
+
+        Returns:
+            It, or None if there is no such one.
+        """
+        ...
+
+    def add(self, thought_experiment: ThoughtExperiment) -> None:
+        """Store a new Thought Experiment.
+
+        Args:
+            thought_experiment: It, with its ID.
+        """
+        ...
+
+    def update(
+        self,
+        thought_experiment_id: UUID,
+        details: ThoughtExperimentDetails,
+        now: datetime,
+    ) -> ThoughtExperiment:
+        """Change what an Admin set on a Thought Experiment.
+
+        Args:
+            thought_experiment_id: Its ID; it exists.
+            details: Its new values.
+            now: When it changed.
+
+        Returns:
+            It, saved.
+        """
+        ...
+
+    def archive(self, thought_experiment_id: UUID, now: datetime) -> ThoughtExperiment:
+        """Archive a Thought Experiment, so it is never asked again.
+
+        Args:
+            thought_experiment_id: Its ID; it exists.
+            now: When it was archived.
+
+        Returns:
+            It, saved.
+        """
+        ...
+
+    def close_waiting(self, thought_experiment_id: UUID) -> None:
+        """Close every waiting Curiosity that would put it to a User.
+
+        Both an Exploration's try and a starter for a new User.
+
+        Args:
+            thought_experiment_id: Its ID.
+        """
+        ...
+
+    def asked_counts(self) -> dict[UUID, int]:
+        """Count how many times each Thought Experiment was put to a User.
+
+        Returns:
+            How many of its Curiosities were asked, by its ID, whether for an
+            Exploration or as a starter; one never asked is left out.
+        """
+        ...
+
+
 class CuriosityRepository(Protocol):
     """Stores each User's Curiosities, which are internal and never shown.
 
@@ -1543,12 +2068,56 @@ class CuriosityRepository(Protocol):
         """
         ...
 
+    def list_aimed(self, user_id: UUID) -> list[Curiosity]:
+        """List a User's aimed Curiosities, in any state, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Curiosities with the aim of an Exploration's need.
+        """
+        ...
+
+    def list_starters(self, user_id: UUID) -> list[Curiosity]:
+        """List a User's starter Thought Experiment Curiosities, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Curiosities with the starter aim, in any state.
+        """
+        ...
+
+    def list_about_predictions(self, user_id: UUID) -> list[Curiosity]:
+        """List a User's Curiosities about Predictions, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Curiosities with the Prediction aim, in any state.
+        """
+        ...
+
     def list_recently_raised(self, user_id: UUID, limit: int) -> list[Curiosity]:
         """List the Curiosities most recently raised with a User, newest first.
 
         Args:
             user_id: The User's ID.
             limit: The most to return.
+
+        Returns:
+            The Curiosities.
+        """
+        ...
+
+    def list_asked_to_drop(self, user_id: UUID) -> list[Curiosity]:
+        """List the Curiosities a User asked Zeph to drop, newest raised first.
+
+        Args:
+            user_id: The User's ID.
 
         Returns:
             The Curiosities.
@@ -1887,6 +2456,29 @@ class CopyRepository(Protocol):
         ...
 
 
+class PatternCatalogRepository(Protocol):
+    """Stores every loaded version of each Pattern Type (ADR-0025)."""
+
+    def list_versions(self) -> list[PatternTypeVersion]:
+        """List every stored version of every Pattern Type.
+
+        Returns:
+            The versions, by Pattern Type ID and then newest loaded first.
+        """
+        ...
+
+    def save_loaded(self, versions: Sequence[PatternTypeVersion]) -> None:
+        """Keep the versions just loaded as the catalog, in one step.
+
+        A version not stored yet is added. Versions stored earlier stay as
+        they were. Exactly the given versions are then the current ones.
+
+        Args:
+            versions: The version of each Pattern Type its file now holds.
+        """
+        ...
+
+
 class HelplineRepository(Protocol):
     """Stores Helplines per country and the one international fallback."""
 
@@ -1983,6 +2575,30 @@ class SafeguardEventRepository(Protocol):
         """
         ...
 
+    def happened_since(self, user_id: UUID, since: datetime) -> bool:
+        """Say whether a User had a Safeguard Event after a time.
+
+        Args:
+            user_id: The User's ID.
+            since: The time; events at it or before are left out.
+
+        Returns:
+            True when there is one.
+        """
+        ...
+
+    def happened_from(self, user_id: UUID, start: datetime) -> bool:
+        """Say whether a User had a Safeguard Event at a time or after it.
+
+        Args:
+            user_id: The User's ID.
+            start: The time; events before it are left out.
+
+        Returns:
+            True when there is one.
+        """
+        ...
+
     def list_overviews(
         self, since: datetime | None, risk_type: RiskType | None
     ) -> list[SafeguardEventOverview]:
@@ -2043,6 +2659,15 @@ class ModelCallRepository(Protocol):
         Args:
             trace_id: The trace's ID.
             shape: The decision's shape.
+        """
+        ...
+
+    def set_tagging_shape(self, trace_id: UUID, shape: TaggingShape) -> None:
+        """Save a Pattern tagging call's shape on a trace's newest tagging call.
+
+        Args:
+            trace_id: The trace's ID.
+            shape: How many Observations were tagged and dropped.
         """
         ...
 
@@ -2899,6 +3524,7 @@ class Repositories:
     conversations: ConversationRepository
     platform_settings: PlatformSettingsRepository
     copy: CopyRepository
+    pattern_catalog: PatternCatalogRepository
     helplines: HelplineRepository
     safeguard_events: SafeguardEventRepository
     memory_categories: MemoryCategoryRepository
@@ -2909,7 +3535,11 @@ class Repositories:
     user_memory: UserMemoryRepository
     life_threads: LifeThreadRepository
     patterns: PatternRepository
+    observations: ObservationRepository
     curiosities: CuriosityRepository
+    explorations: ExplorationRepository
+    thought_experiments: ThoughtExperimentRepository
+    unmatched_entries: UnmatchedEntryRepository
     move_outcomes: MoveOutcomeRepository
     user_portraits: UserPortraitRepository
     knowledge_documents: KnowledgeDocumentRepository
@@ -2939,5 +3569,17 @@ class Transaction(Protocol):
 
         Returns:
             The IDs of the Users who are Admins.
+        """
+        ...
+
+    def lock_user(self, user_id: UUID) -> None:
+        """Lock one User until the transaction ends.
+
+        Another transaction locking them waits for this one, then sees its
+        changes. Scoring their Patterns and deleting their Observations take
+        it, so neither works from what the other is changing.
+
+        Args:
+            user_id: The User's ID.
         """
         ...

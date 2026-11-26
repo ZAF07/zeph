@@ -2,6 +2,7 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import asdict
 from datetime import date, datetime
+from enum import StrEnum
 from functools import partial
 from typing import Any, Protocol
 from uuid import UUID, uuid4
@@ -23,7 +24,12 @@ from sqlalchemy import (
     tuple_,
     update,
 )
-from sqlalchemy.dialects.postgresql import aggregate_order_by, distinct_on, insert
+from sqlalchemy.dialects.postgresql import (
+    JSONB,
+    aggregate_order_by,
+    distinct_on,
+    insert,
+)
 from sqlalchemy.exc import IntegrityError
 
 from companion.adapters.postgres.tables import (
@@ -36,6 +42,9 @@ from companion.adapters.postgres.tables import (
     curiosities,
     daily_usage,
     day_summaries,
+    deleted_quotes,
+    exploration_tries,
+    explorations,
     feature_switches,
     helplines,
     knowledge_documents,
@@ -48,25 +57,37 @@ from companion.adapters.postgres.tables import (
     moves,
     need_ruled_out_moves,
     needs,
+    observations,
     pattern_evidence,
+    pattern_exclusion_flags,
+    pattern_moves,
+    pattern_reactions,
+    pattern_types,
     patterns,
     patterns_in_mind,
+    patterns_never_again,
     pending_auth_account_deletions,
     personal_stickers,
     platform_settings,
+    predictions,
     reply_plans,
     safeguard_events,
     shared_photos,
     stickers,
     telegram_connections,
+    thought_experiments,
     understandings,
+    unmatched_entries,
     user_feature_switches,
     user_portraits,
     users,
 )
 from companion.core.features import feature_details
 from companion.core.models import (
+    AgendaChanges,
+    Audience,
     BringUpWay,
+    CatalogPattern,
     ChannelPhoto,
     ChannelSticker,
     ChatLine,
@@ -84,18 +105,34 @@ from companion.core.models import (
     CheckInShape,
     ChosenCheckIn,
     ChosenKnowledgeDocument,
+    Condition,
     ConnectionToken,
     Conversation,
     ConversationMessage,
     CopySeedSlot,
     CopySlot,
+    CountedUnmatchedEntry,
     Curiosity,
+    CuriosityAim,
     CuriosityChanges,
     CuriositySensitivity,
     CuriosityState,
     CuriosityToRaise,
+    CuriosityTreatment,
     DailyUsage,
     DaySummary,
+    DeletedQuote,
+    Directness,
+    EvidenceKind,
+    ExcludedEvidence,
+    ExclusionFlag,
+    Exploration,
+    ExplorationApproach,
+    ExplorationNeed,
+    ExplorationState,
+    ExplorationTry,
+    Familiarity,
+    FamiliarityCounts,
     Feature,
     FeatureSwitch,
     HeldBack,
@@ -137,15 +174,28 @@ from companion.core.models import (
     Need,
     NeedDetails,
     NextDueTimeChange,
+    Observation,
+    ObservationDirection,
     OfferedTool,
     Pattern,
     PatternEvidence,
+    PatternMove,
+    PatternMoveCause,
+    PatternMoveReason,
+    PatternNarrowing,
     PatternPicked,
     PatternReaction,
     PatternState,
     PatternToSave,
+    PatternTypeVersion,
     PersonalSticker,
     PlatformSettings,
+    Power,
+    Prediction,
+    PredictionOutcome,
+    ReactionToPattern,
+    ReadyCheck,
+    Relationship,
     RepliedToSender,
     RepliedToText,
     ReplyPlan,
@@ -156,16 +206,27 @@ from companion.core.models import (
     SafeguardEventOverview,
     SaidReadUnclear,
     SharedPhoto,
+    SituationSetting,
+    SituationTags,
+    Stakes,
+    Stance,
+    StateGoingIn,
     StoredSetting,
+    TaggingShape,
     TelegramConnection,
+    ThoughtExperiment,
+    ThoughtExperimentDetails,
     ThreadLeftAlone,
     ThreadReaction,
     ThreadToBringUp,
     ToolCallRecord,
     TraceKind,
+    TryOutcome,
     Understanding,
     UnderstandingForm,
     UnderstandingShape,
+    UnmatchedEntry,
+    UnmatchedMark,
     User,
     UserOverview,
     UserPage,
@@ -240,6 +301,7 @@ def _to_user(row: Row[Any]) -> User:
         ai_notice_acknowledged_at=row.ai_notice_acknowledged_at,
         user_memory_enabled=row.user_memory_enabled,
         photo_viewing_enabled=row.photo_viewing_enabled,
+        directness=Directness(row.directness),
         onboarding_completed_at=row.onboarding_completed_at,
         role=UserRole(row.role),
         check_ins=CheckInSettings(
@@ -271,6 +333,9 @@ def _to_user(row: Row[Any]) -> User:
         settings_changed_in_chat=_to_setting_stamps(row.settings_changed_in_chat),
         settings_changed_by_admin=_to_setting_stamps(row.settings_changed_by_admin),
         data_deletion_requested_at=row.data_deletion_requested_at,
+        pattern_noticing_told_at=row.pattern_noticing_told_at,
+        familiarity=Familiarity(row.familiarity),
+        contested_gathering_enabled=row.contested_gathering_enabled,
     )
 
 
@@ -321,6 +386,7 @@ def _to_need(row: Row[Any], ruled_out_move_ids: frozenset[UUID]) -> Need:
         sort_order=row.sort_order,
         is_fallback=row.is_fallback,
         ruled_out_move_ids=ruled_out_move_ids,
+        curiosities=CuriosityTreatment(row.curiosities),
     )
 
 
@@ -424,6 +490,7 @@ def _to_check_in_kind(row: Row[Any]) -> CheckInKind:
         sort_order=row.sort_order,
         sends_shared_photo=row.sends_shared_photo,
         raises_curiosity=row.raises_curiosity,
+        shares_pattern=row.shares_pattern,
     )
 
 
@@ -840,6 +907,8 @@ class PostgresUserRepository:
                 ai_notice_acknowledged_at=user.ai_notice_acknowledged_at,
                 user_memory_enabled=user.user_memory_enabled,
                 photo_viewing_enabled=user.photo_viewing_enabled,
+                directness=user.directness.value,
+                contested_gathering_enabled=user.contested_gathering_enabled,
                 onboarding_completed_at=user.onboarding_completed_at,
                 check_ins_enabled=user.check_ins.enabled,
                 check_in_frequency=user.check_ins.frequency.value,
@@ -908,13 +977,10 @@ class PostgresUserRepository:
             .where(move_outcomes.c.user_id == users.c.id)
             .scalar_subquery()
         )
-        confirmed_pattern_count = (
+        kept_quote_count = (
             select(func.count())
-            .select_from(patterns)
-            .where(
-                patterns.c.user_id == users.c.id,
-                patterns.c.state == PatternState.CONFIRMED.value,
-            )
+            .select_from(observations)
+            .where(observations.c.user_id == users.c.id)
             .scalar_subquery()
         )
         has_portrait = (
@@ -938,10 +1004,17 @@ class PostgresUserRepository:
             life_thread_count.label("life_thread_count"),
             has_portrait.label("has_portrait"),
             move_outcome_count.label("move_outcome_count"),
-            confirmed_pattern_count.label("confirmed_pattern_count"),
+            kept_quote_count.label("kept_quote_count"),
         ).order_by(users.c.created_at.desc())
+        pattern_count_statement = select(
+            patterns.c.user_id, patterns.c.state, func.count()
+        ).group_by(patterns.c.user_id, patterns.c.state)
         with self._database.connect() as connection:
             rows = connection.execute(statement).all()
+            pattern_count_rows = connection.execute(pattern_count_statement).all()
+        pattern_counts: dict[UUID, dict[PatternState, int]] = {}
+        for user_id, state, count in pattern_count_rows:
+            pattern_counts.setdefault(user_id, {})[PatternState(state)] = count
         return [
             UserOverview(
                 user=_to_user(row),
@@ -951,7 +1024,11 @@ class PostgresUserRepository:
                 life_thread_count=row.life_thread_count,
                 has_portrait=row.has_portrait,
                 move_outcome_count=row.move_outcome_count,
-                confirmed_pattern_count=row.confirmed_pattern_count,
+                kept_quote_count=row.kept_quote_count,
+                pattern_counts={
+                    state: pattern_counts.get(row.id, {}).get(state, 0)
+                    for state in PatternState
+                },
             )
             for row in rows
         ]
@@ -1023,6 +1100,96 @@ class PostgresUserRepository:
                 delete(users).where(users.c.id == user_id).returning(users.c.id)
             ).scalar_one_or_none()
         return deleted_id is not None
+
+    def mark_pattern_noticing_told(self, user_id: UUID, told_at: datetime) -> User:
+        """Save that a User was told about Pattern noticing, the first time only.
+
+        Args:
+            user_id: The User's ID.
+            told_at: When they pressed "Got it".
+
+        Returns:
+            The saved User.
+        """
+        with self._database.begin() as connection:
+            row = connection.execute(
+                update(users)
+                .where(users.c.id == user_id)
+                .values(
+                    pattern_noticing_told_at=func.coalesce(
+                        users.c.pattern_noticing_told_at, told_at
+                    )
+                )
+                .returning(users)
+            ).one()
+        return _to_user(row)
+
+    def familiarity_counts(self, user_id: UUID) -> FamiliarityCounts:
+        """Count what the Companion has of a User, for their Familiarity.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            Their Conversations, Life Threads, Observations from real
+            stories and Patterns in each state.
+        """
+        conversation_count = (
+            select(func.count())
+            .select_from(conversations)
+            .where(conversations.c.user_id == user_id)
+            .scalar_subquery()
+        )
+        life_thread_count = (
+            select(func.count())
+            .select_from(life_threads)
+            .where(life_threads.c.user_id == user_id)
+            .scalar_subquery()
+        )
+        real_story_count = (
+            select(func.count())
+            .select_from(observations)
+            .where(
+                observations.c.user_id == user_id,
+                observations.c.evidence_kind == EvidenceKind.REAL_STORY,
+            )
+            .scalar_subquery()
+        )
+        with self._database.connect() as connection:
+            counts = connection.execute(
+                select(
+                    conversation_count.label("conversations"),
+                    life_thread_count.label("life_threads"),
+                    real_story_count.label("real_stories"),
+                )
+            ).one()
+            pattern_rows = connection.execute(
+                select(patterns.c.state, func.count())
+                .where(patterns.c.user_id == user_id)
+                .group_by(patterns.c.state)
+            ).all()
+        return FamiliarityCounts(
+            conversations=counts.conversations,
+            life_threads=counts.life_threads,
+            real_story_observations=counts.real_stories,
+            pattern_states={
+                PatternState(state): count for state, count in pattern_rows
+            },
+        )
+
+    def save_familiarity(self, user_id: UUID, familiarity: Familiarity) -> None:
+        """Save how well the Companion knows a User.
+
+        Args:
+            user_id: The User's ID.
+            familiarity: Their Familiarity now.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                update(users)
+                .where(users.c.id == user_id)
+                .values(familiarity=familiarity.value)
+            )
 
 
 class PostgresPendingAuthAccountDeletionRepository:
@@ -1643,6 +1810,78 @@ class PostgresPlatformSettingsRepository:
                 )
 
 
+class PostgresPatternCatalogRepository:
+    """Stores Pattern Type versions in Postgres, one row per version."""
+
+    def __init__(self, database: Database) -> None:
+        """Set up the repository.
+
+        Args:
+            database: Where to run queries: the engine, or one transaction.
+        """
+        self._database = database
+
+    def list_versions(self) -> list[PatternTypeVersion]:
+        """List every stored version of every Pattern Type.
+
+        Returns:
+            The versions, by Pattern Type ID and then newest loaded first.
+        """
+        statement = select(pattern_types).order_by(
+            pattern_types.c.pattern_type_id, pattern_types.c.loaded_at.desc()
+        )
+        with self._database.connect() as connection:
+            rows = connection.execute(statement).all()
+        return [
+            PatternTypeVersion(
+                pattern_type_id=row.pattern_type_id,
+                version=row.version,
+                content=row.content,
+                is_current=row.is_current,
+                loaded_at=row.loaded_at,
+            )
+            for row in rows
+        ]
+
+    def save_loaded(self, versions: Sequence[PatternTypeVersion]) -> None:
+        """Keep the versions just loaded as the catalog, in one step.
+
+        A version not stored yet is added. Versions stored earlier stay as
+        they were. Exactly the given versions are then the current ones.
+
+        Args:
+            versions: The version of each Pattern Type its file now holds.
+        """
+        loaded_keys = [
+            (version.pattern_type_id, version.version) for version in versions
+        ]
+        with self._database.begin() as connection:
+            if versions:
+                connection.execute(
+                    insert(pattern_types)
+                    .values(
+                        [
+                            {
+                                "pattern_type_id": version.pattern_type_id,
+                                "version": version.version,
+                                "content": version.content,
+                                "is_current": True,
+                                "loaded_at": version.loaded_at,
+                            }
+                            for version in versions
+                        ]
+                    )
+                    .on_conflict_do_nothing()
+                )
+            connection.execute(
+                update(pattern_types).values(
+                    is_current=tuple_(
+                        pattern_types.c.pattern_type_id, pattern_types.c.version
+                    ).in_(loaded_keys)
+                )
+            )
+
+
 class PostgresCopyRepository:
     """Stores website Copy in Postgres, one row per slot."""
 
@@ -1965,6 +2204,48 @@ class PostgresSafeguardEventRepository:
                 )
             )
 
+    def happened_since(self, user_id: UUID, since: datetime) -> bool:
+        """Say whether a User had a Safeguard Event after a time.
+
+        Args:
+            user_id: The User's ID.
+            since: The time; events at it or before are left out.
+
+        Returns:
+            True when there is one.
+        """
+        with self._database.connect() as connection:
+            found = connection.execute(
+                select(safeguard_events.c.id)
+                .where(
+                    safeguard_events.c.user_id == user_id,
+                    safeguard_events.c.created_at > since,
+                )
+                .limit(1)
+            ).first()
+        return found is not None
+
+    def happened_from(self, user_id: UUID, start: datetime) -> bool:
+        """Say whether a User had a Safeguard Event at a time or after it.
+
+        Args:
+            user_id: The User's ID.
+            start: The time; events before it are left out.
+
+        Returns:
+            True when there is one.
+        """
+        with self._database.connect() as connection:
+            found = connection.execute(
+                select(safeguard_events.c.id)
+                .where(
+                    safeguard_events.c.user_id == user_id,
+                    safeguard_events.c.created_at >= start,
+                )
+                .limit(1)
+            ).first()
+        return found is not None
+
     def list_overviews(
         self, since: datetime | None, risk_type: RiskType | None
     ) -> list[SafeguardEventOverview]:
@@ -2081,6 +2362,7 @@ class PostgresNeedRepository:
                     how_to_reply=details.how_to_reply,
                     sort_order=0 if highest is None else int(highest) + 1,
                     is_fallback=False,
+                    curiosities=details.curiosities,
                 )
                 .returning(needs)
             ).one()
@@ -2108,6 +2390,7 @@ class PostgresNeedRepository:
                     name=details.name,
                     when_it_fits=details.when_it_fits,
                     how_to_reply=details.how_to_reply,
+                    curiosities=details.curiosities,
                 )
                 .returning(needs)
             ).one()
@@ -2385,6 +2668,27 @@ class PostgresReplyPlanRepository:
                 )
             )
 
+    def count_since(self, user_id: UUID, since: datetime) -> int:
+        """Count the Reply Plans made for a User after a time, in any Conversation.
+
+        Args:
+            user_id: The User's ID.
+            since: The time; Reply Plans made at it or before are left out.
+
+        Returns:
+            How many there are.
+        """
+        with self._database.connect() as connection:
+            count = connection.execute(
+                select(func.count())
+                .select_from(reply_plans)
+                .where(
+                    reply_plans.c.user_id == user_id,
+                    reply_plans.c.made_at > since,
+                )
+            ).scalar_one()
+        return int(count)
+
     def list_for_conversation(self, conversation_id: UUID) -> list[ReplyPlan]:
         """List a Conversation's Reply Plans, oldest first.
 
@@ -2448,11 +2752,17 @@ def _reply_plan_form_values(form: ReplyPlanForm) -> dict[str, Any]:
         {**item, "pattern_id": str(item["pattern_id"])}
         for item in values["patterns_used"]
     ]
-    if values["pattern_offered"] is not None:
-        values["pattern_offered"] = {
-            **values["pattern_offered"],
-            "pattern_id": str(values["pattern_offered"]["pattern_id"]),
-        }
+    for field_name in (
+        "pattern_offered",
+        "pattern_to_share",
+        "pattern_raised",
+        "pattern_named",
+    ):
+        if values[field_name] is not None:
+            values[field_name] = {
+                **values[field_name],
+                "pattern_id": str(values[field_name]["pattern_id"]),
+            }
     return values
 
 
@@ -2482,8 +2792,9 @@ def _to_knowledge_lookup(stored: dict[str, Any] | None) -> KnowledgeLookup | Non
 def _to_reply_plan_form(stored: dict[str, Any]) -> ReplyPlanForm:
     """Turn a saved form back into a Reply Plan form.
 
-    A form saved before Reply Plans formed a Read, weighed a Check-in or
-    used Patterns, reads as having none.
+    A form saved before Reply Plans formed a Read, weighed a Check-in,
+    used or shared Patterns or said why no Curiosity was asked, reads as
+    having none.
 
     Args:
         stored: The form as saved.
@@ -2543,6 +2854,28 @@ def _to_reply_plan_form(stored: dict[str, Any]) -> ReplyPlanForm:
         pattern_offered=(
             _to_pattern_picked(stored["pattern_offered"])
             if stored.get("pattern_offered")
+            else None
+        ),
+        pattern_to_share=(
+            _to_pattern_picked(stored["pattern_to_share"])
+            if stored.get("pattern_to_share")
+            else None
+        ),
+        pattern_raised=(
+            _to_pattern_picked(stored["pattern_raised"])
+            if stored.get("pattern_raised")
+            else None
+        ),
+        pattern_named=(
+            _to_pattern_picked(stored["pattern_named"])
+            if stored.get("pattern_named")
+            else None
+        ),
+        asked_for_patterns=stored.get("asked_for_patterns", False),
+        curiosity_not_asked_why=stored.get("curiosity_not_asked_why", ""),
+        curiosity_taken=(
+            ThreadReaction(stored["curiosity_taken"])
+            if stored.get("curiosity_taken")
             else None
         ),
     )
@@ -3031,6 +3364,8 @@ class PostgresLifeThreadRepository:
 
 
 PATTERN_COLUMNS = [column for column in patterns.c if column.name != "embedding"]
+HAS_NO_PATTERN_TYPE = patterns.c.pattern_type_id.is_(None)
+HAS_PATTERN_TYPE = patterns.c.pattern_type_id.is_not(None)
 
 
 def _to_pattern(row: Row[Any], evidence: Sequence[PatternEvidence]) -> Pattern:
@@ -3051,12 +3386,350 @@ def _to_pattern(row: Row[Any], evidence: Sequence[PatternEvidence]) -> Pattern:
         evidence=tuple(evidence),
         started_at=row.started_at,
         updated_at=row.updated_at,
-        last_offered_at=row.last_offered_at,
-        last_reaction=(
-            PatternReaction(row.last_reaction) if row.last_reaction else None
-        ),
         confirmed_at=row.confirmed_at,
+        matched_pattern_type_id=row.matched_pattern_type_id,
+        general_description=row.general_description,
+        unmatched_entry_id=row.unmatched_entry_id,
     )
+
+
+def to_observation(row: Row[Any]) -> Observation:
+    """Turn an `observations` row into an Observation.
+
+    Args:
+        row: The row.
+
+    Returns:
+        The Observation.
+    """
+    return Observation(
+        id=row.id,
+        user_id=row.user_id,
+        conversation_id=row.conversation_id,
+        pattern_type_id=row.pattern_type_id,
+        pattern_type_version=row.pattern_type_version,
+        sign_id=row.sign_id,
+        direction=ObservationDirection(row.direction),
+        quote=row.quote,
+        context=row.context,
+        day=row.day,
+        thread_id=row.life_thread_id,
+        about=row.about,
+        tags=SituationTags(
+            relationship=Relationship(row.relationship) if row.relationship else None,
+            power=Power(row.power) if row.power else None,
+            setting=SituationSetting(row.setting) if row.setting else None,
+            stance=Stance(row.stance) if row.stance else None,
+            audience=Audience(row.audience) if row.audience else None,
+            stakes=Stakes(row.stakes) if row.stakes else None,
+            state_going_in=(
+                StateGoingIn(row.state_going_in) if row.state_going_in else None
+            ),
+        ),
+        evidence_kind=EvidenceKind(row.evidence_kind),
+        second_pattern_type_id=row.second_pattern_type_id,
+        second_pattern_type_version=row.second_pattern_type_version,
+        situational=row.situational,
+        tagged_at=row.tagged_at,
+        excluded=row.excluded,
+        ruled_out_topic=row.ruled_out_topic,
+        raised_by_user=row.raised_by_user,
+    )
+
+
+class PostgresObservationRepository:
+    """Stores Observations in Postgres, apart from the messages they quote."""
+
+    def __init__(self, database: Database) -> None:
+        """Set up the repository.
+
+        Args:
+            database: Where to run queries: the engine, or one transaction.
+        """
+        self._database = database
+
+    def add_many(self, new_observations: Sequence[Observation]) -> None:
+        """Save new Observations, all together.
+
+        Args:
+            new_observations: The Observations; none saves nothing.
+        """
+        if not new_observations:
+            return
+        with self._database.begin() as connection:
+            connection.execute(
+                insert(observations),
+                [
+                    {
+                        "id": observation.id,
+                        "user_id": observation.user_id,
+                        "conversation_id": observation.conversation_id,
+                        "pattern_type_id": observation.pattern_type_id,
+                        "pattern_type_version": observation.pattern_type_version,
+                        "sign_id": observation.sign_id,
+                        "direction": observation.direction.value,
+                        "quote": observation.quote,
+                        "context": observation.context,
+                        "day": observation.day,
+                        "life_thread_id": observation.thread_id,
+                        "about": observation.about,
+                        "relationship": _value_or_none(observation.tags.relationship),
+                        "power": _value_or_none(observation.tags.power),
+                        "setting": _value_or_none(observation.tags.setting),
+                        "stance": _value_or_none(observation.tags.stance),
+                        "audience": _value_or_none(observation.tags.audience),
+                        "stakes": _value_or_none(observation.tags.stakes),
+                        "state_going_in": _value_or_none(
+                            observation.tags.state_going_in
+                        ),
+                        "evidence_kind": observation.evidence_kind.value,
+                        "second_pattern_type_id": observation.second_pattern_type_id,
+                        "second_pattern_type_version": (
+                            observation.second_pattern_type_version
+                        ),
+                        "situational": observation.situational,
+                        "tagged_at": observation.tagged_at,
+                        "excluded": observation.excluded,
+                        "ruled_out_topic": observation.ruled_out_topic,
+                        "raised_by_user": observation.raised_by_user,
+                    }
+                    for observation in new_observations
+                ],
+            )
+
+    def settle(self, settled: Sequence[Observation]) -> None:
+        """Save unclear Observations made clear, with the Pattern Type now named.
+
+        Args:
+            settled: The Observations, each with one Pattern Type and its
+                sign; none saves nothing.
+        """
+        if not settled:
+            return
+        with self._database.begin() as connection:
+            connection.execute(
+                update(observations)
+                .where(observations.c.id == bindparam("observation_id"))
+                .values(
+                    pattern_type_id=bindparam("new_pattern_type_id"),
+                    pattern_type_version=bindparam("new_pattern_type_version"),
+                    sign_id=bindparam("new_sign_id"),
+                    second_pattern_type_id=None,
+                    second_pattern_type_version=None,
+                    situational=bindparam("new_situational"),
+                ),
+                [
+                    {
+                        "observation_id": observation.id,
+                        "new_pattern_type_id": observation.pattern_type_id,
+                        "new_pattern_type_version": observation.pattern_type_version,
+                        "new_sign_id": observation.sign_id,
+                        "new_situational": observation.situational,
+                    }
+                    for observation in settled
+                ],
+            )
+
+    def list_for_user(self, user_id: UUID) -> list[Observation]:
+        """List a User's Observations, oldest tagged first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Observations.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(observations)
+                .where(observations.c.user_id == user_id)
+                .order_by(observations.c.position)
+            ).all()
+        return [to_observation(row) for row in rows]
+
+    def delete(self, user_id: UUID, observation_id: UUID) -> bool:
+        """Delete one of a User's Observations.
+
+        Args:
+            user_id: The User's ID.
+            observation_id: The Observation's ID.
+
+        Returns:
+            True if it was deleted; False if the User has no such Observation.
+        """
+        with self._database.begin() as connection:
+            deleted_id = connection.execute(
+                delete(observations)
+                .where(
+                    observations.c.id == observation_id,
+                    observations.c.user_id == user_id,
+                )
+                .returning(observations.c.id)
+            ).scalar_one_or_none()
+        return deleted_id is not None
+
+    def delete_of_pattern_type(self, user_id: UUID, pattern_type_id: str) -> None:
+        """Delete a User's Observations whose first Pattern Type is the one given.
+
+        An unclear Observation that names it second is kept: it belongs
+        first to another Pattern.
+
+        Args:
+            user_id: The User's ID.
+            pattern_type_id: The Pattern Type's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(observations).where(
+                    observations.c.user_id == user_id,
+                    observations.c.pattern_type_id == pattern_type_id,
+                )
+            )
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's Observations, exclusion flags and deleted-quote records.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(observations).where(observations.c.user_id == user_id)
+            )
+            connection.execute(
+                delete(pattern_exclusion_flags).where(
+                    pattern_exclusion_flags.c.user_id == user_id
+                )
+            )
+            connection.execute(
+                delete(deleted_quotes).where(deleted_quotes.c.user_id == user_id)
+            )
+
+    def note_deleted_quotes(self, deleted: Sequence[DeletedQuote]) -> None:
+        """Keep a record of quotes a User deleted, so none is kept again.
+
+        Args:
+            deleted: The records; one already kept is left as it is.
+        """
+        if not deleted:
+            return
+        with self._database.begin() as connection:
+            connection.execute(
+                insert(deleted_quotes).on_conflict_do_nothing(),
+                [
+                    {
+                        "user_id": record.user_id,
+                        "conversation_id": record.conversation_id,
+                        "text_hash": record.text_hash,
+                        "span_start": record.span_start,
+                        "span_end": record.span_end,
+                        "deleted_at": record.deleted_at,
+                    }
+                    for record in deleted
+                ],
+            )
+
+    def list_deleted_quotes(
+        self, user_id: UUID, conversation_id: UUID
+    ) -> list[DeletedQuote]:
+        """List the records of quotes a User deleted from one Conversation.
+
+        Args:
+            user_id: The User's ID.
+            conversation_id: The Conversation the quotes were said in.
+
+        Returns:
+            The records; none when they deleted no quote from it.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(deleted_quotes).where(
+                    deleted_quotes.c.user_id == user_id,
+                    deleted_quotes.c.conversation_id == conversation_id,
+                )
+            ).all()
+        return [
+            DeletedQuote(
+                user_id=row.user_id,
+                conversation_id=row.conversation_id,
+                text_hash=row.text_hash,
+                span_start=row.span_start,
+                span_end=row.span_end,
+                deleted_at=row.deleted_at,
+            )
+            for row in rows
+        ]
+
+    def replace_exclusion_flags(
+        self, user_id: UUID, flags: Sequence[ExclusionFlag]
+    ) -> None:
+        """Save the exclusions that apply to a User now, in place of the old ones.
+
+        Args:
+            user_id: The User's ID.
+            flags: The exclusions that apply now; none clears them.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(pattern_exclusion_flags).where(
+                    pattern_exclusion_flags.c.user_id == user_id
+                )
+            )
+            if flags:
+                connection.execute(
+                    insert(pattern_exclusion_flags),
+                    [
+                        {
+                            "user_id": user_id,
+                            "pattern_type_id": flag.pattern_type_id,
+                            "exclusion": flag.exclusion,
+                            "evidence": flag.evidence.value,
+                            "flagged_at": flag.flagged_at,
+                        }
+                        for flag in flags
+                    ],
+                )
+
+    def list_exclusion_flags(self, user_id: UUID) -> list[ExclusionFlag]:
+        """List the exclusions that apply to a User now.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The flags from the last time their Observations were tagged.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(pattern_exclusion_flags)
+                .where(pattern_exclusion_flags.c.user_id == user_id)
+                .order_by(
+                    pattern_exclusion_flags.c.pattern_type_id,
+                    pattern_exclusion_flags.c.exclusion,
+                )
+            ).all()
+        return [
+            ExclusionFlag(
+                user_id=row.user_id,
+                pattern_type_id=row.pattern_type_id,
+                exclusion=row.exclusion,
+                evidence=ExcludedEvidence(row.evidence),
+                flagged_at=row.flagged_at,
+            )
+            for row in rows
+        ]
+
+
+def _value_or_none(tag: StrEnum | None) -> str | None:
+    """Store a tag that may be empty.
+
+    Args:
+        tag: The tag.
+
+    Returns:
+        Its value; None when empty.
+    """
+    return tag.value if tag else None
 
 
 class PostgresPatternRepository:
@@ -3080,28 +3753,35 @@ class PostgresPatternRepository:
             The Patterns, each with its evidence oldest first.
         """
         return self._list(
-            user_id,
-            patterns.c.user_id == user_id,
+            and_(patterns.c.user_id == user_id, HAS_NO_PATTERN_TYPE),
             [patterns.c.started_at, patterns.c.id],
         )
 
-    def list_confirmed(self, user_id: UUID) -> list[Pattern]:
-        """List the Patterns a User agreed with, newest agreed first.
-
-        Args:
-            user_id: The User's ID.
+    def list_not_matched(self) -> list[Pattern]:
+        """List every User's Patterns with no Pattern Type and none matched.
 
         Returns:
-            The confirmed Patterns, each with its evidence oldest first.
+            The Patterns, each User's together, oldest started first, each
+            with its evidence oldest first.
         """
         return self._list(
-            user_id,
-            and_(
-                patterns.c.user_id == user_id,
-                patterns.c.state == PatternState.CONFIRMED.value,
-            ),
-            [patterns.c.confirmed_at.desc(), patterns.c.id],
+            and_(HAS_NO_PATTERN_TYPE, patterns.c.matched_pattern_type_id.is_(None)),
+            [patterns.c.user_id, patterns.c.started_at, patterns.c.id],
         )
+
+    def save_match(self, pattern_id: UUID, pattern_type_id: str) -> None:
+        """Save the Pattern Type a Pattern with none of its own was found to fit.
+
+        Args:
+            pattern_id: The Pattern's ID.
+            pattern_type_id: The Pattern Type's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                update(patterns)
+                .where(patterns.c.id == pattern_id, HAS_NO_PATTERN_TYPE)
+                .values(matched_pattern_type_id=pattern_type_id)
+            )
 
     def find_close_ids(
         self, user_id: UUID, embedding: list[float], min_closeness: float
@@ -3125,6 +3805,7 @@ class PostgresPatternRepository:
                     select(patterns.c.id)
                     .where(
                         patterns.c.user_id == user_id,
+                        HAS_NO_PATTERN_TYPE,
                         patterns.c.embedding.is_not(None),
                         distance <= 1 - min_closeness,
                     )
@@ -3183,15 +3864,13 @@ class PostgresPatternRepository:
 
     def _list(
         self,
-        user_id: UUID,
         which: ColumnElement[bool],
         order: Sequence[ColumnElement[Any]],
     ) -> list[Pattern]:
-        """List the User's Patterns that match, in the given order, with evidence.
+        """List the Patterns that match, in the given order, with evidence.
 
         Args:
-            user_id: The User's ID.
-            which: Which of their Patterns to list.
+            which: Which Patterns to list.
             order: The order to list them in.
 
         Returns:
@@ -3259,11 +3938,13 @@ class PostgresPatternRepository:
                                 "state": to_save.pattern.state.value,
                                 "started_at": to_save.pattern.started_at,
                                 "updated_at": to_save.pattern.updated_at,
-                                "last_offered_at": to_save.pattern.last_offered_at,
-                                "last_reaction": _stored_reaction(
-                                    to_save.pattern.last_reaction
-                                ),
                                 "confirmed_at": to_save.pattern.confirmed_at,
+                                "general_description": (
+                                    to_save.pattern.general_description
+                                ),
+                                "unmatched_entry_id": (
+                                    to_save.pattern.unmatched_entry_id
+                                ),
                                 "embedding": to_save.embedding,
                             }
                             for to_save in added
@@ -3278,9 +3959,9 @@ class PostgresPatternRepository:
                         pattern=bindparam("new_pattern"),
                         state=bindparam("new_state"),
                         updated_at=bindparam("new_updated_at"),
-                        last_offered_at=bindparam("new_last_offered_at"),
-                        last_reaction=bindparam("new_last_reaction"),
                         confirmed_at=bindparam("new_confirmed_at"),
+                        general_description=bindparam("new_general_description"),
+                        unmatched_entry_id=bindparam("new_unmatched_entry_id"),
                         embedding=func.coalesce(
                             bindparam("new_embedding", type_=patterns.c.embedding.type),
                             patterns.c.embedding,
@@ -3292,11 +3973,13 @@ class PostgresPatternRepository:
                             "new_pattern": to_save.pattern.pattern,
                             "new_state": to_save.pattern.state.value,
                             "new_updated_at": to_save.pattern.updated_at,
-                            "new_last_offered_at": to_save.pattern.last_offered_at,
-                            "new_last_reaction": _stored_reaction(
-                                to_save.pattern.last_reaction
-                            ),
                             "new_confirmed_at": to_save.pattern.confirmed_at,
+                            "new_general_description": (
+                                to_save.pattern.general_description
+                            ),
+                            "new_unmatched_entry_id": (
+                                to_save.pattern.unmatched_entry_id
+                            ),
                             "new_embedding": to_save.embedding,
                         }
                         for to_save in changed
@@ -3352,49 +4035,427 @@ class PostgresPatternRepository:
         with self._database.begin() as connection:
             _delete_patterns_without_evidence(connection, user_id)
 
-    def delete_confirmed(self, user_id: UUID, pattern_id: UUID) -> bool:
-        """Delete one of a User's confirmed Patterns, with its evidence.
+    def list_of_pattern_types(self, user_id: UUID) -> list[CatalogPattern]:
+        """List a User's Patterns of Pattern Types, oldest started first.
 
         Args:
             user_id: The User's ID.
-            pattern_id: The Pattern's ID.
 
         Returns:
-            True if it was deleted; False if the User has no such confirmed
-            Pattern.
+            The Patterns.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(*PATTERN_COLUMNS)
+                .where(patterns.c.user_id == user_id, HAS_PATTERN_TYPE)
+                .order_by(patterns.c.started_at, patterns.c.id)
+            ).all()
+        return [
+            CatalogPattern(
+                id=row.id,
+                user_id=row.user_id,
+                pattern_type_id=row.pattern_type_id,
+                state=PatternState(row.state),
+                started_at=row.started_at,
+                updated_at=row.updated_at,
+                blocked_by=ReadyCheck(row.blocked_by) if row.blocked_by else None,
+                narrowings=tuple(
+                    PatternNarrowing(
+                        tag=Condition(narrowing["tag"]),
+                        holds_with=tuple(narrowing["holds_with"]),
+                        not_with=tuple(narrowing["not_with"]),
+                    )
+                    for narrowing in row.narrowings
+                ),
+                other_side_asked_at=row.other_side_asked_at,
+                other_side_found_better=row.other_side_found_better,
+                shared_at=row.shared_at,
+                shared_wording=row.shared_wording,
+            )
+            for row in rows
+        ]
+
+    def save_moves(
+        self,
+        added: Sequence[CatalogPattern],
+        changed: Sequence[CatalogPattern],
+        deleted_ids: Sequence[UUID],
+        moves: Sequence[PatternMove],
+    ) -> None:
+        """Save what scoring or the ready gate changed in a User's Patterns, at once.
+
+        Args:
+            added: Patterns noticed for the first time.
+            changed: Patterns that moved or that the ready gate judged, with
+                their state, blocking check, narrowings, when the other
+                side was last argued, when they were shared and the
+                wording they were told in.
+            deleted_ids: Patterns with no Observations left; their moves stay.
+            moves: The moves, added to the log in order.
+        """
+        if not added and not changed and not deleted_ids and not moves:
+            return
+        with self._database.begin() as connection:
+            if deleted_ids:
+                connection.execute(
+                    delete(patterns).where(
+                        patterns.c.id.in_(deleted_ids), HAS_PATTERN_TYPE
+                    )
+                )
+            if added:
+                connection.execute(
+                    insert(patterns),
+                    [
+                        {
+                            "id": pattern.id,
+                            "user_id": pattern.user_id,
+                            "pattern_type_id": pattern.pattern_type_id,
+                            "state": pattern.state.value,
+                            "started_at": pattern.started_at,
+                            "updated_at": pattern.updated_at,
+                        }
+                        for pattern in added
+                    ],
+                )
+            if changed:
+                connection.execute(
+                    update(patterns)
+                    .where(patterns.c.id == bindparam("pattern_id"))
+                    .values(
+                        state=bindparam("new_state"),
+                        updated_at=bindparam("new_updated_at"),
+                        blocked_by=bindparam("new_blocked_by"),
+                        narrowings=bindparam("new_narrowings", type_=JSONB),
+                        other_side_asked_at=bindparam("new_other_side_asked_at"),
+                        other_side_found_better=bindparam(
+                            "new_other_side_found_better"
+                        ),
+                        shared_at=bindparam("new_shared_at"),
+                        shared_wording=bindparam("new_shared_wording"),
+                    ),
+                    [
+                        {
+                            "pattern_id": pattern.id,
+                            "new_state": pattern.state.value,
+                            "new_updated_at": pattern.updated_at,
+                            "new_blocked_by": _value_or_none(pattern.blocked_by),
+                            "new_narrowings": [
+                                {
+                                    "tag": narrowing.tag.value,
+                                    "holds_with": list(narrowing.holds_with),
+                                    "not_with": list(narrowing.not_with),
+                                }
+                                for narrowing in pattern.narrowings
+                            ],
+                            "new_other_side_asked_at": pattern.other_side_asked_at,
+                            "new_other_side_found_better": (
+                                pattern.other_side_found_better
+                            ),
+                            "new_shared_at": pattern.shared_at,
+                            "new_shared_wording": pattern.shared_wording,
+                        }
+                        for pattern in changed
+                    ],
+                )
+            if moves:
+                connection.execute(
+                    insert(pattern_moves),
+                    [
+                        {
+                            "id": move.id,
+                            "user_id": move.user_id,
+                            "pattern_id": move.pattern_id,
+                            "pattern_type_id": move.pattern_type_id,
+                            "from_state": _value_or_none(move.from_state),
+                            "to_state": move.to_state.value,
+                            "cause": move.cause.value,
+                            "conversation_id": move.conversation_id,
+                            "points": move.points,
+                            "situations": move.situations,
+                            "moved_at": move.moved_at,
+                            "blocked_by": _value_or_none(move.blocked_by),
+                            "reason": _value_or_none(move.reason),
+                        }
+                        for move in moves
+                    ],
+                )
+
+    def list_moves(self, user_id: UUID) -> list[PatternMove]:
+        """List every move of a User's Patterns, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The moves, including those of Patterns since deleted.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(pattern_moves)
+                .where(pattern_moves.c.user_id == user_id)
+                .order_by(pattern_moves.c.position)
+            ).all()
+        return [
+            PatternMove(
+                id=row.id,
+                user_id=row.user_id,
+                pattern_id=row.pattern_id,
+                pattern_type_id=row.pattern_type_id,
+                from_state=PatternState(row.from_state) if row.from_state else None,
+                to_state=PatternState(row.to_state),
+                cause=PatternMoveCause(row.cause),
+                conversation_id=row.conversation_id,
+                points=row.points,
+                situations=row.situations,
+                moved_at=row.moved_at,
+                blocked_by=ReadyCheck(row.blocked_by) if row.blocked_by else None,
+                reason=PatternMoveReason(row.reason) if row.reason else None,
+            )
+            for row in rows
+        ]
+
+    def count_shared_since(
+        self, user_ids: Sequence[UUID], since: datetime
+    ) -> dict[UUID, int]:
+        """Count the Patterns shared with many Users since a time, in one query.
+
+        It counts the logged moves to shared, so a Pattern deleted since
+        still counts.
+
+        Args:
+            user_ids: The Users' IDs.
+            since: Only Patterns shared after this are counted.
+
+        Returns:
+            Each User's count; a User with none is left out.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(pattern_moves.c.user_id, func.count().label("shared_count"))
+                .where(
+                    pattern_moves.c.user_id.in_(user_ids),
+                    pattern_moves.c.to_state == PatternState.SHARED.value,
+                    pattern_moves.c.moved_at > since,
+                )
+                .group_by(pattern_moves.c.user_id)
+            ).all()
+        return {row.user_id: row.shared_count for row in rows}
+
+    def list_users_with_pattern_ready_by(
+        self, user_ids: Sequence[UUID], ready_by: datetime
+    ) -> set[UUID]:
+        """Find which of many Users have a Pattern ready since a time, in one query.
+
+        Args:
+            user_ids: The Users' IDs.
+            ready_by: Only a Pattern that became ready at or before this
+                counts.
+
+        Returns:
+            The IDs of the Users with such a Pattern.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(patterns.c.user_id)
+                .where(
+                    patterns.c.user_id.in_(user_ids),
+                    patterns.c.state == PatternState.READY.value,
+                    patterns.c.updated_at <= ready_by,
+                )
+                .distinct()
+            ).all()
+        return {row.user_id for row in rows}
+
+    def add_prediction(self, prediction: Prediction) -> None:
+        """Save a Prediction given for a shared Pattern.
+
+        Args:
+            prediction: The Prediction.
         """
         with self._database.begin() as connection:
-            deleted = connection.execute(
-                delete(patterns)
-                .where(
-                    patterns.c.user_id == user_id,
-                    patterns.c.id == pattern_id,
-                    patterns.c.state == PatternState.CONFIRMED.value,
+            connection.execute(
+                insert(predictions).values(
+                    id=prediction.id,
+                    user_id=prediction.user_id,
+                    pattern_id=prediction.pattern_id,
+                    wording=prediction.wording,
+                    made_at=prediction.made_at,
+                    outcome=_value_or_none(prediction.outcome),
+                    outcome_at=prediction.outcome_at,
+                    outcome_conversation_id=prediction.outcome_conversation_id,
+                    wording_number=prediction.wording_number,
                 )
-                .returning(patterns.c.id)
-            ).first()
-        return deleted is not None
+            )
+
+    def save_prediction_outcomes(self, settled: Sequence[Prediction]) -> None:
+        """Save how some Predictions went.
+
+        Args:
+            settled: The Predictions, each with its outcome and when it
+                was read or set.
+        """
+        if not settled:
+            return
+        with self._database.begin() as connection:
+            connection.execute(
+                update(predictions)
+                .where(predictions.c.id == bindparam("prediction_id"))
+                .values(
+                    outcome=bindparam("new_outcome"),
+                    outcome_at=bindparam("new_outcome_at"),
+                    outcome_conversation_id=bindparam("new_conversation_id"),
+                ),
+                [
+                    {
+                        "prediction_id": prediction.id,
+                        "new_outcome": _value_or_none(prediction.outcome),
+                        "new_outcome_at": prediction.outcome_at,
+                        "new_conversation_id": prediction.outcome_conversation_id,
+                    }
+                    for prediction in settled
+                ],
+            )
+
+    def list_predictions(self, user_id: UUID) -> list[Prediction]:
+        """List the Predictions given to a User, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Predictions.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(predictions)
+                .where(predictions.c.user_id == user_id)
+                .order_by(predictions.c.made_at, predictions.c.id)
+            ).all()
+        return [
+            Prediction(
+                id=row.id,
+                user_id=row.user_id,
+                pattern_id=row.pattern_id,
+                wording=row.wording,
+                made_at=row.made_at,
+                outcome=PredictionOutcome(row.outcome) if row.outcome else None,
+                outcome_at=row.outcome_at,
+                outcome_conversation_id=row.outcome_conversation_id,
+                wording_number=row.wording_number,
+            )
+            for row in rows
+        ]
+
+    def add_reactions(self, reactions: Sequence[ReactionToPattern]) -> None:
+        """Save how a User took Patterns in one Conversation.
+
+        A Pattern keeps one reaction per Conversation: a second one read
+        from the same Conversation is left out.
+
+        Args:
+            reactions: The reactions.
+        """
+        if not reactions:
+            return
+        with self._database.begin() as connection:
+            connection.execute(
+                insert(pattern_reactions).on_conflict_do_nothing(
+                    constraint="uq_pattern_reactions_pattern_id_conversation_id"
+                ),
+                [
+                    {
+                        "id": reaction.id,
+                        "user_id": reaction.user_id,
+                        "pattern_id": reaction.pattern_id,
+                        "reaction": reaction.reaction.value,
+                        "conversation_id": reaction.conversation_id,
+                        "reacted_at": reaction.reacted_at,
+                    }
+                    for reaction in reactions
+                ],
+            )
+
+    def list_reactions(self, user_id: UUID) -> list[ReactionToPattern]:
+        """List how a User took the Patterns they were told, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The reactions.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(pattern_reactions)
+                .where(pattern_reactions.c.user_id == user_id)
+                .order_by(pattern_reactions.c.reacted_at, pattern_reactions.c.id)
+            ).all()
+        return [
+            ReactionToPattern(
+                id=row.id,
+                user_id=row.user_id,
+                pattern_id=row.pattern_id,
+                reaction=PatternReaction(row.reaction),
+                conversation_id=row.conversation_id,
+                reacted_at=row.reacted_at,
+            )
+            for row in rows
+        ]
 
     def delete_for_user(self, user_id: UUID) -> None:
-        """Delete every one of a User's Patterns.
+        """Delete a User's Patterns, the log of their moves and "never again" marks.
 
         Args:
             user_id: The User's ID.
         """
         with self._database.begin() as connection:
             connection.execute(delete(patterns).where(patterns.c.user_id == user_id))
+            connection.execute(
+                delete(pattern_moves).where(pattern_moves.c.user_id == user_id)
+            )
+            connection.execute(
+                delete(patterns_never_again).where(
+                    patterns_never_again.c.user_id == user_id
+                )
+            )
 
+    def mark_never_again(
+        self, user_id: UUID, pattern_type_id: str, marked_at: datetime
+    ) -> None:
+        """Mark a Pattern Type as never to be noted or shared for a User again.
 
-def _stored_reaction(reaction: PatternReaction | None) -> str | None:
-    """Write a Pattern's last reaction the way it is stored.
+        Args:
+            user_id: The User's ID.
+            pattern_type_id: The Pattern Type's ID.
+            marked_at: When it was marked; one already marked stays as it is.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                insert(patterns_never_again)
+                .values(
+                    user_id=user_id,
+                    pattern_type_id=pattern_type_id,
+                    marked_at=marked_at,
+                )
+                .on_conflict_do_nothing()
+            )
 
-    Args:
-        reaction: The reaction; None if never offered.
+    def list_never_again(self, user_id: UUID) -> frozenset[str]:
+        """List the Pattern Types never to be noted or shared for a User again.
 
-    Returns:
-        Its value, e.g. "pushed_back"; None if there is none.
-    """
-    return reaction.value if reaction else None
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            Their IDs; none when the User marked none.
+        """
+        with self._database.connect() as connection:
+            marked = connection.execute(
+                select(patterns_never_again.c.pattern_type_id).where(
+                    patterns_never_again.c.user_id == user_id
+                )
+            ).scalars()
+            return frozenset(marked)
 
 
 def _delete_patterns_without_evidence(connection: Connection, user_id: UUID) -> None:
@@ -3410,7 +4471,9 @@ def _delete_patterns_without_evidence(connection: Connection, user_id: UUID) -> 
         .exists()
     )
     connection.execute(
-        delete(patterns).where(patterns.c.user_id == user_id, ~has_evidence)
+        delete(patterns).where(
+            patterns.c.user_id == user_id, HAS_NO_PATTERN_TYPE, ~has_evidence
+        )
     )
 
 
@@ -3557,6 +4620,589 @@ class PostgresUserPortraitRepository:
             )
 
 
+def _to_exploration(row: Row[Any]) -> Exploration:
+    """Turn an `explorations` row into an Exploration.
+
+    Args:
+        row: The row.
+
+    Returns:
+        The Exploration.
+    """
+    return Exploration(
+        id=row.id,
+        user_id=row.user_id,
+        pattern_id=row.pattern_id,
+        pattern_type_id=row.pattern_type_id,
+        state=ExplorationState(row.state),
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        rested_at=row.rested_at,
+        woke_at=row.woke_at,
+    )
+
+
+def _to_exploration_try(row: Row[Any]) -> ExplorationTry:
+    """Turn an `exploration_tries` row into a try.
+
+    Args:
+        row: The row.
+
+    Returns:
+        The try.
+    """
+    return ExplorationTry(
+        curiosity_id=row.curiosity_id,
+        exploration_id=row.exploration_id,
+        user_id=row.user_id,
+        need=ExplorationNeed(row.need),
+        approach=ExplorationApproach(row.approach),
+        created_at=row.created_at,
+        observation_id=row.observation_id,
+        condition=Condition(row.condition) if row.condition else None,
+        condition_value=row.condition_value,
+        outcome=TryOutcome(row.outcome) if row.outcome else None,
+        thought_experiment_id=row.thought_experiment_id,
+    )
+
+
+class PostgresExplorationRepository:
+    """Stores Explorations and their tries in Postgres.
+
+    An Exploration goes with its Pattern, and a try with its aimed Curiosity.
+    """
+
+    def __init__(self, database: Database) -> None:
+        """Set up the repository.
+
+        Args:
+            database: Where to run queries: the engine, or one transaction.
+        """
+        self._database = database
+
+    def list_for_user(self, user_id: UUID) -> list[Exploration]:
+        """List a User's Explorations, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Explorations.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(explorations)
+                .where(explorations.c.user_id == user_id)
+                .order_by(explorations.c.created_at, explorations.c.id)
+            ).all()
+        return [_to_exploration(row) for row in rows]
+
+    def list_tries(self, user_id: UUID) -> list[ExplorationTry]:
+        """List every try of a User's, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The tries.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(exploration_tries)
+                .where(exploration_tries.c.user_id == user_id)
+                .order_by(exploration_tries.c.created_at)
+            ).all()
+        return [_to_exploration_try(row) for row in rows]
+
+    def save_agenda(self, changes: AgendaChanges) -> None:
+        """Save what keeping a User's Agenda changed, in one step.
+
+        A new aimed Curiosity whose Observation was deleted meanwhile is not
+        added, nor is its try: the Observations still there are locked until
+        the step ends.
+
+        Args:
+            changes: The changes.
+        """
+        with self._database.begin() as connection:
+            if changes.added:
+                connection.execute(
+                    insert(explorations).values(
+                        [asdict(exploration) for exploration in changes.added]
+                    )
+                )
+            if changes.changed:
+                connection.execute(
+                    update(explorations)
+                    .where(explorations.c.id == bindparam("exploration_id"))
+                    .values(
+                        state=bindparam("new_state"),
+                        updated_at=bindparam("new_updated_at"),
+                        rested_at=bindparam("new_rested_at"),
+                        woke_at=bindparam("new_woke_at"),
+                    ),
+                    [
+                        {
+                            "exploration_id": exploration.id,
+                            "new_state": exploration.state,
+                            "new_updated_at": exploration.updated_at,
+                            "new_rested_at": exploration.rested_at,
+                            "new_woke_at": exploration.woke_at,
+                        }
+                        for exploration in changes.changed
+                    ],
+                )
+            if changes.judged:
+                connection.execute(
+                    update(exploration_tries)
+                    .where(exploration_tries.c.curiosity_id == bindparam("try_id"))
+                    .values(outcome=bindparam("new_outcome")),
+                    [
+                        {"try_id": attempt.curiosity_id, "new_outcome": attempt.outcome}
+                        for attempt in changes.judged
+                    ],
+                )
+            if changes.closed_curiosity_ids:
+                connection.execute(
+                    update(curiosities)
+                    .where(
+                        curiosities.c.id.in_(changes.closed_curiosity_ids),
+                        curiosities.c.state == CuriosityState.WAITING,
+                    )
+                    .values(state=CuriosityState.CLOSED)
+                )
+            self._add_aimed(connection, changes)
+
+    def _add_aimed(self, connection: Connection, changes: AgendaChanges) -> None:
+        """Add the new aimed Curiosities and their tries, if their aim is still there.
+
+        Args:
+            connection: The connection the step runs on.
+            changes: The changes.
+        """
+        observation_ids = {
+            curiosity.source_observation_id for curiosity in changes.new_curiosities
+        } - {None}
+        found = set(
+            connection.execute(
+                select(observations.c.id)
+                .where(observations.c.id.in_(observation_ids))
+                .with_for_update(read=True)
+            ).scalars()
+        )
+        added = [
+            curiosity
+            for curiosity in changes.new_curiosities
+            if curiosity.source_observation_id in found | {None}
+        ]
+        if not added:
+            return
+        added_ids = {curiosity.id for curiosity in added}
+        connection.execute(
+            insert(curiosities).values(
+                [
+                    {**asdict(curiosity), "reaction": curiosity.reaction}
+                    for curiosity in added
+                ]
+            )
+        )
+        connection.execute(
+            insert(exploration_tries).values(
+                [
+                    asdict(attempt)
+                    for attempt in changes.new_tries
+                    if attempt.curiosity_id in added_ids
+                ]
+            )
+        )
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete every one of a User's Explorations and their tries.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(exploration_tries).where(exploration_tries.c.user_id == user_id)
+            )
+            connection.execute(
+                delete(explorations).where(explorations.c.user_id == user_id)
+            )
+
+
+UNMATCHED_ENTRY_COLUMNS = [
+    column for column in unmatched_entries.c if column.name != "embedding"
+]
+UNMATCHED_ENTRIES_LOCK_KEY = 1717
+USERS_OF_UNMATCHED_ENTRY = func.count(patterns.c.user_id.distinct())
+
+
+def _to_counted_unmatched_entry(row: Row[Any]) -> CountedUnmatchedEntry:
+    """Turn an `unmatched_entries` row with its User count into an entry.
+
+    Args:
+        row: The row, with `user_count`.
+
+    Returns:
+        The entry and how many Users it appears for.
+    """
+    return CountedUnmatchedEntry(
+        entry=UnmatchedEntry(
+            id=row.id,
+            description=row.description,
+            mark=UnmatchedMark(row.mark),
+            folded_into_pattern_type_id=row.folded_into_pattern_type_id,
+            users_when_marked=row.users_when_marked,
+            marked_at=row.marked_at,
+        ),
+        user_count=row.user_count,
+    )
+
+
+def _select_counted_unmatched_entries() -> Select[Any]:
+    """Build the query for every entry with how many Users it appears for.
+
+    A User counts once per entry, through their unmatched Patterns the
+    matching command linked to no Pattern Type.
+
+    Returns:
+        The query, one row per entry, with `user_count`.
+    """
+    return (
+        select(*UNMATCHED_ENTRY_COLUMNS, USERS_OF_UNMATCHED_ENTRY.label("user_count"))
+        .outerjoin(
+            patterns,
+            and_(
+                patterns.c.unmatched_entry_id == unmatched_entries.c.id,
+                patterns.c.state == PatternState.UNMATCHED.value,
+                patterns.c.matched_pattern_type_id.is_(None),
+            ),
+        )
+        .group_by(unmatched_entries.c.id)
+    )
+
+
+class PostgresUnmatchedEntryRepository:
+    """Stores unmatched entries in Postgres, each with its embedding."""
+
+    def __init__(self, database: Database) -> None:
+        """Set up the repository.
+
+        Args:
+            database: Where to run queries: the engine, or one transaction.
+        """
+        self._database = database
+
+    def join_or_add(
+        self,
+        new_entry: UnmatchedEntry,
+        embedding: list[float],
+        min_closeness: float,
+        created_at: datetime,
+    ) -> UUID:
+        """Find the entry a general description belongs under, or add one.
+
+        A transaction-wide advisory lock makes this one at a time across
+        every backend, so two Conversations ending at the same moment never
+        add two entries for the same thing.
+
+        Args:
+            new_entry: The entry to add when none is close enough, holding
+                the general description.
+            embedding: The general description embedded.
+            min_closeness: How close in meaning an entry must be to be
+                joined, from 0 to 1.
+            created_at: When the new entry is added.
+
+        Returns:
+            The ID of the closest entry at least that close, the oldest
+            first when two are as close; the new entry's ID if it was added.
+        """
+        distance = unmatched_entries.c.embedding.cosine_distance(embedding)
+        with self._database.begin() as connection:
+            connection.execute(
+                select(func.pg_advisory_xact_lock(UNMATCHED_ENTRIES_LOCK_KEY))
+            )
+            closest_id: UUID | None = connection.execute(
+                select(unmatched_entries.c.id)
+                .where(distance <= 1 - min_closeness)
+                .order_by(distance, unmatched_entries.c.created_at)
+                .limit(1)
+            ).scalar_one_or_none()
+            if closest_id is not None:
+                return closest_id
+            connection.execute(
+                insert(unmatched_entries).values(
+                    id=new_entry.id,
+                    description=new_entry.description,
+                    embedding=embedding,
+                    mark=new_entry.mark.value,
+                    folded_into_pattern_type_id=(new_entry.folded_into_pattern_type_id),
+                    users_when_marked=new_entry.users_when_marked,
+                    marked_at=new_entry.marked_at,
+                    created_at=created_at,
+                )
+            )
+        return new_entry.id
+
+    def list_counted(self) -> list[CountedUnmatchedEntry]:
+        """List the entries that appear for at least one User.
+
+        Returns:
+            The entries, most Users first, then oldest first.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                _select_counted_unmatched_entries()
+                .having(USERS_OF_UNMATCHED_ENTRY > 0)
+                .order_by(
+                    USERS_OF_UNMATCHED_ENTRY.desc(),
+                    unmatched_entries.c.created_at,
+                    unmatched_entries.c.id,
+                )
+            ).all()
+        return [_to_counted_unmatched_entry(row) for row in rows]
+
+    def get_counted(self, entry_id: UUID) -> CountedUnmatchedEntry | None:
+        """Get one entry with how many Users it appears for now.
+
+        Args:
+            entry_id: The entry's ID.
+
+        Returns:
+            The entry, also when it appears for no User; None if there is
+            no such entry.
+        """
+        with self._database.connect() as connection:
+            row = connection.execute(
+                _select_counted_unmatched_entries().where(
+                    unmatched_entries.c.id == entry_id
+                )
+            ).first()
+        return _to_counted_unmatched_entry(row) if row else None
+
+    def save_mark(self, entry: UnmatchedEntry) -> None:
+        """Save an entry's mark.
+
+        Args:
+            entry: The entry with its new mark, the Pattern Type it is
+                folded into, the Users it appeared for and when.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                update(unmatched_entries)
+                .where(unmatched_entries.c.id == entry.id)
+                .values(
+                    mark=entry.mark.value,
+                    folded_into_pattern_type_id=entry.folded_into_pattern_type_id,
+                    users_when_marked=entry.users_when_marked,
+                    marked_at=entry.marked_at,
+                )
+            )
+
+
+def _to_thought_experiment(row: Row[Any]) -> ThoughtExperiment:
+    """Turn a `thought_experiments` row into a Thought Experiment.
+
+    Args:
+        row: The row.
+
+    Returns:
+        The Thought Experiment.
+    """
+    return ThoughtExperiment(
+        id=row.id,
+        details=ThoughtExperimentDetails(
+            wording=row.wording,
+            pattern_type_id=row.pattern_type_id,
+            other_pattern_type_id=row.other_pattern_type_id,
+            sensitivity=CuriositySensitivity(row.sensitivity),
+            starter=row.starter,
+            on=row.is_on,
+        ),
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        archived_at=row.archived_at,
+        seed_key=row.seed_key,
+    )
+
+
+def _thought_experiment_values(details: ThoughtExperimentDetails) -> dict[str, Any]:
+    """Turn what an Admin set on a Thought Experiment into column values.
+
+    Args:
+        details: What an Admin set.
+
+    Returns:
+        The values for its columns.
+    """
+    return {
+        "wording": details.wording,
+        "pattern_type_id": details.pattern_type_id,
+        "other_pattern_type_id": details.other_pattern_type_id,
+        "sensitivity": details.sensitivity,
+        "starter": details.starter,
+        "is_on": details.on,
+    }
+
+
+class PostgresThoughtExperimentRepository:
+    """Stores Thought Experiments in Postgres. None is ever deleted."""
+
+    def __init__(self, database: Database) -> None:
+        """Set up the repository.
+
+        Args:
+            database: Where to run queries: the engine, or one transaction.
+        """
+        self._database = database
+
+    def list_all(self) -> list[ThoughtExperiment]:
+        """List every Thought Experiment, archived ones too, oldest first.
+
+        Returns:
+            The Thought Experiments.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(thought_experiments).order_by(
+                    thought_experiments.c.created_at, thought_experiments.c.id
+                )
+            ).all()
+        return [_to_thought_experiment(row) for row in rows]
+
+    def get(self, thought_experiment_id: UUID) -> ThoughtExperiment | None:
+        """Find one Thought Experiment.
+
+        Args:
+            thought_experiment_id: Its ID.
+
+        Returns:
+            It, or None if there is no such one.
+        """
+        with self._database.connect() as connection:
+            row = connection.execute(
+                select(thought_experiments).where(
+                    thought_experiments.c.id == thought_experiment_id
+                )
+            ).one_or_none()
+        return _to_thought_experiment(row) if row else None
+
+    def add(self, thought_experiment: ThoughtExperiment) -> None:
+        """Store a new Thought Experiment.
+
+        Args:
+            thought_experiment: It, with its ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                insert(thought_experiments).values(
+                    id=thought_experiment.id,
+                    created_at=thought_experiment.created_at,
+                    updated_at=thought_experiment.updated_at,
+                    archived_at=thought_experiment.archived_at,
+                    seed_key=thought_experiment.seed_key,
+                    **_thought_experiment_values(thought_experiment.details),
+                )
+            )
+
+    def update(
+        self,
+        thought_experiment_id: UUID,
+        details: ThoughtExperimentDetails,
+        now: datetime,
+    ) -> ThoughtExperiment:
+        """Change what an Admin set on a Thought Experiment.
+
+        Args:
+            thought_experiment_id: Its ID; it exists.
+            details: Its new values.
+            now: When it changed.
+
+        Returns:
+            It, saved.
+        """
+        with self._database.begin() as connection:
+            row = connection.execute(
+                update(thought_experiments)
+                .where(thought_experiments.c.id == thought_experiment_id)
+                .values(updated_at=now, **_thought_experiment_values(details))
+                .returning(thought_experiments)
+            ).one()
+        return _to_thought_experiment(row)
+
+    def archive(self, thought_experiment_id: UUID, now: datetime) -> ThoughtExperiment:
+        """Archive a Thought Experiment, so it is never asked again.
+
+        Args:
+            thought_experiment_id: Its ID; it exists.
+            now: When it was archived.
+
+        Returns:
+            It, saved.
+        """
+        with self._database.begin() as connection:
+            row = connection.execute(
+                update(thought_experiments)
+                .where(thought_experiments.c.id == thought_experiment_id)
+                .values(archived_at=now, updated_at=now)
+                .returning(thought_experiments)
+            ).one()
+        return _to_thought_experiment(row)
+
+    def close_waiting(self, thought_experiment_id: UUID) -> None:
+        """Close every waiting Curiosity that would put it to a User.
+
+        Both an Exploration's try and a starter for a new User.
+
+        Args:
+            thought_experiment_id: Its ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                update(curiosities)
+                .where(
+                    curiosities.c.state == CuriosityState.WAITING,
+                    or_(
+                        curiosities.c.thought_experiment_id == thought_experiment_id,
+                        curiosities.c.id.in_(
+                            select(exploration_tries.c.curiosity_id).where(
+                                exploration_tries.c.thought_experiment_id
+                                == thought_experiment_id
+                            )
+                        ),
+                    ),
+                )
+                .values(state=CuriosityState.CLOSED)
+            )
+
+    def asked_counts(self) -> dict[UUID, int]:
+        """Count how many times each Thought Experiment was put to a User.
+
+        Returns:
+            How many of its Curiosities were asked, by its ID, whether for an
+            Exploration or as a starter; one never asked is left out.
+        """
+        put = func.coalesce(
+            curiosities.c.thought_experiment_id,
+            exploration_tries.c.thought_experiment_id,
+        )
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(put, func.count())
+                .select_from(
+                    curiosities.outerjoin(
+                        exploration_tries,
+                        exploration_tries.c.curiosity_id == curiosities.c.id,
+                    )
+                )
+                .where(put.is_not(None), curiosities.c.raised_at.is_not(None))
+                .group_by(put)
+            ).all()
+        return {row[0]: row[1] for row in rows}
+
+
 def _to_curiosity(row: Row[Any]) -> Curiosity:
     """Turn a `curiosities` row into a Curiosity.
 
@@ -3575,6 +5221,7 @@ def _to_curiosity(row: Row[Any]) -> Curiosity:
         sensitivity=CuriositySensitivity(row.sensitivity),
         state=CuriosityState(row.state),
         created_at=row.created_at,
+        aim=CuriosityAim(row.aim),
         source_memory_item_id=row.source_memory_item_id,
         source_life_thread_id=row.source_life_thread_id,
         raised_at=row.raised_at,
@@ -3582,6 +5229,12 @@ def _to_curiosity(row: Row[Any]) -> Curiosity:
         reaction=ThreadReaction(row.reaction) if row.reaction else None,
         guess=row.guess,
         how_sure=HowSure(row.how_sure) if row.how_sure else None,
+        exploration_id=row.exploration_id,
+        source_observation_id=row.source_observation_id,
+        thought_experiment_id=row.thought_experiment_id,
+        not_after=row.not_after,
+        pattern_id=row.pattern_id,
+        prediction_id=row.prediction_id,
     )
 
 
@@ -3634,6 +5287,86 @@ class PostgresCuriosityRepository:
                 select(curiosities)
                 .where(curiosities.c.raised_conversation_id == conversation_id)
                 .order_by(curiosities.c.raised_at, curiosities.c.position)
+            ).all()
+        return [_to_curiosity(row) for row in rows]
+
+    def list_aimed(self, user_id: UUID) -> list[Curiosity]:
+        """List a User's aimed Curiosities, in any state, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Curiosities with the aim of an Exploration's need.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(curiosities)
+                .where(
+                    curiosities.c.user_id == user_id,
+                    curiosities.c.aim == CuriosityAim.EXPLORATION,
+                )
+                .order_by(curiosities.c.position)
+            ).all()
+        return [_to_curiosity(row) for row in rows]
+
+    def list_starters(self, user_id: UUID) -> list[Curiosity]:
+        """List a User's starter Thought Experiment Curiosities, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Curiosities with the starter aim, in any state.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(curiosities)
+                .where(
+                    curiosities.c.user_id == user_id,
+                    curiosities.c.aim == CuriosityAim.STARTER,
+                )
+                .order_by(curiosities.c.position)
+            ).all()
+        return [_to_curiosity(row) for row in rows]
+
+    def list_about_predictions(self, user_id: UUID) -> list[Curiosity]:
+        """List a User's Curiosities about Predictions, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Curiosities with the Prediction aim, in any state.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(curiosities)
+                .where(
+                    curiosities.c.user_id == user_id,
+                    curiosities.c.aim == CuriosityAim.PREDICTION,
+                )
+                .order_by(curiosities.c.position)
+            ).all()
+        return [_to_curiosity(row) for row in rows]
+
+    def list_asked_to_drop(self, user_id: UUID) -> list[Curiosity]:
+        """List the Curiosities a User asked Zeph to drop, newest raised first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Curiosities.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(curiosities)
+                .where(
+                    curiosities.c.user_id == user_id,
+                    curiosities.c.reaction == ThreadReaction.ASKED_TO_DROP,
+                )
+                .order_by(curiosities.c.raised_at.desc(), curiosities.c.position)
             ).all()
         return [_to_curiosity(row) for row in rows]
 
@@ -5093,6 +6826,7 @@ class PostgresCheckInRepository:
                     sort_order=0 if highest is None else int(highest) + 1,
                     sends_shared_photo=False,
                     raises_curiosity=False,
+                    shares_pattern=False,
                 )
                 .returning(check_in_kinds)
             ).one()
@@ -5963,6 +7697,16 @@ class PostgresTransaction:
             ).scalars()
         )
 
+    def lock_user(self, user_id: UUID) -> None:
+        """Lock one User's row until the transaction ends.
+
+        Args:
+            user_id: The User's ID.
+        """
+        self._connection.execute(
+            select(users.c.id).where(users.c.id == user_id).with_for_update()
+        )
+
     @contextmanager
     def _join(self) -> Iterator["PostgresTransaction"]:
         """Join this transaction, for a transaction started inside it.
@@ -6046,7 +7790,8 @@ def _to_reply_plan_shape(values: dict[str, Any]) -> ReplyPlanShape:
     """Read a Reply Plan call's stored shape.
 
     A shape saved before Reply Plans formed a Read, or weighed a Check-in,
-    reads as forming none and being offered none.
+    reads as forming none and being offered none; one saved before
+    Curiosities were recorded has none recorded.
 
     Args:
         values: The stored JSON.
@@ -6070,6 +7815,11 @@ def _to_reply_plan_shape(values: dict[str, Any]) -> ReplyPlanShape:
         pattern_used=values.get("pattern_used", False),
         pattern_offered=values.get("pattern_offered", False),
         check_in_kind=values.get("check_in_kind"),
+        curiosities_offered=values.get("curiosities_offered"),
+        curiosity_asked=values.get("curiosity_asked"),
+        pattern_to_share_offered=values.get("pattern_to_share_offered"),
+        pattern_share_planned=values.get("pattern_share_planned"),
+        pattern_shared=values.get("pattern_shared"),
     )
 
 
@@ -6122,6 +7872,7 @@ def to_model_call(row: Row[Any]) -> ModelCall:
         reply_plan_shape=(
             _to_reply_plan_shape(row.reply_plan_shape) if row.reply_plan_shape else None
         ),
+        tagging_shape=TaggingShape(**row.tagging_shape) if row.tagging_shape else None,
     )
 
 
@@ -6169,6 +7920,9 @@ class PostgresModelCallRepository:
                     ),
                     reply_plan_shape=(
                         asdict(call.reply_plan_shape) if call.reply_plan_shape else None
+                    ),
+                    tagging_shape=(
+                        asdict(call.tagging_shape) if call.tagging_shape else None
                     ),
                 )
             )
@@ -6245,6 +7999,30 @@ class PostgresModelCallRepository:
                 update(model_calls)
                 .where(model_calls.c.id == newest_check_in_call)
                 .values(check_in_shape=asdict(shape))
+            )
+
+    def set_tagging_shape(self, trace_id: UUID, shape: TaggingShape) -> None:
+        """Save a Pattern tagging call's shape on a trace's newest tagging call.
+
+        Args:
+            trace_id: The trace's ID.
+            shape: How many Observations were tagged and dropped.
+        """
+        newest_tagging_call = (
+            select(model_calls.c.id)
+            .where(
+                model_calls.c.trace_id == trace_id,
+                model_calls.c.step == ModelStep.PATTERN_TAGGING.value,
+            )
+            .order_by(model_calls.c.position.desc())
+            .limit(1)
+            .scalar_subquery()
+        )
+        with self._database.begin() as connection:
+            connection.execute(
+                update(model_calls)
+                .where(model_calls.c.id == newest_tagging_call)
+                .values(tagging_shape=asdict(shape))
             )
 
     def list_traces(
@@ -6555,6 +8333,7 @@ def _build_repositories(
         conversations=PostgresConversationRepository(database),
         platform_settings=PostgresPlatformSettingsRepository(database),
         copy=PostgresCopyRepository(database),
+        pattern_catalog=PostgresPatternCatalogRepository(database),
         helplines=PostgresHelplineRepository(database),
         safeguard_events=PostgresSafeguardEventRepository(database),
         memory_categories=PostgresMemoryCategoryRepository(database),
@@ -6565,7 +8344,11 @@ def _build_repositories(
         user_memory=PostgresUserMemoryRepository(database),
         life_threads=PostgresLifeThreadRepository(database),
         patterns=PostgresPatternRepository(database),
+        observations=PostgresObservationRepository(database),
         curiosities=PostgresCuriosityRepository(database),
+        explorations=PostgresExplorationRepository(database),
+        thought_experiments=PostgresThoughtExperimentRepository(database),
+        unmatched_entries=PostgresUnmatchedEntryRepository(database),
         move_outcomes=PostgresMoveOutcomeRepository(database),
         user_portraits=PostgresUserPortraitRepository(database),
         knowledge_documents=PostgresKnowledgeDocumentRepository(database),

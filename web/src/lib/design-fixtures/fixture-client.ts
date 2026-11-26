@@ -12,9 +12,12 @@ import { memoriesFixtures } from "@/lib/design-fixtures/memories";
 import { modelCallTraceFixtures } from "@/lib/design-fixtures/model-call-trace";
 import { onboardingFixtures } from "@/lib/design-fixtures/onboarding";
 import { overviewFixtures } from "@/lib/design-fixtures/overview";
+import { patternCatalogFixtures } from "@/lib/design-fixtures/pattern-catalog";
 import { planFixtures } from "@/lib/design-fixtures/plan";
 import { alex, shellFixtures, zaf } from "@/lib/design-fixtures/shell";
 import { telegramFixtures } from "@/lib/design-fixtures/telegram";
+import { thoughtExperimentsFixtures } from "@/lib/design-fixtures/thought-experiments";
+import { unmatchedPatternsFixtures } from "@/lib/design-fixtures/unmatched-patterns";
 
 /** Who the design fixtures sign in as: Alex the User, or Zaf the Admin. */
 export type DesignAs = "user" | "admin";
@@ -90,6 +93,9 @@ export function createFixtureClient(designAs: DesignAs): ApiClient {
     ...planFixtures,
     ...overviewFixtures,
     ...copyFixtures,
+    ...patternCatalogFixtures,
+    ...thoughtExperimentsFixtures,
+    ...unmatchedPatternsFixtures,
     ...evalDaySummaryFixtures,
   });
 }

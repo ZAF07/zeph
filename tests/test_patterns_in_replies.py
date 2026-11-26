@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
 from companion.adapters.postgres.database import migrate
+from companion.core.models import PatternState
 from companion.core.platform_settings import EDITABLE_SETTINGS_BY_KEY
 from tests.fakes import (
     FakeAuthVerifier,
@@ -28,15 +29,12 @@ from tests.test_moves_migration import downgrade_to
 from tests.test_older_summaries import set_settings
 from tests.test_patterns import (
     GOES_QUIET,
-    end_with_pattern_answer,
-    pattern_keeping_answer,
+    set_pattern_state,
     start_goes_quiet_pattern,
 )
-from tests.test_post_conversation import processing_answer, quiet_gap
 
 NAMES_MUM = "mum is staying with me again next week"
 CLOSE_TO_GOES_QUIET = "when something grabs me everything else goes quiet"
-OFFERED_HERE = "offered to them in this Conversation"
 
 
 def have_goes_quiet_pattern(
@@ -69,21 +67,6 @@ def offer_goes_quiet(client: TestClient, chat_model: ScriptedChatModel) -> str:
     return reply_instructions(client, chat_model, NAMES_MUM)
 
 
-def end_current_conversation(
-    chat_model: ScriptedChatModel,
-    clock: FakeClock,
-    scheduler: FakeScheduler,
-    seeded_settings: dict[str, Any],
-) -> str:
-    """Let the quiet gap pass and run the Conversation end; return what the
-    Pattern keeping call was given."""
-    clock.advance(quiet_gap(seeded_settings) + timedelta(minutes=1))
-    chat_model.script_processing(processing_answer(summary="Talked.", mood="fine"))
-    chat_model.script_pattern_keeping(pattern_keeping_answer([]))
-    scheduler.tick()
-    return chat_model.pattern_keeping_calls[-1].history[0].text
-
-
 def test_a_pattern_linked_to_a_reminded_thread_reaches_the_reply_plan(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
@@ -106,7 +89,7 @@ def test_a_pattern_linked_to_a_reminded_thread_reaches_the_reply_plan(
     seen = reply_plan_sees(client, chat_model, NAMES_MUM)
 
     assert "Mum's visit" in seen
-    assert f"[1] (suspected) {GOES_QUIET}" in seen
+    assert f"[1] (unmatched) {GOES_QUIET}" in seen
     assert "Snapped at mum because the app had them." in seen
 
 
@@ -132,7 +115,7 @@ def test_a_pattern_close_in_meaning_to_a_message_with_no_thread_reaches_it_too(
     seen = reply_plan_sees(client, chat_model, CLOSE_TO_GOES_QUIET)
 
     assert "then those from earlier in this Conversation:\nNone." in seen
-    assert f"[1] (suspected) {GOES_QUIET}" in seen
+    assert f"[1] (unmatched) {GOES_QUIET}" in seen
 
 
 def test_a_message_far_from_every_pattern_and_thread_brings_no_pattern(
@@ -214,78 +197,7 @@ def test_a_pattern_in_mind_stays_in_mind_for_the_conversation(
     reply_plan_sees(client, chat_model, CLOSE_TO_GOES_QUIET)
     seen_later = reply_plan_sees(client, chat_model, "any good podcasts about space?")
 
-    assert f"[1] (suspected) {GOES_QUIET}" in seen_later
-
-
-def test_a_closed_pattern_never_reaches_the_reply_plan(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    chat_model: ScriptedChatModel,
-    clock: FakeClock,
-    scheduler: FakeScheduler,
-    seeded_settings: dict[str, Any],
-) -> None:
-    have_goes_quiet_pattern(
-        client,
-        auth_verifier,
-        chat_channel,
-        chat_model,
-        clock,
-        scheduler,
-        seeded_settings,
-    )
-    end_with_pattern_answer(
-        client,
-        chat_model,
-        clock,
-        scheduler,
-        seeded_settings,
-        {"pattern": 1, "reaction": "pushed_back", "state": "closed"},
-    )
-    clock.advance(timedelta(days=365))
-
-    seen = reply_plan_sees(client, chat_model, NAMES_MUM)
-
-    assert "Mum's visit" in seen
-    assert GOES_QUIET not in seen
-
-
-def test_a_pushed_back_pattern_waits_the_admin_set_days_before_it_comes_back(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    chat_model: ScriptedChatModel,
-    clock: FakeClock,
-    scheduler: FakeScheduler,
-    seeded_settings: dict[str, Any],
-) -> None:
-    have_goes_quiet_pattern(
-        client,
-        auth_verifier,
-        chat_channel,
-        chat_model,
-        clock,
-        scheduler,
-        seeded_settings,
-    )
-    set_settings(client, auth_verifier, {"pattern_pushed_back_wait_days": 10})
-    end_with_pattern_answer(
-        client,
-        chat_model,
-        clock,
-        scheduler,
-        seeded_settings,
-        {"pattern": 1, "reaction": "pushed_back"},
-    )
-
-    clock.advance(timedelta(days=9))
-    seen_while_waiting = reply_plan_sees(client, chat_model, NAMES_MUM)
-    clock.advance(timedelta(days=2))
-    seen_after = reply_plan_sees(client, chat_model, NAMES_MUM)
-
-    assert GOES_QUIET not in seen_while_waiting
-    assert GOES_QUIET in seen_after
+    assert f"[1] (unmatched) {GOES_QUIET}" in seen_later
 
 
 def test_an_offered_pattern_reaches_the_reply_as_zephs_view(
@@ -306,12 +218,44 @@ def test_an_offered_pattern_reaches_the_reply_as_zephs_view(
         scheduler,
         seeded_settings,
     )
+    set_pattern_state(client.engine, PatternState.CONFIRMED)
 
     instructions = offer_goes_quiet(client, chat_model)
 
     assert GOES_QUIET in instructions
     assert "here's what I notice" in instructions
     assert "never as fact" in instructions
+
+
+def test_an_unmatched_pattern_shapes_the_read_but_is_never_offered(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    have_goes_quiet_pattern(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+    )
+    admin = owner_headers(client, auth_verifier)
+
+    instructions = offer_goes_quiet(client, chat_model)
+
+    seen = chat_model.reply_plan_calls[-1].history[0].text
+    assert "never offer it or say it as a pattern" in seen
+    assert "Whatever grabs them crowds out the people around them." in instructions
+    assert GOES_QUIET not in instructions
+    assert "here's what I notice" not in instructions
+    shape = newest_call(client, admin, "reply_plan")["reply_plan_shape"]
+    assert (shape["pattern_used"], shape["pattern_offered"]) == (True, False)
 
 
 def test_a_pattern_used_but_not_offered_never_reaches_the_reply(
@@ -359,6 +303,7 @@ def test_a_pattern_is_offered_only_when_the_read_is_said(
         scheduler,
         seeded_settings,
     )
+    set_pattern_state(client.engine, PatternState.CONFIRMED)
     chat_model.script_reply_plan(
         reply_plan_answer(
             read="It's the same pull again.", say_read=False, offer_pattern=1
@@ -366,40 +311,8 @@ def test_a_pattern_is_offered_only_when_the_read_is_said(
     )
 
     instructions = reply_instructions(client, chat_model, NAMES_MUM)
-    keeping_sees = end_current_conversation(
-        chat_model, clock, scheduler, seeded_settings
-    )
 
     assert GOES_QUIET not in instructions
-    assert OFFERED_HERE not in keeping_sees
-
-
-def test_the_next_conversation_ends_keeping_call_sees_the_pattern_was_offered(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    chat_model: ScriptedChatModel,
-    clock: FakeClock,
-    scheduler: FakeScheduler,
-    seeded_settings: dict[str, Any],
-) -> None:
-    have_goes_quiet_pattern(
-        client,
-        auth_verifier,
-        chat_channel,
-        chat_model,
-        clock,
-        scheduler,
-        seeded_settings,
-    )
-
-    offer_goes_quiet(client, chat_model)
-    keeping_sees = end_current_conversation(
-        chat_model, clock, scheduler, seeded_settings
-    )
-
-    assert f"[1] (suspected; {OFFERED_HERE}: judge how they took it" in keeping_sees
-    assert GOES_QUIET in keeping_sees
 
 
 def test_the_model_call_log_shows_whether_a_pattern_was_used_or_offered(
@@ -420,6 +333,7 @@ def test_the_model_call_log_shows_whether_a_pattern_was_used_or_offered(
         scheduler,
         seeded_settings,
     )
+    set_pattern_state(client.engine, PatternState.CONFIRMED)
     admin = owner_headers(client, auth_verifier)
 
     def shape_after(answer: str) -> dict[str, Any]:
@@ -442,27 +356,6 @@ def test_the_model_call_log_shows_whether_a_pattern_was_used_or_offered(
     assert (none["pattern_used"], none["pattern_offered"]) == (False, False)
     assert (used["pattern_used"], used["pattern_offered"]) == (True, False)
     assert (offered["pattern_used"], offered["pattern_offered"]) == (True, True)
-
-
-def test_the_push_back_wait_is_admin_editable_with_a_hint(
-    client: TestClient, auth_verifier: FakeAuthVerifier
-) -> None:
-    headers = owner_headers(client, auth_verifier)
-
-    response = client.patch(
-        "/api/admin/settings",
-        json={"values": {"pattern_pushed_back_wait_days": 45}},
-        headers=headers,
-    )
-
-    assert response.status_code == 200
-    setting = response.json()["settings"]["pattern_pushed_back_wait_days"]
-    assert setting["value"] == 45
-    assert (
-        setting["hint"]
-        == EDITABLE_SETTINGS_BY_KEY["pattern_pushed_back_wait_days"].hint
-    )
-    assert "pushed back" in setting["hint"]
 
 
 def test_the_pattern_bar_is_admin_editable_with_a_hint_and_seeded_at_52(

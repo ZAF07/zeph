@@ -5,7 +5,9 @@ from datetime import date, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+from companion.core.agenda import AgendaKeeper
 from companion.core.curiosities import CuriosityKeeper
+from companion.core.familiarity import FamiliarityKeeper
 from companion.core.life_threads import LifeThreadKeeper
 from companion.core.memory_retrieval import format_time
 from companion.core.model_call_log import start_trace
@@ -16,6 +18,7 @@ from companion.core.models import (
     Conversation,
     ConversationMessage,
     DaySummary,
+    Familiarity,
     Feature,
     LifeThread,
     MemoryCategory,
@@ -24,6 +27,7 @@ from companion.core.models import (
     MemorySource,
     MessageDirection,
     ModelStep,
+    PatternMoveCause,
     PlatformSettings,
     SharedPhoto,
     TraceKind,
@@ -31,14 +35,21 @@ from companion.core.models import (
     UserSnapshot,
 )
 from companion.core.move_outcomes import MoveOutcomeKeeper
+from companion.core.observations import PatternTagger
+from companion.core.pattern_scoring import PatternScorer
+from companion.core.pattern_sharing import PatternSharing
 from companion.core.patterns import PatternKeeper
 from companion.core.personal_stickers import PersonalStickerKeeper
 from companion.core.platform_settings import (
     MEMORY_PROCESSING_MODEL,
     MEMORY_PROCESSING_PROMPT,
     MEMORY_PROCESSING_THINKING,
+    thinking_to_use,
 )
 from companion.core.ports import Clock, Embedder, Repositories
+from companion.core.predictions import PredictionKeeper
+from companion.core.ready_gate import ReadyGate
+from companion.core.starter_thought_experiments import StarterThoughtExperimentKeeper
 from companion.core.timing import day_span, users_today
 from companion.core.transcripts import to_transcript_lines
 from companion.core.usage import UsageRecordingChatModel
@@ -643,7 +654,9 @@ class DayMemoryWriter:
                 snapshot=snapshot,
                 step=ModelStep.CONVERSATION_END,
                 model=settings.get(MEMORY_PROCESSING_MODEL),
-                thinking=settings.get(MEMORY_PROCESSING_THINKING),
+                thinking=thinking_to_use(
+                    settings, MEMORY_PROCESSING_MODEL, MEMORY_PROCESSING_THINKING
+                ),
                 instructions=settings.get(MEMORY_PROCESSING_PROMPT),
                 history=[ChatLine(role=ChatRole.USER, text=description)],
             )
@@ -660,8 +673,9 @@ class PostConversationProcessor:
     all of that day's messages; everything else is learned from the
     Conversation that ended only, so nothing is learned twice. It changes
     their Memory Items, keeps the photos that matter to them as Shared
-    Photos, updates their Life Threads and Patterns, keeps their Curiosities
-    and Move Outcomes and then rewrites their User Portrait. Each Day Summary records
+    Photos, updates their Life Threads, Observations and Patterns, keeps
+    their Curiosities and Move Outcomes and then rewrites their User
+    Portrait. Each Day Summary records
     how their mood moved and what the Companion offered and how it landed,
     and is embedded, so it can be found by meaning however old it is.
     Separately from User Memory, it keeps the User's Personal Stickers.
@@ -674,8 +688,16 @@ class PostConversationProcessor:
         chat_model: UsageRecordingChatModel,
         personal_sticker_keeper: PersonalStickerKeeper,
         life_thread_keeper: LifeThreadKeeper,
+        pattern_tagger: PatternTagger,
+        pattern_scorer: PatternScorer,
+        ready_gate: ReadyGate,
+        pattern_sharing: PatternSharing,
+        prediction_keeper: PredictionKeeper,
         pattern_keeper: PatternKeeper,
         curiosity_keeper: CuriosityKeeper,
+        agenda_keeper: AgendaKeeper,
+        familiarity_keeper: FamiliarityKeeper,
+        starter_keeper: StarterThoughtExperimentKeeper,
         move_outcome_keeper: MoveOutcomeKeeper,
         portrait_writer: PortraitWriter,
         embedder: Embedder,
@@ -693,10 +715,26 @@ class PostConversationProcessor:
             personal_sticker_keeper: Keeps the stickers the User sent whose
                 meaning was clear.
             life_thread_keeper: Starts and adds to the User's Life Threads.
-            pattern_keeper: Starts, adds to, confirms and closes the User's
-                Patterns.
+            pattern_tagger: Tags the User's Observations while Pattern
+                noticing works.
+            pattern_scorer: Scores and moves the User's Patterns of Pattern
+                Types while Pattern noticing works.
+            ready_gate: Decides which suspected Patterns may be shared,
+                right after scoring.
+            pattern_sharing: Makes contested the Patterns the User pushed
+                back on, right after tagging.
+            prediction_keeper: Confirms or closes the User's shared
+                Patterns, and writes the Curiosities about their
+                Predictions.
+            pattern_keeper: Notes the User's unmatched Patterns.
             curiosity_keeper: Writes, updates and closes the User's
                 Curiosities.
+            agenda_keeper: Keeps the User's Agenda and writes its aimed
+                Curiosities while Pattern exploring works.
+            familiarity_keeper: Works out how well the Companion knows the
+                User.
+            starter_keeper: Writes a new User's next starter Thought
+                Experiment while Pattern exploring works.
             move_outcome_keeper: Keeps what was learned about each Move made.
             portrait_writer: Rewrites the User's Portrait.
             embedder: Embeds each Summary, so it can be found by meaning.
@@ -706,8 +744,16 @@ class PostConversationProcessor:
         self._user_snapshots = user_snapshots
         self._personal_sticker_keeper = personal_sticker_keeper
         self._life_thread_keeper = life_thread_keeper
+        self._pattern_tagger = pattern_tagger
+        self._pattern_scorer = pattern_scorer
+        self._ready_gate = ready_gate
+        self._pattern_sharing = pattern_sharing
+        self._prediction_keeper = prediction_keeper
         self._pattern_keeper = pattern_keeper
         self._curiosity_keeper = curiosity_keeper
+        self._agenda_keeper = agenda_keeper
+        self._familiarity_keeper = familiarity_keeper
+        self._starter_keeper = starter_keeper
         self._move_outcome_keeper = move_outcome_keeper
         self._portrait_writer = portrait_writer
         self._clock = clock
@@ -720,15 +766,24 @@ class PostConversationProcessor:
 
         Personal Stickers are kept first, whatever User Memory says; if that
         fails, the failure is logged and processing goes on. Nothing more is
-        saved when User Memory doesn't work for the User, and no photo is
+        saved when User Memory doesn't work for the User, except how well
+        the Companion knows them (their Familiarity), and no photo is
         kept when Photo Viewing doesn't. One model call, given all of the
         day's messages, gives the day's rewritten Day Summary, the operations
         and the photos to keep as Shared Photos; an unreadable answer is asked
         again once, and if it is still unreadable nothing is saved, so a bad
         answer is never retried forever. Once the Conversation is marked
-        processed, its Life Threads are kept, then its Patterns from the
-        Threads it touched, then its Curiosities while the
-        Curiosities Feature works, then its Move Outcomes, and then the User
+        processed, its Life Threads are kept, then its Observations are
+        tagged, the User's shared Patterns confirmed or closed, their
+        Patterns of Pattern Types scored and the ready
+        gate run while Pattern noticing works, then its unmatched Patterns
+        from the
+        Threads it touched, then the User's Familiarity is worked out, then
+        its Curiosities while the
+        Curiosities Feature works, then the Agenda and a new User's starter
+        Thought Experiments while Pattern exploring
+        works too, then the Curiosities about their Predictions while
+        Pattern sharing works, then its Move Outcomes, and then the User
         Portrait is rewritten; if any of them fails, the failure is logged and
         not tried again, so nothing is ever added twice.
 
@@ -747,15 +802,27 @@ class PostConversationProcessor:
         if snapshot is not None:
             self._keep_personal_stickers(snapshot, messages)
         if snapshot is None or not snapshot.works(Feature.USER_MEMORY) or not messages:
+            if snapshot is not None:
+                self._keep_familiarity(snapshot)
             self._repositories.user_memory.save_processed_conversation(
                 conversation.id, self._clock.now(), None, NO_CHANGES
             )
             return
         self._day_memory_writer.write(snapshot, conversation, messages)
         touched = self._keep_life_threads(snapshot, conversation.id, messages)
+        self._tag_observations(snapshot, conversation.id, messages, touched)
+        if snapshot.works(Feature.PATTERN_NOTICING):
+            self._settle_reactions(snapshot, conversation.id)
+            self._settle_shared_patterns(snapshot, conversation.id)
+            self._score_patterns(snapshot, conversation.id)
+            self._check_ready(snapshot, conversation.id)
         self._keep_patterns(snapshot, conversation.id, messages, touched)
+        familiarity = self._keep_familiarity(snapshot)
         if snapshot.works(Feature.CURIOSITIES):
             self._keep_curiosities(snapshot, conversation.id, messages)
+            self._keep_agenda(snapshot, conversation.id)
+            self._keep_starters(snapshot, familiarity)
+            self._keep_prediction_follow_ups(snapshot)
         self._keep_move_outcomes(snapshot, conversation.id, messages)
         self._write_portrait(snapshot)
 
@@ -782,6 +849,95 @@ class PostConversationProcessor:
         except Exception:
             logger.exception("Could not keep Life Threads")
             return []
+
+    def _tag_observations(
+        self,
+        snapshot: UserSnapshot,
+        conversation_id: UUID,
+        messages: list[ConversationMessage],
+        touched: list[LifeThread],
+    ) -> None:
+        """Tag the User's Observations, logging a failure instead of raising.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            conversation_id: The ended Conversation.
+            messages: Its messages, oldest first.
+            touched: The Life Threads the Conversation touched.
+        """
+        try:
+            self._pattern_tagger.tag_from(snapshot, conversation_id, messages, touched)
+        except Exception:
+            logger.exception("Could not tag Observations")
+
+    def _settle_reactions(self, snapshot: UserSnapshot, conversation_id: UUID) -> None:
+        """Make contested the Patterns the User pushed back on, never raising.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            conversation_id: The ended Conversation, in which the tagging
+                step read how they took the Patterns they were told.
+        """
+        try:
+            self._pattern_sharing.settle_reactions(snapshot, conversation_id)
+        except Exception:
+            logger.exception("Could not settle reactions to Patterns")
+
+    def _settle_shared_patterns(
+        self, snapshot: UserSnapshot, conversation_id: UUID
+    ) -> None:
+        """Confirm or close the User's shared Patterns, never raising.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            conversation_id: The ended Conversation, in which the tagging
+                step read how their Predictions went.
+        """
+        try:
+            self._prediction_keeper.settle_shared(snapshot, conversation_id)
+        except Exception:
+            logger.exception("Could not confirm or close shared Patterns")
+
+    def _keep_prediction_follow_ups(self, snapshot: UserSnapshot) -> None:
+        """Write the Curiosities about the User's Predictions, never raising.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+        """
+        try:
+            self._prediction_keeper.keep_follow_ups(snapshot)
+        except Exception:
+            logger.exception("Could not keep the follow-ups of Predictions")
+
+    def _score_patterns(self, snapshot: UserSnapshot, conversation_id: UUID) -> None:
+        """Score the User's Patterns again, logging a failure instead of raising.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            conversation_id: The ended Conversation, whose Observations were
+                tagged.
+        """
+        try:
+            self._pattern_scorer.score(
+                snapshot.user,
+                snapshot.settings,
+                PatternMoveCause.CONVERSATION_TAGGED,
+                conversation_id,
+            )
+        except Exception:
+            logger.exception("Could not score Patterns")
+
+    def _check_ready(self, snapshot: UserSnapshot, conversation_id: UUID) -> None:
+        """Run the ready gate, logging a failure instead of raising.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            conversation_id: The ended Conversation.
+        """
+        try:
+            self._ready_gate.check(snapshot, conversation_id)
+        except Exception:
+            logger.exception("Could not run the ready gate")
 
     def _keep_patterns(
         self,
@@ -831,6 +987,45 @@ class PostConversationProcessor:
             self._curiosity_keeper.keep_from(snapshot, conversation_id, messages)
         except Exception:
             logger.exception("Could not keep Curiosities")
+
+    def _keep_agenda(self, snapshot: UserSnapshot, conversation_id: UUID) -> None:
+        """Keep the User's Agenda, logging a failure instead of raising.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            conversation_id: The ended Conversation.
+        """
+        try:
+            self._agenda_keeper.keep(snapshot, conversation_id)
+        except Exception:
+            logger.exception("Could not keep the Agenda")
+
+    def _keep_familiarity(self, snapshot: UserSnapshot) -> Familiarity:
+        """Work out the User's Familiarity, logging a failure instead of raising.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+
+        Returns:
+            Their Familiarity now; as it was if working it out failed.
+        """
+        try:
+            return self._familiarity_keeper.keep(snapshot)
+        except Exception:
+            logger.exception("Could not work out Familiarity")
+            return snapshot.user.familiarity
+
+    def _keep_starters(self, snapshot: UserSnapshot, familiarity: Familiarity) -> None:
+        """Keep a new User's starter Thought Experiments, logging a failure.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            familiarity: How well the Companion knows them now.
+        """
+        try:
+            self._starter_keeper.keep(snapshot, familiarity)
+        except Exception:
+            logger.exception("Could not keep starter Thought Experiments")
 
     def _keep_move_outcomes(
         self,

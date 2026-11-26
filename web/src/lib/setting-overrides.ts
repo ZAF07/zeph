@@ -5,6 +5,7 @@ import type {
   OverridableNeed,
   OverrideChoices,
 } from "@/lib/api-client";
+import { curiosityTreatmentLabel } from "@/lib/curiosity-treatment";
 
 /** The start of a Need override's key, `need:<id>`. */
 export const needOverridePrefix = "need:";
@@ -89,8 +90,8 @@ export function overrideLabel(
  *
  * @param value - The value: text, a number, on/off, or a Need's or Move's
  *   text.
- * @returns E.g. "On", "1,200", the text, or a Need's or Move's three parts;
- *   "—" when there is none.
+ * @returns E.g. "On", "1,200", the text, or a Need's or Move's parts; "—"
+ *   when there is none.
  */
 export function describeSettingValue(value: unknown): string {
   if (value === null || value === undefined) {
@@ -103,7 +104,10 @@ export function describeSettingValue(value: unknown): string {
     return value.toLocaleString("en");
   }
   if (isNeedOverride(value)) {
-    return `${value.name}\nWhen it fits: ${value.when_it_fits}\nHow to reply: ${value.how_to_reply}`;
+    const curiosities = value.curiosities
+      ? `\nCuriosities: ${curiosityTreatmentLabel(value.curiosities)}`
+      : "";
+    return `${value.name}\nWhen it fits: ${value.when_it_fits}\nHow to reply: ${value.how_to_reply}${curiosities}`;
   }
   if (isMoveOverride(value)) {
     return `${value.name}\nWhen it fits: ${value.when_it_fits}\nHow to do it: ${value.how_to_do_it}`;

@@ -1,6 +1,7 @@
 import logging
 from collections.abc import Sequence
 from datetime import datetime
+from uuid import UUID
 
 from companion.core.life_threads import describe_thread
 from companion.core.memory_retrieval import (
@@ -18,17 +19,20 @@ from companion.core.models import (
     MemoryItem,
     ModelStep,
     MoveOutcome,
-    Pattern,
+    PatternState,
     PlatformSettings,
     TraceKind,
     UserPortrait,
     UserSnapshot,
 )
 from companion.core.move_outcomes import describe_move_outcome
+from companion.core.narrowing_words import describe_where_it_shows
+from companion.core.pattern_catalog import PatternCatalogService
 from companion.core.platform_settings import (
     PORTRAIT_MODEL,
     PORTRAIT_PROMPT,
     PORTRAIT_THINKING,
+    thinking_to_use,
 )
 from companion.core.ports import Clock, Repositories
 from companion.core.usage import UsageRecordingChatModel
@@ -43,7 +47,7 @@ def describe_user_memory(
     categories: Sequence[MemoryCategory],
     items: Sequence[MemoryItem],
     threads: Sequence[LifeThread],
-    confirmed_patterns: Sequence[Pattern],
+    confirmed_patterns: Sequence[str],
     move_outcomes: Sequence[MoveOutcome],
     summaries: Sequence[DaySummary],
     now: datetime,
@@ -55,8 +59,9 @@ def describe_user_memory(
         categories: Every Memory Category, archived ones included.
         items: The User's Memory Items.
         threads: The User's Life Threads, open first.
-        confirmed_patterns: The Patterns the User agreed with; never
-            suspected or closed ones, since the User reads the Portrait.
+        confirmed_patterns: The User's confirmed Patterns, each in the
+            words it was told in; never a shared or unmatched one, since
+            the User reads the Portrait.
         move_outcomes: The User's Move Outcomes, newest first.
         summaries: Their newest Day Summaries, newest first.
         now: The current time.
@@ -71,7 +76,7 @@ def describe_user_memory(
     thread_lines = "\n".join(
         f"- {describe_thread(thread, time_zone)}" for thread in threads
     )
-    pattern_lines = "\n".join(f"- {pattern.pattern}" for pattern in confirmed_patterns)
+    pattern_lines = "\n".join(f"- {pattern}" for pattern in confirmed_patterns)
     outcome_lines = "\n".join(
         f"- {describe_move_outcome(outcome, time_zone)}" for outcome in move_outcomes
     )
@@ -99,6 +104,7 @@ class PortraitWriter:
         self,
         repositories: Repositories,
         user_snapshots: UserSnapshotLoader,
+        pattern_catalog: PatternCatalogService,
         chat_model: UsageRecordingChatModel,
         clock: Clock,
     ) -> None:
@@ -108,11 +114,13 @@ class PortraitWriter:
             repositories: Where User Memory, Life Threads, Move Outcomes and
                 Portraits are stored.
             user_snapshots: Reads a User and their Features for a rewrite.
+            pattern_catalog: Reads the words a confirmed Pattern was told in.
             chat_model: Writes the Portrait and records the tokens used.
             clock: Tells the current time.
         """
         self._repositories = repositories
         self._user_snapshots = user_snapshots
+        self._pattern_catalog = pattern_catalog
         self._chat_model = chat_model
         self._clock = clock
 
@@ -182,7 +190,7 @@ class PortraitWriter:
             self._repositories.memory_categories.list_all(),
             self._repositories.user_memory.list_items(user_id),
             self._repositories.life_threads.list_for_user(user_id),
-            self._repositories.patterns.list_confirmed(user_id),
+            self._confirmed_patterns(user_id),
             self._repositories.move_outcomes.list_for_user(user_id),
             self._repositories.user_memory.list_summaries(
                 user_id, limit=SUMMARIES_FOR_PORTRAIT
@@ -195,7 +203,36 @@ class PortraitWriter:
             snapshot=snapshot,
             step=ModelStep.PORTRAIT,
             model=settings.get(PORTRAIT_MODEL),
-            thinking=settings.get(PORTRAIT_THINKING),
+            thinking=thinking_to_use(settings, PORTRAIT_MODEL, PORTRAIT_THINKING),
             instructions=settings.get(PORTRAIT_PROMPT),
             history=[ChatLine(role=ChatRole.USER, text=description)],
         ).strip()
+
+    def _confirmed_patterns(self, user_id: UUID) -> list[str]:
+        """Write the User's confirmed Patterns as the Portrait model reads them.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            Each confirmed Pattern whose Pattern Type is in the catalog
+            now, in its approved wording with where it shows, oldest
+            first; a Pattern that is only shared is left out.
+        """
+        confirmed = [
+            pattern
+            for pattern in self._repositories.patterns.list_of_pattern_types(user_id)
+            if pattern.state == PatternState.CONFIRMED
+        ]
+        if not confirmed:
+            return []
+        pattern_types = {
+            entry.pattern_type.id: entry.pattern_type
+            for entry in self._pattern_catalog.catalog()
+        }
+        return [
+            f"{pattern_types[pattern.pattern_type_id].approved_wording}"
+            f"{describe_where_it_shows(pattern.narrowings)}"
+            for pattern in confirmed
+            if pattern.pattern_type_id in pattern_types
+        ]

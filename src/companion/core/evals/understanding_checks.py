@@ -1,11 +1,20 @@
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 
+from companion.core.agenda import APPROACH_WORDS
 from companion.core.evals.cases import UnderstandingExpectations
+from companion.core.evals.made_up_patterns import AimedAt
+from companion.core.models import ExplorationNeed
 
 UNDERSTANDING_STEP = "Understanding"
 RECALL_STEP = "Recall"
 REPLY_PLAN_STEP = "Reply Plan"
+NEED_WORDS = {
+    ExplorationNeed.UNCLEAR: "an unclear story",
+    ExplorationNeed.COUNTER_TEST: "a counter-test",
+    ExplorationNeed.MISSING_CONDITION: "a missing Condition",
+}
+NO_AIMED_CURIOSITY = "brought up no aimed Curiosity"
 
 
 @dataclass(frozen=True)
@@ -38,6 +47,9 @@ class ObservedUnderstanding:
             their own words.
         read_formed: Whether the Reply Plan formed a Read.
         read_said: Whether the Reply Plan had the reply say its Read.
+        agenda_shown: Whether the Reply Plan was shown the Agenda: something
+            an Exploration still needs to learn was in what it was given.
+        aimed_raised: What each aimed Curiosity it brought up is for.
     """
 
     need: str
@@ -58,6 +70,8 @@ class ObservedUnderstanding:
     wants_said: bool = False
     read_formed: bool = False
     read_said: bool = False
+    agenda_shown: bool = False
+    aimed_raised: Sequence[AimedAt] = ()
 
 
 @dataclass(frozen=True)
@@ -321,6 +335,88 @@ def check_woven_in(expected: bool, woven_in: bool) -> CheckResult:
     return CheckResult("woven in", woven_in == expected, detail)
 
 
+def check_aim(name: str, expected: str, aimed: Sequence[str]) -> CheckResult:
+    """Check what the aimed Curiosity brought up aims at, or how, or for what.
+
+    Args:
+        name: What is checked, e.g. "aimed need".
+        expected: What it must be, in words, e.g. "an unclear story".
+        aimed: The same of each aimed Curiosity brought up, in words.
+
+    Returns:
+        The check's outcome; failed when no aimed Curiosity was brought up,
+        or when any brought up differs from what is expected.
+    """
+    if not aimed:
+        return CheckResult(name, False, f"{NO_AIMED_CURIOSITY}, expected {expected}")
+    found = " and ".join(dict.fromkeys(aimed))
+    if all(one == expected for one in aimed):
+        return CheckResult(name, True, found)
+    return CheckResult(name, False, f"{found}, expected only {expected}")
+
+
+def check_agenda(
+    expect: UnderstandingExpectations, observed: ObservedUnderstanding
+) -> list[CheckResult]:
+    """Check what the Reply Plan did with the Agenda and its aimed Curiosity.
+
+    Args:
+        expect: What it should have done; empty fields aren't checked.
+        observed: What it did.
+
+    Returns:
+        One outcome per check: the Agenda shown, the aimed Curiosity brought
+        up, then its need, Approach and Pattern Type.
+    """
+    checks = []
+    aimed = observed.aimed_raised
+    if expect.agenda_shown is not None:
+        checks.append(
+            check_yes_no(
+                "agenda shown",
+                expect.agenda_shown,
+                observed.agenda_shown,
+                "was shown the Agenda",
+                "wasn't shown the Agenda",
+            )
+        )
+    if expect.aimed_raised is not None:
+        checks.append(
+            check_yes_no(
+                "aimed curiosity",
+                expect.aimed_raised,
+                bool(aimed),
+                "brought up the aimed Curiosity",
+                NO_AIMED_CURIOSITY,
+            )
+        )
+    if expect.aimed_need is not None:
+        checks.append(
+            check_aim(
+                "aimed need",
+                f"aimed at {NEED_WORDS[expect.aimed_need]}",
+                [f"aimed at {NEED_WORDS[aim.attempt.need]}" for aim in aimed],
+            )
+        )
+    if expect.aimed_approach is not None:
+        checks.append(
+            check_aim(
+                "aimed Approach",
+                f"asked by {APPROACH_WORDS[expect.aimed_approach]}",
+                [f"asked by {APPROACH_WORDS[aim.attempt.approach]}" for aim in aimed],
+            )
+        )
+    if expect.aimed_pattern_type:
+        checks.append(
+            check_aim(
+                "aimed pattern type",
+                f"for {expect.aimed_pattern_type}",
+                [f"for {aim.pattern_type_id}" for aim in aimed],
+            )
+        )
+    return checks
+
+
 def mark_with_step(step: str, results: list[CheckResult]) -> list[CheckResult]:
     """Mark checks with the step that owns them.
 
@@ -428,8 +524,8 @@ def check_reply_plan(
     Returns:
         One outcome per check, in a fixed order: the Read formed and said,
         the Need, the lead, supporting, no and next Move, each Thread to be
-        brought up and left alone, then the Curiosity, asking why, Knowledge
-        and the woven-in Check-in.
+        brought up and left alone, then the Curiosity, the Agenda and its
+        aimed Curiosity, asking why, Knowledge and the woven-in Check-in.
     """
     checks = []
     if expect.read_formed is not None:
@@ -498,6 +594,7 @@ def check_reply_plan(
         checks.append(
             check_curiosity(expect.curiosity_raised, observed.raised_curiosities)
         )
+    checks += check_agenda(expect, observed)
     if expect.asked_why is not None:
         checks.append(check_asked_why(expect.asked_why, observed.asked_why))
     if expect.knowledge is not None:

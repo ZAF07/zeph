@@ -45,7 +45,7 @@ class DeepSeekPhotoViewer:
         """Look at a photo and write what the instructions ask for.
 
         Args:
-            model: The DeepSeek model to use, e.g. "deepseek-flash".
+            model: The model to use, e.g. "deepseek/deepseek-v4.1-flash-1017".
             thinking: Whether the model should think before it answers.
             instructions: What to write about the photo.
             photo: The photo's image.

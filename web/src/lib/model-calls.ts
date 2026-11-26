@@ -2,6 +2,7 @@ import type {
   CheckInShape,
   ModelStep,
   ReplyPlanShape,
+  TaggingShape,
   TraceKind,
   UnderstandingShape,
 } from "@/lib/api-client";
@@ -18,6 +19,13 @@ export const modelSteps: { id: ModelStep; label: string }[] = [
   { id: "life_threads", label: "Life Threads" },
   { id: "curiosities", label: "Curiosities" },
   { id: "move_outcomes", label: "Move Outcomes" },
+  { id: "pattern_tagging", label: "Pattern tagging" },
+  { id: "pattern_other_side", label: "Other side" },
+  { id: "pattern_shared_check", label: "Pattern shared check" },
+  { id: "prediction_given_check", label: "Prediction given check" },
+  { id: "curiosity_asked_check", label: "Curiosity asked check" },
+  { id: "settings_claim_check", label: "Settings claim check" },
+  { id: "pattern_matching", label: "Pattern matching" },
   { id: "patterns", label: "Pattern keeping" },
   { id: "portrait", label: "User Portrait" },
   { id: "personal_stickers", label: "Personal Stickers" },
@@ -28,6 +36,7 @@ const traceKindLabels: Record<TraceKind, string> = {
   check_in: "Check-in",
   conversation_end: "Conversation end",
   portrait_rewrite: "Portrait rewrite",
+  pattern_matching: "Pattern matching",
 };
 
 /**
@@ -111,6 +120,21 @@ export function checkInShapeFacts(
   ];
 }
 
+/**
+ * Lists the facts of a Pattern tagging call, as labels and values.
+ *
+ * @param shape - The call's shape.
+ * @returns E.g. "Observations tagged: 3", "Dropped by code: 1".
+ */
+export function taggingShapeFacts(
+  shape: TaggingShape,
+): { label: string; value: string }[] {
+  return [
+    { label: "Observations tagged", value: String(shape.tagged) },
+    { label: "Dropped by code", value: String(shape.dropped) },
+  ];
+}
+
 const intensityLabels: Record<UnderstandingShape["intensity"], string> = {
   low: "Low",
   medium: "Medium",
@@ -149,13 +173,63 @@ export function describePatternUse(shape: ReplyPlanShape): string {
 }
 
 /**
+ * Lists a Reply Plan's facts about Curiosities, as labels and values.
+ *
+ * @param shape - The Reply Plan's shape.
+ * @returns "Curiosities offered: 2" and "Curiosity asked: Yes"; nothing for
+ * a trace saved before they were recorded.
+ */
+function curiosityFacts(
+  shape: ReplyPlanShape,
+): { label: string; value: string }[] {
+  if (shape.curiosities_offered == null || shape.curiosity_asked == null) {
+    return [];
+  }
+  return [
+    { label: "Curiosities offered", value: String(shape.curiosities_offered) },
+    { label: "Curiosity asked", value: shape.curiosity_asked ? "Yes" : "No" },
+  ];
+}
+
+/**
+ * Says whether a Reply Plan was offered a ready Pattern to share and what
+ * came of it.
+ *
+ * @param shape - The Reply Plan's shape.
+ * @returns "Pattern to share: Shared", "Picked, not shared", "Picked",
+ * "Offered, not picked" or "None offered"; nothing for a trace saved before
+ * it was recorded.
+ */
+function patternToShareFacts(
+  shape: ReplyPlanShape,
+): { label: string; value: string }[] {
+  if (shape.pattern_to_share_offered == null) {
+    return [];
+  }
+  const label = "Pattern to share";
+  if (!shape.pattern_to_share_offered) {
+    return [{ label, value: "None offered" }];
+  }
+  if (!shape.pattern_share_planned) {
+    return [{ label, value: "Offered, not picked" }];
+  }
+  if (shape.pattern_shared == null) {
+    return [{ label, value: "Picked" }];
+  }
+  return [
+    { label, value: shape.pattern_shared ? "Shared" : "Picked, not shared" },
+  ];
+}
+
+/**
  * Lists the facts of a Reply Plan's shape, as labels and values.
  *
  * @param shape - The Reply Plan's shape.
  * @returns E.g. "Need picked: Be heard", "Lead Move: Calm", "Threads brought
  * up: 2 (1 lead, 1 weave)", "Read formed: Yes", "Read said: No", "Pattern:
  * Used, not offered", "Check-in Kinds offered: 2", "Check-in Kind chosen:
- * None".
+ * None", "Curiosities offered: 2", "Curiosity asked: Yes", "Pattern to
+ * share: Shared".
  */
 export function replyPlanShapeFacts(
   shape: ReplyPlanShape,
@@ -184,5 +258,7 @@ export function replyPlanShapeFacts(
       value: String(shape.check_in_kinds_offered),
     },
     { label: "Check-in Kind chosen", value: shape.check_in_kind ?? "None" },
+    ...curiosityFacts(shape),
+    ...patternToShareFacts(shape),
   ];
 }

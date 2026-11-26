@@ -33,6 +33,8 @@ const reasonTexts: Record<FeatureReason, string> = {
   off_for_user: "Off for this user",
   turned_off_by_user: "Off: the user turned it off",
   stickers_off: "Off: Stickers is off for this user",
+  pattern_noticing_off: "Off: Pattern noticing is off for this user",
+  pattern_exploring_off: "Off: Pattern exploring is off for this user",
 };
 
 /**

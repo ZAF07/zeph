@@ -30,6 +30,7 @@ from companion.core.platform_settings import (
     LIFE_THREADS_CLOSENESS_PERCENT,
     LIFE_THREADS_PER_REPLY,
     LIFE_THREADS_TEXTS_TO_SEARCH,
+    thinking_to_use,
 )
 from companion.core.ports import Clock, Embedder, Repositories
 from companion.core.transcripts import to_transcript_lines
@@ -531,10 +532,10 @@ def read_thread_keeping_answer(answer: str) -> list[Any] | None:
 
 
 def read_text(entry: dict[str, Any], key: str) -> str | None:
-    """Read a non-empty text field from one Thread the model wrote.
+    """Read a non-empty text field from one entry a model wrote.
 
     Args:
-        entry: The Thread, as the model wrote it.
+        entry: The entry, such as a Thread, as the model wrote it.
         key: The field's name.
 
     Returns:
@@ -808,7 +809,9 @@ class LifeThreadKeeper:
                 snapshot=snapshot,
                 step=ModelStep.LIFE_THREADS,
                 model=settings.get(LIFE_THREAD_KEEPING_MODEL),
-                thinking=settings.get(LIFE_THREAD_KEEPING_THINKING),
+                thinking=thinking_to_use(
+                    settings, LIFE_THREAD_KEEPING_MODEL, LIFE_THREAD_KEEPING_THINKING
+                ),
                 instructions=settings.get(LIFE_THREAD_KEEPING_PROMPT),
                 history=[ChatLine(role=ChatRole.USER, text=description)],
             )

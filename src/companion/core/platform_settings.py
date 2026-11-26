@@ -223,6 +223,8 @@ TYPING_SECONDS_PER_CHARACTER = Setting("typing_seconds_per_character", read_numb
 MIN_TYPING_SECONDS = Setting("min_typing_seconds", read_number)
 MAX_TYPING_SECONDS = Setting("max_typing_seconds", read_number)
 AVAILABLE_MODELS = Setting("available_models", read_text_list)
+MODELS_THAT_CANNOT_THINK = Setting("models_that_cannot_think", read_text_list)
+MODELS_THAT_ALWAYS_THINK = Setting("models_that_always_think", read_text_list)
 RESPONSE_MODEL = Setting("response_model", read_text)
 RESPONSE_THINKING = Setting("response_thinking", read_on_off)
 PERSONA = Setting("persona", read_text)
@@ -285,6 +287,20 @@ CURIOSITIES_PER_CONVERSATION = Setting(
     "curiosities_per_conversation", read_whole_number
 )
 CURIOSITIES_WAITING_LIMIT = Setting("curiosities_waiting_limit", read_whole_number)
+CURIOSITY_REPLIES_BETWEEN = Setting("curiosity_replies_between", read_whole_number)
+CURIOSITY_REPLIES_BETWEEN_GENTLE = Setting(
+    "curiosity_replies_between_gentle", read_whole_number
+)
+CURIOSITY_REPLIES_BETWEEN_DIRECT = Setting(
+    "curiosity_replies_between_direct", read_whole_number
+)
+CURIOSITIES_PER_REPLY = Setting("curiosities_per_reply", read_whole_number)
+CURIOSITY_HELD_WHEN_ASKING_WHY = Setting("curiosity_held_when_asking_why", read_on_off)
+FOLLOW_UPS_PER_CONVERSATION = Setting("follow_ups_per_conversation", read_whole_number)
+CURIOSITY_BRUSH_OFFS_TO_BACK_OFF = Setting(
+    "curiosity_brush_offs_to_back_off", read_whole_number
+)
+CURIOSITY_BACK_OFF = Setting("curiosity_back_off_days", read_days)
 CURIOSITY_CHECK_INS_PER_WEEK = Setting(
     "curiosity_check_ins_per_week", read_whole_number
 )
@@ -299,7 +315,89 @@ PATTERN_KEEPING_THINKING = Setting("pattern_keeping_thinking", read_on_off)
 PATTERN_KEEPING_PROMPT = Setting("pattern_keeping_prompt", read_text)
 PATTERN_KEEPING_THREADS = Setting("pattern_keeping_threads", read_whole_number)
 PATTERN_KEEPING_DAYS = Setting("pattern_keeping_days", read_whole_number)
-PATTERN_PUSHED_BACK_WAIT = Setting("pattern_pushed_back_wait_days", read_days)
+PATTERN_TAGGING_MODEL = Setting("pattern_tagging_model", read_text)
+PATTERN_TAGGING_THINKING = Setting("pattern_tagging_thinking", read_on_off)
+PATTERN_TAGGING_PROMPT = Setting("pattern_tagging_prompt", read_text)
+PATTERN_MATCHING_MODEL = Setting("pattern_matching_model", read_text)
+PATTERN_MATCHING_THINKING = Setting("pattern_matching_thinking", read_on_off)
+PATTERN_MATCHING_PROMPT = Setting("pattern_matching_prompt", read_text)
+PATTERN_WEAK_SIGN_POINTS = Setting("pattern_weak_sign_points", read_whole_number)
+PATTERN_MODERATE_SIGN_POINTS = Setting(
+    "pattern_moderate_sign_points", read_whole_number
+)
+PATTERN_STRONG_SIGN_POINTS = Setting("pattern_strong_sign_points", read_whole_number)
+PATTERN_REAL_STORY_PERCENT = Setting("pattern_real_story_percent", read_whole_number)
+PATTERN_REPORTED_HABIT_PERCENT = Setting(
+    "pattern_reported_habit_percent", read_whole_number
+)
+PATTERN_WHAT_IF_PERCENT = Setting("pattern_what_if_percent", read_whole_number)
+PATTERN_OWN_OPINION_PERCENT = Setting("pattern_own_opinion_percent", read_whole_number)
+PATTERN_UNCLEAR_PERCENT = Setting("pattern_unclear_percent", read_whole_number)
+PATTERN_HALF_LIFE_DAYS = Setting("pattern_half_life_days", read_whole_number)
+PATTERN_PEOPLE_PER_SITUATION = Setting(
+    "pattern_people_per_situation", read_whole_number
+)
+NARROWING_STORIES_NEEDED = Setting("narrowing_stories_needed", read_whole_number)
+NARROWINGS_PER_PATTERN = Setting("narrowings_per_pattern", read_whole_number)
+PATTERN_SUSPECTED_SITUATIONS = Setting(
+    "pattern_suspected_situations", read_whole_number
+)
+PATTERN_SUSPECTED_POINTS = Setting("pattern_suspected_points", read_whole_number)
+PATTERN_CLOSED_UNDER_POINTS = Setting("pattern_closed_under_points", read_whole_number)
+PATTERN_READY_SITUATIONS = Setting("pattern_ready_situations", read_whole_number)
+PATTERN_READY_CONVERSATIONS = Setting("pattern_ready_conversations", read_whole_number)
+PATTERN_READY_POINTS = Setting("pattern_ready_points", read_whole_number)
+PATTERN_READY_AGAINST_UNDER_POINTS = Setting(
+    "pattern_ready_against_under_points", read_whole_number
+)
+PATTERN_SAFEGUARD_QUIET = Setting("pattern_safeguard_quiet_days", read_days)
+PATTERN_EXCLUSION_SUMMARY_DAYS = Setting(
+    "pattern_exclusion_summary_days", read_whole_number
+)
+PATTERN_RULED_OUT_TOPICS = Setting("pattern_ruled_out_topics", read_text_list)
+PATTERNS_SHARED_PER_WEEK = Setting("patterns_shared_per_week", read_whole_number)
+PATTERN_SHARE_WAIT = Setting("pattern_share_wait_days", read_days)
+PREDICTION_FOLLOW_UP_WAIT = Setting("prediction_follow_up_wait_days", read_days)
+PREDICTION_FOLLOW_UP_DROP = Setting("prediction_follow_up_drop_days", read_days)
+PREDICTIONS_TO_CONFIRM = Setting("predictions_to_confirm", read_whole_number)
+PREDICTIONS_TO_CLOSE = Setting("predictions_to_close", read_whole_number)
+PREDICTIONS_UNANSWERED_TO_STOP = Setting(
+    "predictions_unanswered_to_stop", read_whole_number
+)
+PATTERN_CONFIRM_POINTS_AFTER_SHARING = Setting(
+    "pattern_confirm_points_after_sharing", read_whole_number
+)
+PATTERN_OTHER_SIDE_MODEL = Setting("pattern_other_side_model", read_text)
+PATTERN_OTHER_SIDE_THINKING = Setting("pattern_other_side_thinking", read_on_off)
+PATTERN_OTHER_SIDE_PROMPT = Setting("pattern_other_side_prompt", read_text)
+AGENDA_SIZE = Setting("agenda_size", read_whole_number)
+EXPLORATION_WAIT = Setting("exploration_wait_days", read_days)
+EXPLORATION_WAIT_GENTLE = Setting("exploration_wait_days_gentle", read_days)
+EXPLORATION_WAIT_DIRECT = Setting("exploration_wait_days_direct", read_days)
+EXPLORATION_REST_AFTER_TRIES = Setting(
+    "exploration_rest_after_tries", read_whole_number
+)
+EXPLORATION_REST_AFTER_TRIES_GENTLE = Setting(
+    "exploration_rest_after_tries_gentle", read_whole_number
+)
+EXPLORATION_REST_AFTER_TRIES_DIRECT = Setting(
+    "exploration_rest_after_tries_direct", read_whole_number
+)
+CONDITION_ONE_SIDED_STORIES = Setting("condition_one_sided_stories", read_whole_number)
+THOUGHT_EXPERIMENTS_PER_PATTERN_PER_WEEK = Setting(
+    "thought_experiments_per_pattern_per_week", read_whole_number
+)
+FAMILIARITY_CONVERSATIONS = Setting("familiarity_conversations", read_whole_number)
+FAMILIARITY_LIFE_THREADS = Setting("familiarity_life_threads", read_whole_number)
+FAMILIARITY_REAL_STORIES = Setting("familiarity_real_stories", read_whole_number)
+STARTER_THOUGHT_EXPERIMENTS = Setting("starter_thought_experiments", read_whole_number)
+STARTER_THOUGHT_EXPERIMENT_DAYS = Setting("starter_thought_experiment_days", read_days)
+STARTER_THOUGHT_EXPERIMENTS_PER_CONVERSATION = Setting(
+    "starter_thought_experiments_per_conversation", read_whole_number
+)
+UNMATCHED_GROUPING_CLOSENESS_PERCENT = Setting(
+    "unmatched_grouping_closeness_percent", read_whole_number
+)
 PATTERN_CLOSENESS_PERCENT = Setting("pattern_closeness_percent", read_whole_number)
 PORTRAIT_MODEL = Setting("portrait_model", read_text)
 PORTRAIT_THINKING = Setting("portrait_thinking", read_on_off)
@@ -359,7 +457,7 @@ class ModelPrice:
     """What one model costs in SGD per 1,000,000 tokens.
 
     Attributes:
-        model: The model's name, e.g. "deepseek-flash".
+        model: The model's name, e.g. "deepseek/deepseek-v4.1-flash-1017".
         sgd_in: SGD per 1,000,000 tokens it reads.
         sgd_out: SGD per 1,000,000 tokens it writes.
     """
@@ -374,7 +472,7 @@ def read_model_prices(value: Any) -> dict[str, ModelPrice]:
 
     Args:
         value: The stored value: SGD in and out by model, e.g.
-            {"deepseek-flash": {"in": 0.38, "out": 1.54}}.
+            {"deepseek/deepseek-v4.1-flash-1017": {"in": 0.38, "out": 1.54}}.
 
     Returns:
         Each priced model's price, by name.
@@ -966,12 +1064,79 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         hint=THINKING_HINT,
     ),
     EditableSetting(
+        PATTERN_TAGGING_PROMPT.key,
+        "Pattern tagging prompt",
+        SettingKind.TEXT,
+        hint=(
+            "How to read a Conversation into the Pattern Catalog as Observations, "
+            "which code then checks. It runs once a Conversation ends, after Life "
+            "Threads, while Pattern noticing works."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_TAGGING_MODEL.key,
+        "Pattern tagging model",
+        SettingKind.MODEL,
+        hint=MODEL_HINT,
+    ),
+    EditableSetting(
+        PATTERN_TAGGING_THINKING.key,
+        "Pattern tagging thinking",
+        SettingKind.ON_OFF,
+        hint=THINKING_HINT,
+    ),
+    EditableSetting(
+        PATTERN_OTHER_SIDE_PROMPT.key,
+        "Other-side prompt",
+        SettingKind.TEXT,
+        hint=(
+            "How to argue against a Pattern that passed every other ready check: "
+            "is there a better explanation of the same evidence? It can only stop "
+            "a Pattern being ready, never make one ready."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_OTHER_SIDE_MODEL.key,
+        "Other-side model",
+        SettingKind.MODEL,
+        hint=MODEL_HINT,
+    ),
+    EditableSetting(
+        PATTERN_OTHER_SIDE_THINKING.key,
+        "Other-side thinking",
+        SettingKind.ON_OFF,
+        hint=THINKING_HINT,
+    ),
+    EditableSetting(
+        PATTERN_MATCHING_PROMPT.key,
+        "Pattern matching prompt",
+        SettingKind.TEXT,
+        hint=(
+            "How to say which Pattern Type, if any, a Pattern written before the "
+            "Pattern Catalog or an unmatched one fits. It runs only when an Admin "
+            "runs the matching command."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_MATCHING_MODEL.key,
+        "Pattern matching model",
+        SettingKind.MODEL,
+        hint=MODEL_HINT,
+    ),
+    EditableSetting(
+        PATTERN_MATCHING_THINKING.key,
+        "Pattern matching thinking",
+        SettingKind.ON_OFF,
+        hint=THINKING_HINT,
+    ),
+    EditableSetting(
         PATTERN_KEEPING_PROMPT.key,
         "Pattern keeping prompt",
         SettingKind.TEXT,
         hint=(
-            "What counts as a Pattern. It runs once a Conversation ends, after Life "
-            "Threads are kept."
+            "What counts as an unmatched Pattern: a way of acting that shows in "
+            "two or more Life Threads and fits no Pattern Type. It runs once a "
+            "Conversation ends, after Life Threads are kept."
         ),
     ),
     EditableSetting(
@@ -1234,15 +1399,539 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         ),
     ),
     EditableSetting(
-        PATTERN_PUSHED_BACK_WAIT.key,
-        "Wait after a pushed-back Pattern",
+        PATTERN_WEAK_SIGN_POINTS.key,
+        "Points for a weak sign",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=1000,
+        hint=(
+            "What an Observation matching a weak sign of its Pattern Type is "
+            "worth, before its kind of evidence and fading. Scoring runs at "
+            "Conversation end after tagging, and when Observations are deleted."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_MODERATE_SIGN_POINTS.key,
+        "Points for a moderate sign",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=1000,
+        hint=(
+            "What an Observation matching a moderate sign is worth, before its "
+            "kind of evidence and fading."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_STRONG_SIGN_POINTS.key,
+        "Points for a strong sign",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=1000,
+        hint=(
+            "What an Observation matching a strong sign is worth, before its "
+            "kind of evidence and fading."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_REAL_STORY_PERCENT.key,
+        "Real story counts",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=100,
+        hint=(
+            "How much of its sign's points an Observation from something that "
+            "really happened keeps."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_REPORTED_HABIT_PERCENT.key,
+        "Reported habit counts",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=100,
+        hint=(
+            "How much of its sign's points an Observation keeps when the User "
+            "says what they usually do."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_WHAT_IF_PERCENT.key,
+        "“What if” answer counts",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=100,
+        hint=(
+            "How much of its sign's points an Observation keeps when it answers "
+            "a made-up situation."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_OWN_OPINION_PERCENT.key,
+        "Own opinion counts",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=100,
+        hint=(
+            "How much of its sign's points an Observation keeps when it is the "
+            "User's opinion of themselves."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_UNCLEAR_PERCENT.key,
+        "Unclear counts",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=100,
+        hint=(
+            "How much an unclear Observation, naming two look-alike Pattern "
+            "Types, keeps toward each of them."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_HALF_LIFE_DAYS.key,
+        "Pattern evidence half-life",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=3650,
+        hint=(
+            "After this many days an Observation counts half, and a quarter "
+            "after twice as long, so Patterns keep up with who the User is now."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_PEOPLE_PER_SITUATION.key,
+        "Most people per situation",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=50,
+        hint=(
+            "Within one Life Thread only the strongest Observation per person "
+            "counts, for and against apart; this many people at most add "
+            "weight."
+        ),
+    ),
+    EditableSetting(
+        NARROWING_STORIES_NEEDED.key,
+        "Stories before a Condition narrows a Pattern",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=50,
+        hint=(
+            "A Condition (who was there, the stakes, the setting…) narrows a "
+            "Pattern only when this many clear stories for it say that "
+            "Condition, and what counts against it happened under other values."
+        ),
+    ),
+    EditableSetting(
+        NARROWINGS_PER_PATTERN.key,
+        "Most narrowings per Pattern",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=7,
+        hint=(
+            "At most this many Conditions narrow one Pattern: those with the "
+            "most stories. Evidence against that they don't explain counts "
+            "against the Pattern in full."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_SUSPECTED_SITUATIONS.key,
+        "Situations to be suspected",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=50,
+        hint=(
+            "How many situations (Life Threads; with none, the same person and "
+            "setting) a noticed Pattern must show in to become suspected."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_SUSPECTED_POINTS.key,
+        "Score to be suspected",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=10000,
+        hint=(
+            "The lowest score, in points, at which a noticed Pattern seen in "
+            "enough situations becomes suspected. Under it, a suspected one "
+            "goes back to noticed."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_CLOSED_UNDER_POINTS.key,
+        "Score that closes a Pattern",
+        SettingKind.WHOLE_NUMBER,
+        minimum=-10000,
+        maximum=0,
+        hint=(
+            "A noticed or suspected Pattern whose score falls under this, in "
+            "points, is closed. One whose score comes back over it is noticed "
+            "again."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_READY_SITUATIONS.key,
+        "Situations to be ready",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=50,
+        hint=(
+            "How many situations a suspected Pattern must show in before it may "
+            "be shared. A Pattern Type that asks for more in the Pattern Catalog "
+            "needs that many."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_READY_CONVERSATIONS.key,
+        "Conversations to be ready",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=50,
+        hint=(
+            "How many different Conversations a Pattern’s evidence must come "
+            "from before it may be shared, so one long talk is never enough."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_READY_POINTS.key,
+        "Score to be ready",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=10000,
+        hint=(
+            "The lowest score, in points, at which a suspected Pattern may be "
+            "shared; its clear Observations alone must reach it too. Higher "
+            "means fewer, surer Patterns."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_READY_AGAINST_UNDER_POINTS.key,
+        "Evidence against must stay under",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=10000,
+        hint=(
+            "A Pattern with this many points of evidence against it, or more, is "
+            "not ready. Evidence against that only narrows it (“with seniors, "
+            "not with friends”) isn’t counted."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_SAFEGUARD_QUIET.key,
+        "Days no Pattern is ready after a Safeguard Event",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=365,
+        hint=(
+            "For this many days after a Safeguard Event no Pattern of that User "
+            "becomes ready, and a ready one goes back to suspected. 0 turns "
+            "this off."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_EXCLUSION_SUMMARY_DAYS.key,
+        "Day Summaries read for exclusions",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=60,
+        hint=(
+            "How many of a User’s latest Day Summaries the tagging step reads, "
+            "with their open Life Threads, to tell whether a Pattern Type’s "
+            "exclusion (grief, a crisis) applies now."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_RULED_OUT_TOPICS.key,
+        "Ruled-out topics",
+        SettingKind.TEXT_LIST,
+        hint=(
+            "Topics, separated by commas, that no Pattern is shared from unless "
+            "the User raised them: a Pattern resting on one Zeph asked about is "
+            "never ready. Adding a topic counts for Conversations that end after."
+        ),
+    ),
+    EditableSetting(
+        PATTERNS_SHARED_PER_WEEK.key,
+        "New Patterns shared a week",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=7,
+        hint=(
+            "The most new Patterns Zeph tells one User in any 7 days, in chat "
+            "or as a Check-in, so each has room to sink in. 0 shares none."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_SHARE_WAIT.key,
+        "Days a ready Pattern waits for a moment in chat",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=90,
+        hint=(
+            "A ready Pattern the Reply Plan found no good moment for within "
+            "this many days goes out as a Check-in. 0 sends it with the next "
+            "Check-in."
+        ),
+    ),
+    EditableSetting(
+        PREDICTION_FOLLOW_UP_WAIT.key,
+        "Days before Zeph asks how a Prediction went",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=90,
+        hint=(
+            "Zeph asks how a Prediction went no sooner than this many days "
+            "after giving it, so the User has had time to notice. It also "
+            "waits this long again after they say it hasn’t come up."
+        ),
+    ),
+    EditableSetting(
+        PREDICTION_FOLLOW_UP_DROP.key,
+        "Days after which an unasked Prediction is dropped",
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=365,
         hint=(
-            "Days before a Pattern the User pushed back on comes to mind for the "
-            "Reply Plan again, so Zeph doesn't offer the same view too soon. A "
-            "closed Pattern never comes back."
+            "A Prediction with no answer this many days after it was given is "
+            "dropped: Zeph stops asking about it, it counts nothing, and the "
+            "Pattern gets a new one. Keep it above the days before Zeph asks."
+        ),
+    ),
+    EditableSetting(
+        PREDICTIONS_TO_CONFIRM.key,
+        "Predictions that came true to confirm a Pattern",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=10,
+        hint=(
+            "A shared Pattern is confirmed once this many of its Predictions "
+            "came true, as the User reported, and more came true than didn’t. "
+            "A confirmed Pattern goes into their User Portrait."
+        ),
+    ),
+    EditableSetting(
+        PREDICTIONS_TO_CLOSE.key,
+        "Predictions that didn’t come true to close a Pattern",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=10,
+        hint=(
+            "A shared Pattern is closed once this many of its Predictions "
+            "didn’t come true, as the User reported, and more didn’t than "
+            "did. The User sees it under “Didn’t hold up”."
+        ),
+    ),
+    EditableSetting(
+        PREDICTIONS_UNANSWERED_TO_STOP.key,
+        "Unanswered Predictions in a row before Zeph stops offering",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=10,
+        hint=(
+            "After this many Predictions in a row got no answer, Zeph offers "
+            "no new one for that Pattern until the User brings the Pattern "
+            "up themselves. Lower means Zeph gives up sooner."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_CONFIRM_POINTS_AFTER_SHARING.key,
+        "Score from new evidence that confirms a shared Pattern",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=10000,
+        hint=(
+            "A shared Pattern is also confirmed once the Observations tagged "
+            "after it was shared reach this score, in points, by themselves. "
+            "Higher means it takes more new evidence."
+        ),
+    ),
+    EditableSetting(
+        AGENDA_SIZE.key,
+        "Explorations on the Agenda",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=20,
+        hint=(
+            "How many of a User's suspected Patterns Zeph explores at once, "
+            "highest score first, while Pattern exploring works. Each gets an "
+            "aimed Curiosity when a Conversation ends."
+        ),
+    ),
+    EditableSetting(
+        EXPLORATION_WAIT.key,
+        "Wait after a try with nothing: balanced",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=365,
+        hint=(
+            "Days before an Exploration is tried again, by a different "
+            "Approach, after an aimed Curiosity came back vague or brushed "
+            "off. For a User set to balanced; gentle and direct have their own."
+        ),
+    ),
+    EditableSetting(
+        EXPLORATION_WAIT_GENTLE.key,
+        "Wait after a try with nothing: gentle",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=365,
+        hint=(
+            "The same wait for a User set to gentle. Longer leaves them more "
+            "room between questions about a suspected Pattern."
+        ),
+    ),
+    EditableSetting(
+        EXPLORATION_WAIT_DIRECT.key,
+        "Wait after a try with nothing: direct",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=365,
+        hint=(
+            "The same wait for a User set to direct. Shorter means Zeph comes "
+            "back to a suspected Pattern sooner."
+        ),
+    ),
+    EditableSetting(
+        EXPLORATION_REST_AFTER_TRIES.key,
+        "Tries with nothing before resting: balanced",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=50,
+        hint=(
+            "After this many tries in a row with nothing useful, an "
+            "Exploration rests until a new Observation for its Pattern wakes "
+            "it. For a User set to balanced; gentle and direct have their own."
+        ),
+    ),
+    EditableSetting(
+        EXPLORATION_REST_AFTER_TRIES_GENTLE.key,
+        "Tries with nothing before resting: gentle",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=50,
+        hint=(
+            "The same number for a User set to gentle: lower means Zeph "
+            "gives up sooner. Asking Zeph to drop it rests an Exploration at "
+            "once, whatever the setting."
+        ),
+    ),
+    EditableSetting(
+        EXPLORATION_REST_AFTER_TRIES_DIRECT.key,
+        "Tries with nothing before resting: direct",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=50,
+        hint=(
+            "The same number for a User set to direct: higher means Zeph "
+            "keeps trying longer. Asking Zeph to drop it rests an Exploration "
+            "at once, whatever the setting."
+        ),
+    ),
+    EditableSetting(
+        CONDITION_ONE_SIDED_STORIES.key,
+        "Stories that make a Condition one-sided",
+        SettingKind.WHOLE_NUMBER,
+        minimum=2,
+        maximum=50,
+        hint=(
+            "Zeph asks about a Condition (who was there, the stakes, the "
+            "setting and so on) only once this many clear stories for a "
+            "suspected Pattern share one value of it, and another value was "
+            "never seen. Higher means Zeph asks about Conditions later."
+        ),
+    ),
+    EditableSetting(
+        THOUGHT_EXPERIMENTS_PER_PATTERN_PER_WEEK.key,
+        "Thought Experiments per Pattern a week",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=7,
+        hint=(
+            "The most Thought Experiments Zeph puts to a User about one Pattern "
+            "in 7 days, counting one still waiting to be asked. 0 asks none."
+        ),
+    ),
+    EditableSetting(
+        FAMILIARITY_CONVERSATIONS.key,
+        "Conversations to be getting to know",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=1000,
+        hint=(
+            "A new User becomes one Zeph is getting to know after this many "
+            "Conversations, once the other two bars are met too. A first "
+            "suspected Pattern gets them there sooner."
+        ),
+    ),
+    EditableSetting(
+        FAMILIARITY_LIFE_THREADS.key,
+        "Life Threads to be getting to know",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=1000,
+        hint=(
+            "How many Life Threads Zeph must follow for a new User before it is "
+            "getting to know them, with the Conversations and real stories bars."
+        ),
+    ),
+    EditableSetting(
+        FAMILIARITY_REAL_STORIES.key,
+        "Real stories to be getting to know",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=1000,
+        hint=(
+            "How many Observations from things that really happened a new User "
+            "needs before Zeph is getting to know them, with the other two "
+            "bars. 0 means none are needed."
+        ),
+    ),
+    EditableSetting(
+        STARTER_THOUGHT_EXPERIMENTS.key,
+        "Starter Thought Experiments for a new User",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=50,
+        hint=(
+            "The most starter Thought Experiments Zeph puts to a new User while "
+            "Pattern exploring works, counting one still waiting; 0 asks none. "
+            "They stop once Zeph is getting to know them."
+        ),
+    ),
+    EditableSetting(
+        STARTER_THOUGHT_EXPERIMENT_DAYS.key,
+        "Days starter Thought Experiments are offered",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=365,
+        hint=(
+            "Starter Thought Experiments are offered only for this many days "
+            "after a User signs up. After that, one still waiting is closed."
+        ),
+    ),
+    EditableSetting(
+        STARTER_THOUGHT_EXPERIMENTS_PER_CONVERSATION.key,
+        "Starter Thought Experiments per Conversation",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=5,
+        hint=(
+            "The most starter Thought Experiments in one Conversation (0 asks "
+            "none); the next is written when a Conversation ends. The Curiosity "
+            "limits still apply."
+        ),
+    ),
+    EditableSetting(
+        UNMATCHED_GROUPING_CLOSENESS_PERCENT.key,
+        "Unmatched grouping bar",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=100,
+        hint=(
+            "How close in meaning two general descriptions must be to count as "
+            "one entry on the Unmatched Patterns page, for Patterns kept from "
+            "now on. The same way in other words scores about 74–88; a "
+            "different way up to about 78."
         ),
     ),
     EditableSetting(
@@ -1257,6 +1946,26 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         ),
     ),
     EditableSetting(
+        CURIOSITIES_PER_REPLY.key,
+        "Most Curiosities per reply",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=5,
+        hint=(
+            "How many Curiosities one reply may ask. Most Curiosities raised per "
+            "Conversation still caps it."
+        ),
+    ),
+    EditableSetting(
+        CURIOSITY_HELD_WHEN_ASKING_WHY.key,
+        "Hold a Curiosity when the reply asks why",
+        SettingKind.ON_OFF,
+        hint=(
+            "When on, a reply that asks why they feel as they do asks no "
+            "Curiosity too, and it stays due. When off, the reply can ask both."
+        ),
+    ),
+    EditableSetting(
         CURIOSITIES_WAITING_LIMIT.key,
         "Most Curiosities waiting at once",
         SettingKind.WHOLE_NUMBER,
@@ -1265,6 +1974,76 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         hint=(
             "Most Curiosities waiting at once. When a Conversation’s end makes more, "
             "Curiosity keeping closes the oldest."
+        ),
+    ),
+    EditableSetting(
+        CURIOSITY_REPLIES_BETWEEN.key,
+        "Fewest replies between Curiosities: balanced",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=50,
+        hint=(
+            "How many replies must pass after a Curiosity is raised, in any "
+            "Conversation, before another is offered to the Reply Plan. For a "
+            "User set to balanced; gentle and direct have their own."
+        ),
+    ),
+    EditableSetting(
+        CURIOSITY_REPLIES_BETWEEN_GENTLE.key,
+        "Fewest replies between Curiosities: gentle",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=50,
+        hint=(
+            "The same number for a User set to gentle: higher means Zeph's "
+            "own questions come further apart. It still doubles while Zeph "
+            "backs off after brush-offs."
+        ),
+    ),
+    EditableSetting(
+        CURIOSITY_REPLIES_BETWEEN_DIRECT.key,
+        "Fewest replies between Curiosities: direct",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=50,
+        hint=(
+            "The same number for a User set to direct: lower means Zeph's "
+            "own questions come closer together. It still doubles while Zeph "
+            "backs off after brush-offs."
+        ),
+    ),
+    EditableSetting(
+        FOLLOW_UPS_PER_CONVERSATION.key,
+        "Most follow-up questions per Conversation",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=10,
+        hint=(
+            "How many replies in one Conversation may make a Move that asks a "
+            "question, such as Get curious. These don't use the Curiosity limit."
+        ),
+    ),
+    EditableSetting(
+        CURIOSITY_BRUSH_OFFS_TO_BACK_OFF.key,
+        "Brush-offs before backing off",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=10,
+        hint=(
+            "After this many Curiosities brushed off in a row, none is offered for "
+            "the rest of the Conversation and the spacing doubles. One engaged "
+            "answer ends it."
+        ),
+    ),
+    EditableSetting(
+        CURIOSITY_BACK_OFF.key,
+        "Days of doubled spacing",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=60,
+        hint=(
+            "How long the fewest replies between Curiosities stays doubled after "
+            "Zeph backs off, counted from the last brush-off."
         ),
     ),
     EditableSetting(
@@ -1690,11 +2469,54 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         thinking_key=CHECK_IN_THINKING.key,
     ),
     CoreService(
+        name="Pattern tagging",
+        runs_when="Conversation end · after Life Threads, while Pattern noticing works",
+        description=(
+            "Reads the Conversation into the Pattern Catalog: each Observation "
+            "with its Pattern Type and sign, for or against, the User’s exact "
+            "quote and its situation tags. Code drops any whose Pattern Type, "
+            "sign, quote or tags don’t check out. Nothing reaches a reply."
+        ),
+        prompt_key=PATTERN_TAGGING_PROMPT.key,
+        model_key=PATTERN_TAGGING_MODEL.key,
+        thinking_key=PATTERN_TAGGING_THINKING.key,
+    ),
+    CoreService(
+        name="Other side",
+        runs_when=(
+            "Conversation end · after scoring, only for a Pattern that passed "
+            "every other ready check"
+        ),
+        description=(
+            "Argues against a Pattern about to become ready: is there a better "
+            "explanation of the same evidence, such as a look-alike or what "
+            "anyone would do? A yes, an unreadable answer or a failed call "
+            "stops it being ready. It can never make a Pattern ready."
+        ),
+        prompt_key=PATTERN_OTHER_SIDE_PROMPT.key,
+        model_key=PATTERN_OTHER_SIDE_MODEL.key,
+        thinking_key=PATTERN_OTHER_SIDE_THINKING.key,
+    ),
+    CoreService(
+        name="Pattern matching",
+        runs_when="Only when an Admin runs the matching command",
+        description=(
+            "Says which Pattern Type, if any, a Pattern with none fits. Code keeps "
+            "the answer only when the Pattern Type is in the Pattern Catalog, then "
+            "tags the Conversations behind the Pattern’s evidence again against it."
+        ),
+        prompt_key=PATTERN_MATCHING_PROMPT.key,
+        model_key=PATTERN_MATCHING_MODEL.key,
+        thinking_key=PATTERN_MATCHING_THINKING.key,
+    ),
+    CoreService(
         name="Pattern keeping",
         runs_when="Conversation end · after Life Threads",
         description=(
             "Looks across Life Threads for the same way of thinking, feeling or "
-            "acting, and keeps it as a Pattern."
+            "acting that fits no Pattern Type, and keeps it as an unmatched "
+            "Pattern. It never starts, confirms or closes a Pattern of a Pattern "
+            "Type."
         ),
         prompt_key=PATTERN_KEEPING_PROMPT.key,
         model_key=PATTERN_KEEPING_MODEL.key,
@@ -1781,6 +2603,92 @@ def check_waits_fit_under_the_cap(
         )
 
 
+def thinking_for_model(settings: PlatformSettings, model: str, wanted: bool) -> bool:
+    """Say whether a call should ask its model to think.
+
+    Args:
+        settings: The platform settings.
+        model: The model the call uses.
+        wanted: Whether the caller wants the model to think.
+
+    Returns:
+        True for a model that always thinks, False for one that can't
+        think, and what the caller wants for any other model.
+    """
+    if model in settings.get(MODELS_THAT_ALWAYS_THINK):
+        return True
+    if model in settings.get(MODELS_THAT_CANNOT_THINK):
+        return False
+    return wanted
+
+
+def thinking_to_use(
+    settings: PlatformSettings, model: Setting[str], thinking: Setting[bool]
+) -> bool:
+    """Say whether a core service's call should ask its model to think.
+
+    Args:
+        settings: The platform settings.
+        model: The setting holding the model the service uses.
+        thinking: The setting holding the service's thinking switch.
+
+    Returns:
+        True if the model always thinks, or the switch is on and the model
+        can think.
+    """
+    return thinking_for_model(settings, settings.get(model), settings.get(thinking))
+
+
+def with_thinking_fitted_to_the_models(
+    settings: PlatformSettings, values: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Keep each core service's thinking as its model needs it, after a change.
+
+    Thinking stays off for a model that can't think and on for one that
+    always thinks. Only a service whose model or thinking is being changed
+    is looked at, so other settings can always be saved.
+
+    Args:
+        settings: The platform settings before the change.
+        values: The checked new value for each setting key being changed.
+
+    Returns:
+        The values to save: the ones given, plus thinking off for each
+        service on a model that can't think whose thinking is saved as on,
+        and thinking on for each service on a model that always thinks
+        whose thinking is saved as off.
+
+    Raises:
+        InvalidSettingError: If thinking would be turned on for a model
+            that can't think, or off for a model that always thinks.
+    """
+    models_that_cannot_think = settings.get(MODELS_THAT_CANNOT_THINK)
+    models_that_always_think = settings.get(MODELS_THAT_ALWAYS_THINK)
+    fitted_values = dict(values)
+    for service in CORE_SERVICES:
+        if not {service.model_key, service.thinking_key} & values.keys():
+            continue
+        model = values.get(service.model_key, settings.values[service.model_key])
+        label = EDITABLE_SETTINGS_BY_KEY[service.thinking_key].label
+        new_thinking = values.get(service.thinking_key)
+        saved_thinking = settings.values[service.thinking_key]
+        if model in models_that_always_think:
+            if new_thinking is False:
+                raise InvalidSettingError(
+                    f"The {label} can't be off: {model} always thinks."
+                )
+            if not saved_thinking:
+                fitted_values[service.thinking_key] = True
+        elif model in models_that_cannot_think:
+            if new_thinking:
+                raise InvalidSettingError(
+                    f"The {label} can't be on: {model} can't think."
+                )
+            if saved_thinking:
+                fitted_values[service.thinking_key] = False
+    return fitted_values
+
+
 class PlatformSettingsService:
     """Lets Admins read and change the platform settings they manage.
 
@@ -1827,8 +2735,28 @@ class PlatformSettingsService:
         """
         return self._settings.load().get(AVAILABLE_MODELS)
 
+    def models_that_cannot_think(self) -> list[str]:
+        """List the models whose thinking can't be turned on.
+
+        Returns:
+            The model names.
+        """
+        return self._settings.load().get(MODELS_THAT_CANNOT_THINK)
+
+    def models_that_always_think(self) -> list[str]:
+        """List the models whose thinking can't be turned off.
+
+        Returns:
+            The model names.
+        """
+        return self._settings.load().get(MODELS_THAT_ALWAYS_THINK)
+
     def update(self, admin: User, values: Mapping[str, Any]) -> list[StoredSetting]:
         """Check and save setting changes, all together or not at all.
+
+        A core service changed to a model that can't think gets its thinking
+        saved as off, and one changed to a model that always thinks gets it
+        saved as on.
 
         Args:
             admin: The Admin making the change.
@@ -1839,15 +2767,18 @@ class PlatformSettingsService:
 
         Raises:
             InvalidSettingError: If a key may not be changed, a value is not
-                valid, or the Message wait cap would be shorter than a wait;
-                nothing is saved.
+                valid, the Message wait cap would be shorter than a wait, or
+                thinking would be on for a model that can't think, or off
+                for a model that always thinks; nothing is saved.
         """
-        validated_values = {
+        checked_values = {
             key: self.checked_value(key, value) for key, value in values.items()
         }
-        check_waits_fit_under_the_cap(self._settings.load(), validated_values)
-        if validated_values:
-            self._settings.save_many(validated_values, self._clock.now(), admin.id)
+        settings = self._settings.load()
+        check_waits_fit_under_the_cap(settings, checked_values)
+        values_to_save = with_thinking_fitted_to_the_models(settings, checked_values)
+        if values_to_save:
+            self._settings.save_many(values_to_save, self._clock.now(), admin.id)
         return self.list_editable()
 
     def checked_value(self, key: str, value: Any) -> Any:

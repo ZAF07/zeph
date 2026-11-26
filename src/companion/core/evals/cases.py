@@ -6,11 +6,29 @@ from typing import Any
 
 from companion.core.evals.case_shapes import InvalidFormError, read_time_of_day
 from companion.core.models import (
+    Audience,
     CuriositySensitivity,
+    ExplorationApproach,
+    ExplorationNeed,
     HowSure,
     MoveResult,
     MoveRole,
+    ObservationDirection,
+    Relationship,
+    SituationSetting,
+    Stakes,
+    StateGoingIn,
     ThreadReaction,
+    TryOutcome,
+)
+
+ASKED_TO_DROP = "asked_to_drop"
+AGENDA_EXPECTATIONS = (
+    "agenda_shown",
+    "aimed_raised",
+    "aimed_need",
+    "aimed_approach",
+    "aimed_pattern_type",
 )
 
 
@@ -325,6 +343,95 @@ class EvalMoveOutcome:
 
 
 @dataclass(frozen=True)
+class EvalObservation:
+    """An Observation the person already has when the case starts.
+
+    Attributes:
+        quote: Their own words.
+        sign: The ID of the sign it matched, e.g. I2.
+        direction: Whether it counts for its Pattern Type or against it.
+        context: What was going on, in Zeph's words.
+        about: Who it is about, e.g. "Mei, their sister".
+        days_ago: How many days before the case's time they said it.
+        second_pattern_type: The look-alike Pattern Type it couldn't be told
+            apart from, which makes it unclear; None when it is clear.
+        thread: The title of the Life Thread it belongs to; None for none.
+        setting: Where it happened; None if not known.
+        relationship: Who the other person is to them; None if not known.
+        audience: Who else was there; None if not known.
+        stakes: Whether something that matters to them could be lost; None
+            if not known.
+        state_going_in: How they were before it happened; None if not known.
+    """
+
+    quote: str
+    sign: str
+    direction: ObservationDirection
+    context: str
+    about: str
+    days_ago: int = 1
+    second_pattern_type: str | None = None
+    thread: str | None = None
+    setting: SituationSetting | None = None
+    relationship: Relationship | None = None
+    audience: Audience | None = None
+    stakes: Stakes | None = None
+    state_going_in: StateGoingIn | None = None
+
+
+@dataclass(frozen=True)
+class EvalTry:
+    """A try Zeph already made at a suspected Pattern before the case starts.
+
+    Attributes:
+        need: What it aimed at.
+        approach: Its Approach: how it asked.
+        outcome: How it came back.
+        asked_to_drop: Whether the person asked Zeph to drop it, which the
+            real Agenda code then rests the Exploration for.
+        days_ago: How many days before the case's time it was asked.
+    """
+
+    need: ExplorationNeed
+    approach: ExplorationApproach
+    outcome: TryOutcome
+    asked_to_drop: bool = False
+    days_ago: int = 1
+
+
+@dataclass(frozen=True)
+class EvalPattern:
+    """A Pattern Zeph suspects of the person when the case starts.
+
+    Attributes:
+        pattern_type: Its Pattern Type's ID, e.g. CONF.AVOID.BELONG.
+        observations: Its Observations.
+        tries: The tries already made at it, in any order.
+    """
+
+    pattern_type: str
+    observations: list[EvalObservation]
+    tries: list[EvalTry] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class EvalThoughtExperiment:
+    """A Thought Experiment on the platform when the case starts.
+
+    Attributes:
+        wording: The made-up situation and its question.
+        pattern_type: One of the two look-alike Pattern Types it tells apart.
+        other_pattern_type: The other one.
+        sensitivity: How sensitive it is.
+    """
+
+    wording: str
+    pattern_type: str
+    other_pattern_type: str
+    sensitivity: CuriositySensitivity = CuriositySensitivity.LOW
+
+
+@dataclass(frozen=True)
 class EvalMemory:
     """The made-up User Memory a case starts with.
 
@@ -336,6 +443,11 @@ class EvalMemory:
         curiosities: Waiting Curiosities.
         knowledge_documents: Knowledge Documents on the platform.
         move_outcomes: What helped the person before, and what didn't.
+        patterns: The Patterns Zeph suspects of them. With any, the person
+            has Pattern noticing and Pattern exploring on, and the real
+            Agenda code writes their Agenda and aimed Curiosities.
+        thought_experiments: The only Thought Experiments on the platform;
+            empty leaves the seeded ones.
     """
 
     portrait: str = ""
@@ -345,6 +457,8 @@ class EvalMemory:
     curiosities: list[EvalCuriosity] = field(default_factory=list)
     knowledge_documents: list[EvalKnowledgeDocument] = field(default_factory=list)
     move_outcomes: list[EvalMoveOutcome] = field(default_factory=list)
+    patterns: list[EvalPattern] = field(default_factory=list)
+    thought_experiments: list[EvalThoughtExperiment] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -381,6 +495,12 @@ class UnderstandingExpectations:
         raised: Life Threads, by title, it must bring up.
         not_raised: Life Threads, by title, it must not bring up.
         curiosity_raised: Whether it must bring up a Curiosity.
+        agenda_shown: Whether the Reply Plan must be shown the Agenda.
+        aimed_raised: Whether it must bring up an aimed Curiosity, one the
+            Agenda code wrote for an Exploration.
+        aimed_need: The need that aimed Curiosity must aim at.
+        aimed_approach: The Approach it must ask by.
+        aimed_pattern_type: The ID of the Pattern Type it must be for.
         asked_why: Whether it must gently ask why they feel as they do.
         knowledge: Whether it must choose Knowledge documents to search.
         woven_in: Whether the reply must weave in the due Check-in.
@@ -404,6 +524,11 @@ class UnderstandingExpectations:
     raised: list[str] = field(default_factory=list)
     not_raised: list[str] = field(default_factory=list)
     curiosity_raised: bool | None = None
+    agenda_shown: bool | None = None
+    aimed_raised: bool | None = None
+    aimed_need: ExplorationNeed | None = None
+    aimed_approach: ExplorationApproach | None = None
+    aimed_pattern_type: str = ""
     asked_why: bool | None = None
     knowledge: bool | None = None
     woven_in: bool | None = None
@@ -756,13 +881,88 @@ def to_eval_curiosity(entry: dict[str, Any]) -> EvalCuriosity:
     )
 
 
+def to_eval_observation(entry: dict[str, Any]) -> EvalObservation:
+    """Read an Observation the person already has, as written in the case.
+
+    Args:
+        entry: `quote`, `sign`, `direction`, `context` and `about`, and
+            optionally `days_ago`, `second_pattern_type`, `thread`,
+            `setting`, `relationship`, `audience`, `stakes` and
+            `state_going_in`.
+
+    Returns:
+        The Observation.
+    """
+    setting = entry.get("setting")
+    relationship = entry.get("relationship")
+    audience = entry.get("audience")
+    stakes = entry.get("stakes")
+    state_going_in = entry.get("state_going_in")
+    return EvalObservation(
+        quote=entry["quote"],
+        sign=entry["sign"].strip(),
+        direction=ObservationDirection(entry["direction"]),
+        context=entry["context"],
+        about=entry["about"],
+        days_ago=entry.get("days_ago", 1),
+        second_pattern_type=(entry.get("second_pattern_type") or "").strip() or None,
+        thread=entry.get("thread") or None,
+        setting=SituationSetting(setting) if setting else None,
+        relationship=Relationship(relationship) if relationship else None,
+        audience=Audience(audience) if audience else None,
+        stakes=Stakes(stakes) if stakes else None,
+        state_going_in=StateGoingIn(state_going_in) if state_going_in else None,
+    )
+
+
+def to_eval_try(entry: dict[str, Any]) -> EvalTry:
+    """Read a try already made, as written in the case.
+
+    Args:
+        entry: `need`, `approach` and `outcome` (useful, vague, brushed_off or
+            asked_to_drop), and optionally `days_ago`.
+
+    Returns:
+        The try; one they asked to drop came back brushed off.
+    """
+    asked_to_drop = entry["outcome"] == ASKED_TO_DROP
+    return EvalTry(
+        need=ExplorationNeed(entry["need"]),
+        approach=ExplorationApproach(entry["approach"]),
+        outcome=(
+            TryOutcome.BRUSHED_OFF if asked_to_drop else TryOutcome(entry["outcome"])
+        ),
+        asked_to_drop=asked_to_drop,
+        days_ago=entry.get("days_ago", 1),
+    )
+
+
+def to_eval_pattern(entry: dict[str, Any]) -> EvalPattern:
+    """Read a suspected Pattern as written in the case.
+
+    Args:
+        entry: `pattern_type` and `observations`, and optionally `tries`.
+
+    Returns:
+        The Pattern.
+    """
+    return EvalPattern(
+        pattern_type=entry["pattern_type"].strip(),
+        observations=[
+            to_eval_observation(observation) for observation in entry["observations"]
+        ],
+        tries=[to_eval_try(attempt) for attempt in entry.get("tries") or []],
+    )
+
+
 def to_eval_memory(entry: dict[str, Any]) -> EvalMemory:
     """Read a case's made-up User Memory.
 
     Args:
         entry: A mapping with any of `portrait`, `items` (each
             `{category, contents}`), `summaries`, `threads`, `curiosities`,
-            `knowledge_documents` and `move_outcomes`.
+            `knowledge_documents`, `move_outcomes`, `patterns` and
+            `thought_experiments`.
 
     Returns:
         The memory.
@@ -795,6 +995,18 @@ def to_eval_memory(entry: dict[str, Any]) -> EvalMemory:
         move_outcomes=[
             to_eval_move_outcome(outcome)
             for outcome in entry.get("move_outcomes") or []
+        ],
+        patterns=[to_eval_pattern(pattern) for pattern in entry.get("patterns") or []],
+        thought_experiments=[
+            EvalThoughtExperiment(
+                wording=experiment["wording"],
+                pattern_type=experiment["pattern_type"].strip(),
+                other_pattern_type=experiment["other_pattern_type"].strip(),
+                sensitivity=CuriositySensitivity(
+                    experiment.get("sensitivity") or "low"
+                ),
+            )
+            for experiment in entry.get("thought_experiments") or []
         ],
     )
 
@@ -857,6 +1069,19 @@ def to_understanding_message(entry: dict[str, Any]) -> UnderstandingMessage:
             raised=expect.get("raised") or [],
             not_raised=expect.get("not_raised") or [],
             curiosity_raised=expect.get("curiosity_raised"),
+            agenda_shown=expect.get("agenda_shown"),
+            aimed_raised=expect.get("aimed_raised"),
+            aimed_need=(
+                ExplorationNeed(expect["aimed_need"])
+                if expect.get("aimed_need")
+                else None
+            ),
+            aimed_approach=(
+                ExplorationApproach(expect["aimed_approach"])
+                if expect.get("aimed_approach")
+                else None
+            ),
+            aimed_pattern_type=(expect.get("aimed_pattern_type") or "").strip(),
             asked_why=expect.get("asked_why"),
             knowledge=expect.get("knowledge"),
             woven_in=expect.get("woven_in"),
@@ -912,7 +1137,8 @@ def texts_besides_threads(case: UnderstandingCase) -> list[str]:
 
     Returns:
         The Portrait, Memory Items, Summaries, Curiosities, Knowledge
-        Documents, Move Outcomes, earlier messages and Messages.
+        Documents, Move Outcomes, suspected Patterns' Observations, earlier
+        messages and Messages.
     """
     memory = case.memory
     return [
@@ -927,6 +1153,11 @@ def texts_besides_threads(case: UnderstandingCase) -> list[str]:
         *(
             f"{outcome.situation} {outcome.feeling} {outcome.why}"
             for outcome in memory.move_outcomes
+        ),
+        *(
+            f"{observation.quote} {observation.context} {observation.about}"
+            for pattern in memory.patterns
+            for observation in pattern.observations
         ),
         *(line.text for line in case.earlier),
         *(message.text for message in case.messages),
@@ -1002,6 +1233,74 @@ def require_checkable_names(case: UnderstandingCase) -> None:
         )
 
 
+def unknown_thread_problems(
+    observations: Sequence[EvalObservation], titles: Sequence[str], path: str
+) -> dict[str, str]:
+    """Find made-up Observations naming a Life Thread the case doesn't have.
+
+    Args:
+        observations: The Observations.
+        titles: The titles of the case's Life Threads.
+        path: The path of the list they are in.
+
+    Returns:
+        What is wrong, by field path; empty when nothing is.
+    """
+    return {
+        f"{path}.{number}.thread": "No Life Thread has this title: "
+        f"{observation.thread}"
+        for number, observation in enumerate(observations)
+        if observation.thread is not None and observation.thread not in titles
+    }
+
+
+def require_agenda_checkable(case: UnderstandingCase) -> None:
+    """Check a case's suspected Patterns and Agenda expectations fit together.
+
+    Args:
+        case: The case.
+
+    Raises:
+        InvalidEvalCaseError: If an Observation names a Life Thread the case
+            doesn't have, a Message expects something of the Agenda with no
+            suspected Pattern in the memory, or says what the aimed Curiosity
+            aims at while expecting none.
+    """
+    titles = [thread.title for thread in case.memory.threads]
+    problems: dict[str, str] = {}
+    for number, pattern in enumerate(case.memory.patterns):
+        problems.update(
+            unknown_thread_problems(
+                pattern.observations, titles, f"memory.patterns.{number}.observations"
+            )
+        )
+    for number, message in enumerate(case.messages):
+        expect = message.expect
+        expect_path = f"messages.{number}.expect"
+        if not case.memory.patterns:
+            problems.update(
+                {
+                    f"{expect_path}.{name}": "Needs a suspected Pattern in the "
+                    "made-up User Memory."
+                    for name in AGENDA_EXPECTATIONS
+                    if getattr(expect, name) not in (None, "")
+                }
+            )
+        if expect.aimed_raised is False:
+            problems.update(
+                {
+                    f"{expect_path}.{name}": "Expects no aimed Curiosity, so "
+                    "leave this empty."
+                    for name in ("aimed_need", "aimed_approach", "aimed_pattern_type")
+                    if getattr(expect, name) not in (None, "")
+                }
+            )
+    if problems:
+        raise InvalidEvalCaseError(
+            f"{case.id} can't be checked: " + "; ".join(problems.values()), problems
+        )
+
+
 def read_understanding_case(key: str, content: dict[str, Any]) -> UnderstandingCase:
     """Read an Understanding case and check it can be checked.
 
@@ -1019,8 +1318,9 @@ def read_understanding_case(key: str, content: dict[str, Any]) -> UnderstandingC
         InvalidEvalCaseError: If it names an unknown rule or Life Thread,
             writes a Thread's title outside it, has a Thread raised in its
             Conversation but no earlier lines, expects a Check-in woven
-            in or not with none due, or expects no Move and names Moves on
-            the same Message.
+            in or not with none due, expects no Move and names Moves on
+            the same Message, or its suspected Patterns and Agenda
+            expectations don't fit together.
     """
     case = UnderstandingCase(
         id=key,
@@ -1037,6 +1337,7 @@ def read_understanding_case(key: str, content: dict[str, Any]) -> UnderstandingC
     )
     require_checkable_names(case)
     require_moves_or_no_move(case)
+    require_agenda_checkable(case)
     expects_woven_in = any(
         message.expect.woven_in is not None for message in case.messages
     )
@@ -1339,5 +1640,300 @@ def read_day_summary_case(key: str, content: dict[str, Any]) -> DaySummaryCase:
                 question=entry["question"].strip(), expected=entry["expected"].strip()
             )
             for entry in content["questions"]
+        ],
+    )
+
+
+@dataclass(frozen=True)
+class TaggingMessage:
+    """One message of a Tagging case's ended Conversation.
+
+    Attributes:
+        from_person: True if the User sent it; False if Zeph did.
+        text: What it says.
+    """
+
+    from_person: bool
+    text: str
+
+
+@dataclass(frozen=True)
+class ExpectedObservation:
+    """An Observation the tagging step must keep.
+
+    Attributes:
+        pattern_type: The Pattern Type's ID, e.g. CONF.AVOID.BELONG; when
+            unclear, either of the two it names.
+        direction: Whether it counts for or against.
+        unclear: Whether it names two Pattern Types it can't tell apart.
+        situational: Whether anyone would have acted the same there.
+        audience: The audience it must hold, or "empty" when it must hold
+            none; None when the case doesn't say.
+        stakes: The stakes it must hold, likewise.
+        state_going_in: The state going in it must hold, likewise.
+    """
+
+    pattern_type: str
+    direction: ObservationDirection
+    unclear: bool
+    situational: bool
+    audience: str | None = None
+    stakes: str | None = None
+    state_going_in: str | None = None
+
+    @property
+    def conditions(self) -> dict[str, str]:
+        """List the Conditions the case states for it.
+
+        Returns:
+            Each stated Condition's value, or "empty", by its name.
+        """
+        stated = {
+            "audience": self.audience,
+            "stakes": self.stakes,
+            "state_going_in": self.state_going_in,
+        }
+        return {name: value for name, value in stated.items() if value is not None}
+
+    @property
+    def label(self) -> str:
+        """Name it as the Case Result groups its checks.
+
+        Returns:
+            E.g. "CONF.AVOID.BELONG · for · unclear · audience: group".
+        """
+        parts = [self.pattern_type, self.direction.value]
+        if self.unclear:
+            parts.append("unclear")
+        if self.situational:
+            parts.append("situational")
+        parts += [
+            f"{name.replace('_', ' ')}: {value}"
+            for name, value in self.conditions.items()
+        ]
+        return " · ".join(parts)
+
+
+@dataclass(frozen=True)
+class UnclearStory:
+    """An unclear Observation the person already has in a Tagging case.
+
+    Attributes:
+        pattern_type: The first of its two Pattern Types, by ID.
+        observation: The Observation; its second Pattern Type is set.
+        asked: Whether an aimed Curiosity asked about it in the case's
+            Conversation, so the tagging step is shown it.
+        ends_clear_for: The Pattern Type it must end clear for; None if it
+            must stay unclear.
+    """
+
+    pattern_type: str
+    observation: EvalObservation
+    asked: bool
+    ends_clear_for: str | None
+
+    @property
+    def pattern_types(self) -> list[str]:
+        """List the two Pattern Types it can't be told apart between.
+
+        Returns:
+            Their IDs, first then second.
+        """
+        return [self.pattern_type, self.observation.second_pattern_type or ""]
+
+
+@dataclass(frozen=True)
+class TaggingCase:
+    """An ended Conversation and the Observations its tagging should keep.
+
+    Attributes:
+        id: The case's key.
+        now: When the first message was sent, in UTC.
+        threads: The Life Threads the Conversation touched, in the order
+            the tagging step is shown them.
+        messages: The Conversation, oldest first.
+        observations: The Observations that must be kept; none means
+            nothing may be kept.
+        unclear: The unclear Observations the person already has, and how
+            each must end.
+    """
+
+    id: str
+    now: datetime
+    threads: list[EvalThread]
+    messages: list[TaggingMessage]
+    observations: list[ExpectedObservation]
+    unclear: list[UnclearStory] = field(default_factory=list)
+
+
+def to_unclear_story(entry: dict[str, Any]) -> UnclearStory:
+    """Read an unclear Observation of a Tagging case.
+
+    Args:
+        entry: `pattern_type` and an Observation's fields (see
+            `to_eval_observation`), and optionally `asked`, true unless set
+            to false, and `ends_clear_for`.
+
+    Returns:
+        The unclear story.
+    """
+    return UnclearStory(
+        pattern_type=entry["pattern_type"].strip(),
+        observation=to_eval_observation(entry),
+        asked=entry.get("asked") is not False,
+        ends_clear_for=(entry.get("ends_clear_for") or "").strip() or None,
+    )
+
+
+def unclear_story_problems(case: TaggingCase) -> dict[str, str]:
+    """Find unclear stories that can't end the way the case expects.
+
+    Args:
+        case: The case.
+
+    Returns:
+        What is wrong, by field path; empty when nothing is.
+    """
+    problems = unknown_thread_problems(
+        [story.observation for story in case.unclear],
+        [thread.title for thread in case.threads],
+        "unclear",
+    )
+    for number, story in enumerate(case.unclear):
+        path = f"unclear.{number}"
+        if story.observation.second_pattern_type is None:
+            problems[f"{path}.second_pattern_type"] = (
+                "An unclear story needs its second Pattern Type."
+            )
+        if story.ends_clear_for is None:
+            continue
+        if not story.asked:
+            problems[f"{path}.ends_clear_for"] = (
+                "Only a story Zeph asked about can end clear."
+            )
+        elif story.ends_clear_for not in story.pattern_types:
+            problems[f"{path}.ends_clear_for"] = (
+                "Must be one of its two Pattern Types: "
+                + " or ".join(story.pattern_types)
+            )
+    return problems
+
+
+def read_tagging_case(key: str, content: dict[str, Any]) -> TaggingCase:
+    """Read a Tagging case and check it can be checked.
+
+    Args:
+        key: The case's key.
+        content: `now`, `threads` (each `{title, story, people}`),
+            `messages` (each `{who, text}`), `observations` (each
+            `{pattern_type, direction, unclear, situational}`, and
+            optionally `audience`, `stakes` and `state_going_in`, each a
+            value from its list or "empty") and optionally `unclear` (see
+            `to_unclear_story`).
+
+    Returns:
+        The case.
+
+    Raises:
+        InvalidEvalCaseError: If the User says nothing in their own words,
+            so there is nothing the tagging step could quote, or an unclear
+            story can't end the way the case expects.
+    """
+    case = TaggingCase(
+        id=key,
+        now=to_utc(content["now"]),
+        threads=[to_eval_thread(entry) for entry in content.get("threads") or []],
+        messages=[
+            TaggingMessage(from_person=entry["who"] == "person", text=entry["text"])
+            for entry in content["messages"]
+        ],
+        observations=[
+            ExpectedObservation(
+                pattern_type=entry["pattern_type"].strip(),
+                direction=ObservationDirection(entry["direction"]),
+                unclear=bool(entry.get("unclear")),
+                situational=bool(entry.get("situational")),
+                audience=entry.get("audience") or None,
+                stakes=entry.get("stakes") or None,
+                state_going_in=entry.get("state_going_in") or None,
+            )
+            for entry in content.get("observations") or []
+        ],
+        unclear=[to_unclear_story(entry) for entry in content.get("unclear") or []],
+    )
+    if not any(message.from_person for message in case.messages):
+        raise InvalidEvalCaseError(
+            f"{key} can't be checked: the User sends no message",
+            {"messages": "Add at least one message from the User."},
+        )
+    problems = unclear_story_problems(case)
+    if problems:
+        raise InvalidEvalCaseError(
+            f"{key} can't be checked: " + "; ".join(problems.values()), problems
+        )
+    return case
+
+
+@dataclass(frozen=True)
+class PipelineConversation:
+    """One scripted Conversation of a Whole-pipeline case.
+
+    Attributes:
+        days_later: How many days after the Conversation before it starts;
+            for the first one, after the case's start.
+        messages: What the made-up User sends, in order. Zeph's replies are
+            the real ones.
+    """
+
+    days_later: int
+    messages: list[str]
+
+
+@dataclass(frozen=True)
+class WholePipelineCase:
+    """A made-up User with hidden true Patterns and their scripted Conversations.
+
+    Attributes:
+        id: The case's key.
+        now: When the made-up User's story starts, in UTC.
+        true_pattern_types: The IDs of the Pattern Types that are true of
+            them; none means no Pattern may become ready.
+        conversations: Their Conversations, in order.
+    """
+
+    id: str
+    now: datetime
+    true_pattern_types: list[str]
+    conversations: list[PipelineConversation]
+
+
+def read_whole_pipeline_case(key: str, content: dict[str, Any]) -> WholePipelineCase:
+    """Read a Whole-pipeline case.
+
+    Args:
+        key: The case's key.
+        content: `now`, `true_pattern_types` (Pattern Type IDs) and
+            `conversations` (each `{days_later, messages}`, `messages` being
+            the User's texts).
+
+    Returns:
+        The case, each true Pattern Type once.
+    """
+    return WholePipelineCase(
+        id=key,
+        now=to_utc(content["now"]),
+        true_pattern_types=list(
+            dict.fromkeys(
+                name.strip()
+                for name in content.get("true_pattern_types") or []
+                if name.strip()
+            )
+        ),
+        conversations=[
+            PipelineConversation(
+                days_later=entry.get("days_later") or 0,
+                messages=list(entry["messages"]),
+            )
+            for entry in content["conversations"]
         ],
     )

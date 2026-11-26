@@ -35,7 +35,12 @@ export type ChatSetting =
   | "quiet_hours"
   | "user_memory"
   | "photo_viewing"
-  | "time_zone";
+  | "time_zone"
+  | "directness"
+  | "contested_gathering";
+
+/** How direct a User wants Zeph to be with its Read of what is going on. */
+export type Directness = "gentle" | "balanced" | "direct";
 
 /**
  * The signed-in User, with their profile and preferences. `changed_in_chat`
@@ -44,6 +49,12 @@ export type ChatSetting =
  * `photo_viewing_available` are false when an Admin has that Feature off for
  * them, so they can't switch it. `personal_stickers_available` says whether
  * Personal Stickers works for them; they have no switch of their own.
+ * `show_pattern_noticing_notice` says whether to show the notice that Zeph now
+ * keeps quotes as evidence, until they press "Got it".
+ * `directness` is how direct they want Zeph to be with its Read.
+ * `contested_gathering_enabled` is their own switch for letting Zeph keep
+ * noting evidence for a Pattern they disagreed with; it is shown only while
+ * `pattern_sharing_works`.
  */
 export type Me = {
   id: string;
@@ -58,7 +69,11 @@ export type Me = {
   user_memory_available: boolean;
   photo_viewing_enabled: boolean;
   photo_viewing_available: boolean;
+  directness: Directness;
+  contested_gathering_enabled: boolean;
+  pattern_sharing_works: boolean;
   personal_stickers_available: boolean;
+  show_pattern_noticing_notice: boolean;
   onboarding_completed_at: string | null;
   role: UserRole;
   changed_in_chat: Partial<Record<ChatSetting, string>>;
@@ -146,6 +161,8 @@ export type PreferenceChanges = {
   name?: string;
   user_memory_enabled?: boolean;
   photo_viewing_enabled?: boolean;
+  directness?: Directness;
+  contested_gathering_enabled?: boolean;
   country?: string;
   time_zone?: string;
 };
@@ -155,6 +172,23 @@ export type PlatformContent = {
   onboarding_reason_choices: string[];
   message_retention_days: number;
 };
+
+/**
+ * Where a Pattern stands, from first noticed to confirmed or closed.
+ * Unmatched is apart: a Pattern that fits no Pattern Type.
+ */
+export type PatternState =
+  | "noticed"
+  | "suspected"
+  | "ready"
+  | "shared"
+  | "confirmed"
+  | "contested"
+  | "closed"
+  | "unmatched";
+
+/** How well Zeph knows a User, worked out when a Conversation ends. */
+export type Familiarity = "new" | "getting_to_know" | "knows_well";
 
 /** A User as Admins see them: activity counts, never message text. */
 export type AdminUser = {
@@ -169,7 +203,9 @@ export type AdminUser = {
   life_thread_count: number;
   move_outcome_count: number;
   has_portrait: boolean;
-  confirmed_pattern_count: number;
+  pattern_counts: Record<PatternState, number>;
+  kept_quote_count: number;
+  familiarity: Familiarity;
 };
 
 /** A User's role after a change. */
@@ -188,7 +224,10 @@ export type Feature =
   | "settings_in_chat"
   | "photo_viewing"
   | "personal_stickers"
-  | "curiosities";
+  | "curiosities"
+  | "pattern_noticing"
+  | "pattern_exploring"
+  | "pattern_sharing";
 
 /** A Feature's switch for everyone and who last changed it, and when. */
 export type FeatureSwitch = {
@@ -210,7 +249,9 @@ export type FeatureReason =
   | "off_for_everyone"
   | "off_for_user"
   | "turned_off_by_user"
-  | "stickers_off";
+  | "stickers_off"
+  | "pattern_noticing_off"
+  | "pattern_exploring_off";
 
 /** Whether a Feature works for one User, why, and the Admin's switch for them. */
 export type UserFeatureStatus = {
@@ -293,10 +334,15 @@ export type CoreService = {
   limits: ServiceLimit[];
 };
 
-/** The core services and the models Admins can pick for them. */
+/**
+ * The core services, the models Admins can pick for them, which of those
+ * models can't think and which always think.
+ */
 export type CoreServices = {
   services: CoreService[];
   model_choices: string[];
+  models_that_cannot_think: string[];
+  models_that_always_think: string[];
 };
 
 /** A crisis support contact; the international fallback has no country. */
@@ -450,22 +496,85 @@ export type MoveOutcome = {
   made_at: string;
 };
 
-/** One time a Pattern showed up: the day, its Life Thread and what happened. */
-export type PatternEvidence = {
+/** A Condition an Observation can hold, as the backend names it. */
+export type PatternCondition =
+  | "relationship"
+  | "power"
+  | "stance"
+  | "setting"
+  | "audience"
+  | "stakes"
+  | "state_going_in";
+
+/**
+ * Where a Pattern shows and where it was shown not to happen: the Condition
+ * and its values as stored. Copy puts each value in words.
+ */
+export type WhereItShows = {
+  condition: PatternCondition;
+  shows_with: string[];
+  not_with: string[];
+};
+
+/** One of the User's quotes behind a Pattern, and the day (`YYYY-MM-DD`). */
+export type PatternQuote = {
+  quote: string;
   day: string;
-  thread: string;
-  line: string;
 };
 
 /**
- * A Pattern the User agreed with: what keeps showing up across their life,
- * when they agreed and what it is based on, newest day first.
+ * A Pattern's quotes from one part of the User's life: the Life Thread's
+ * title, or null for quotes in no Thread, and the quotes newest first.
+ */
+export type PatternQuoteGroup = {
+  life_thread: string | null;
+  quotes: PatternQuote[];
+};
+
+/** How a Prediction went, once the User said or Zeph stopped waiting. */
+export type PredictionOutcome =
+  "came_true" | "did_not" | "not_come_up" | "not_followed_up";
+
+/**
+ * The one thing Zeph asked the User to notice for a Pattern, when, and how
+ * it went; `outcome` is null until Zeph has asked.
+ */
+export type PatternPrediction = {
+  wording: string;
+  made_at: string;
+  outcome: PredictionOutcome | null;
+};
+
+/**
+ * Where a Pattern Zeph told the User about stands: shared is still being
+ * tested, contested is one they disagreed with and closed didn't hold up.
+ */
+export type ToldPatternState = "shared" | "confirmed" | "contested" | "closed";
+
+/**
+ * A Pattern Zeph told the User about: its wording, where it shows, when
+ * Zeph told them, their quotes by part of life and what they were asked
+ * to notice, newest first. It never carries a score.
  */
 export type Pattern = {
   id: string;
+  state: ToldPatternState;
   pattern: string;
-  agreed_at: string;
-  evidence: PatternEvidence[];
+  where_it_shows: WhereItShows[];
+  told_at: string;
+  quote_groups: PatternQuoteGroup[];
+  predictions: PatternPrediction[];
+};
+
+/**
+ * A quote Zeph keeps as evidence: the User's exact words, Zeph's note on
+ * what was going on, and the day (`YYYY-MM-DD`). No Pattern is named.
+ */
+export type KeptQuote = {
+  id: string;
+  quote: string;
+  context: string;
+  day: string;
 };
 
 /** A photo that matters to the User, kept in their User Memory. */
@@ -494,24 +603,38 @@ export type CheckInKindInput = {
 
 /**
  * A Check-in Kind as Admins manage it. `sends_shared_photo` marks a Kind
- * that sends one of the User's Shared Photos and `raises_curiosity` one
- * that asks one of their Curiosities; Admins can't change either.
+ * that sends one of the User's Shared Photos, `raises_curiosity` one that
+ * asks one of their Curiosities and `shares_pattern` one that tells them a
+ * ready Pattern; Admins can't change any of them.
  */
 export type CheckInKind = CheckInKindInput & {
   id: string;
   sends_shared_photo: boolean;
   raises_curiosity: boolean;
+  shares_pattern: boolean;
 };
 
 /** A Check-in Kind and how many Check-ins of it were sent in 30 days. */
 export type CheckInKindOverview = CheckInKind & { sent_last_30_days: number };
 
-/** A Need's name, when it fits, how to reply and the Moves it rules out. */
+/**
+ * How Curiosities are treated while a Need is picked: the Reply Plan asks a
+ * due one or says why not, asks one light opener per Conversation, asks one
+ * only if it fits, or never asks one.
+ */
+export type CuriosityTreatment =
+  "ask_by_default" | "test_the_water" | "only_if_it_fits" | "never";
+
+/**
+ * A Need's name, when it fits, how to reply, the Moves it rules out and how
+ * Curiosities are treated while it is picked.
+ */
 export type NeedInput = {
   name: string;
   when_it_fits: string;
   how_to_reply: string;
   ruled_out_move_ids: string[];
+  curiosities: CuriosityTreatment;
 };
 
 /**
@@ -632,7 +755,11 @@ export type AdminCheckInChanges = {
 
 /** What a Model Call Log trace was for. */
 export type TraceKind =
-  "message" | "check_in" | "conversation_end" | "portrait_rewrite";
+  | "message"
+  | "check_in"
+  | "conversation_end"
+  | "portrait_rewrite"
+  | "pattern_matching";
 
 /** Which step of the Companion's work a model call was for. */
 export type ModelStep =
@@ -646,6 +773,13 @@ export type ModelStep =
   | "life_threads"
   | "curiosities"
   | "move_outcomes"
+  | "pattern_tagging"
+  | "pattern_other_side"
+  | "pattern_shared_check"
+  | "prediction_given_check"
+  | "curiosity_asked_check"
+  | "settings_claim_check"
+  | "pattern_matching"
   | "patterns"
   | "portrait"
   | "personal_stickers";
@@ -694,7 +828,11 @@ export type UnderstandingShape = {
 
 /**
  * The shape of a Reply Plan: the Need, Move names, counts and whether a Read
- * was formed and said, never any words.
+ * was formed and said, never any words. `curiosities_offered`,
+ * `curiosity_asked`, `pattern_to_share_offered` and `pattern_share_planned`
+ * are missing or null on a trace saved before they were recorded.
+ * `pattern_shared` is null unless the reply was to share a ready Pattern and
+ * the check after it has run.
  */
 export type ReplyPlanShape = {
   need: string;
@@ -712,12 +850,23 @@ export type ReplyPlanShape = {
   check_in_kind: string | null;
   pattern_used: boolean;
   pattern_offered: boolean;
+  curiosities_offered?: number | null;
+  curiosity_asked?: boolean | null;
+  pattern_to_share_offered?: boolean | null;
+  pattern_share_planned?: boolean | null;
+  pattern_shared?: boolean | null;
 };
 
 /** The shape of a check on whether a reply brought up its Woven-in Check-in. */
 export type CheckInShape = {
   kind: string;
   brought_up: boolean;
+};
+
+/** How many Observations a Pattern tagging call wrote and code dropped. */
+export type TaggingShape = {
+  tagged: number;
+  dropped: number;
 };
 
 /** One model call in a trace; `content` is null unless it was kept. */
@@ -736,6 +885,7 @@ export type ModelCall = {
   understanding_shape: UnderstandingShape | null;
   check_in_shape: CheckInShape | null;
   reply_plan_shape: ReplyPlanShape | null;
+  tagging_shape: TaggingShape | null;
 };
 
 /** One Model Call Log trace with every call in it, in order. */
@@ -787,6 +937,69 @@ export type MemoryCategoryInput = {
   name: string;
   description: string;
   always_include: boolean;
+};
+
+/** How sensitive a Thought Experiment is, as its Curiosity's. */
+export type ThoughtExperimentSensitivity = "low" | "medium" | "high";
+
+/**
+ * A made-up situation that tells two look-alike Pattern Types apart, as
+ * Admins manage it, with how many times it was put to a User.
+ */
+export type ThoughtExperiment = {
+  id: string;
+  wording: string;
+  pattern_type_id: string;
+  other_pattern_type_id: string;
+  sensitivity: ThoughtExperimentSensitivity;
+  starter: boolean;
+  on: boolean;
+  archived_at: string | null;
+  asked_count: number;
+};
+
+/** What an Admin sets on a Thought Experiment. */
+export type ThoughtExperimentInput = {
+  wording: string;
+  pattern_type_id: string;
+  other_pattern_type_id: string;
+  sensitivity: ThoughtExperimentSensitivity;
+  starter: boolean;
+  on: boolean;
+};
+
+/** A Pattern Type a Thought Experiment can name. */
+export type PatternTypeChoice = { id: string; name: string };
+
+/** Every Thought Experiment, oldest first, and the Pattern Types to pick from. */
+export type ThoughtExperimentList = {
+  thought_experiments: ThoughtExperiment[];
+  pattern_types: PatternTypeChoice[];
+};
+
+/** What an Admin decided about an unmatched entry. */
+export type UnmatchedMark =
+  "to_review" | "new_pattern_type" | "folded" | "dropped";
+
+/**
+ * Something Zeph keeps noticing that fits no Pattern Type, as Admins see
+ * it: a general description with nothing about a User, and how many Users
+ * it appears for. `dropped_before` is true when it was dropped and came
+ * back by appearing for more Users.
+ */
+export type UnmatchedEntry = {
+  id: string;
+  description: string;
+  user_count: number;
+  mark: UnmatchedMark;
+  folded_into_pattern_type_id: string | null;
+  dropped_before: boolean;
+};
+
+/** The unmatched entries, most Users first, and the Pattern Types to fold into. */
+export type UnmatchedEntryList = {
+  entries: UnmatchedEntry[];
+  pattern_types: PatternTypeChoice[];
 };
 
 /** The kinds of file a Knowledge document can be. */
@@ -842,7 +1055,7 @@ export type Sticker = {
   added_at: string;
 };
 
-/** One of the eight Evals. */
+/** One of the ten Evals. */
 export type EvalName =
   | "safeguard"
   | "persona"
@@ -851,7 +1064,9 @@ export type EvalName =
   | "photo_descriptions"
   | "understanding"
   | "move_outcome"
-  | "day_summary";
+  | "day_summary"
+  | "tagging"
+  | "whole_pipeline";
 
 /** An Eval and the cases a new run of it would run. */
 export type EvalSummary = { eval: EvalName; case_keys: string[] };
@@ -904,7 +1119,7 @@ export type EvalRunPick = { evals: EvalName[]; case_keys: string[] };
 
 /**
  * A Variant's Setting Overrides, by setting key, or `need:<id>` for a Need
- * (its name, when it fits and how to reply).
+ * (its name, when it fits, how to reply and how Curiosities are treated).
  */
 export type SettingOverrides = Record<string, unknown>;
 
@@ -950,11 +1165,16 @@ export type OverridableSetting = {
   value: unknown;
 };
 
-/** A Need as an override's value. */
+/**
+ * A Need as an override's value. `curiosities` is missing on one saved
+ * before Needs said how Curiosities are treated, which keeps the live
+ * Need's choice.
+ */
 export type NeedOverride = {
   name: string;
   when_it_fits: string;
   how_to_reply: string;
+  curiosities?: CuriosityTreatment;
 };
 
 /** A Need a Variant can override, keyed `need:<id>`, with its live details. */
@@ -1046,6 +1266,8 @@ export type CaseResult = {
   duration_ms: number;
   finished_at: string;
   day_summary?: DaySummaryResult | null;
+  tagging?: TaggingResult | null;
+  whole_pipeline?: WholePipelineResult | null;
 };
 
 /** One question of a Day Summary case, answered from the Summary and marked. */
@@ -1061,6 +1283,86 @@ export type DaySummaryAnswer = {
 export type DaySummaryResult = {
   summary: string;
   answers: DaySummaryAnswer[];
+};
+
+/** An Observation a Tagging case's tagging step kept. */
+export type KeptObservation = {
+  pattern_types: string[];
+  sign: string;
+  direction: string;
+  unclear: boolean;
+  situational: boolean;
+  quote: string;
+  context: string;
+  about: string;
+  thread: string | null;
+  conditions?: Record<string, string | null>;
+  expected: boolean;
+};
+
+/** An Observation the tagging model wrote that code dropped, and why. */
+export type DroppedObservation = {
+  pattern_types: string[];
+  sign: string;
+  direction: string;
+  quote: string;
+  reason: string;
+};
+
+/** An Observation a Tagging case expected, and whether one like it was kept. */
+export type ExpectedObservation = {
+  pattern_type: string;
+  direction: string;
+  unclear: boolean;
+  situational: boolean;
+  conditions?: Record<string, string>;
+  matched: boolean;
+};
+
+/** An unclear story a Tagging case's User already had, and how it ended. */
+export type UnclearStory = {
+  quote: string;
+  pattern_types: string[];
+  direction: string;
+  asked: boolean;
+  ended_clear_for: string | null;
+  sign: string | null;
+  expected_clear_for: string | null;
+  matched: boolean;
+};
+
+/** What a Tagging case's tagging step kept and dropped, and what it expected. */
+export type TaggingResult = {
+  answered: boolean;
+  kept: KeptObservation[];
+  dropped: DroppedObservation[];
+  expected: ExpectedObservation[];
+  unclear: UnclearStory[];
+};
+
+/** A Pattern that became ready or was shared in a Whole-pipeline case. */
+export type ReadyPattern = {
+  pattern_type: string;
+  name: string;
+  is_true: boolean;
+  shared: boolean;
+  state: PatternState | null;
+};
+
+/** A true Pattern a Whole-pipeline case never made ready, and where it stopped. */
+export type MissedPattern = {
+  pattern_type: string;
+  name: string;
+  state: PatternState | null;
+  blocked_by: string | null;
+};
+
+/** Which Patterns a Whole-pipeline case made ready, against the true ones. */
+export type WholePipelineResult = {
+  patterns: ReadyPattern[];
+  missed: MissedPattern[];
+  true_count: number;
+  conversations: number;
 };
 
 /** How one Variant's finished cases went, added up. */
@@ -1223,10 +1525,82 @@ export type CopyTab = {
   slots: CopySlot[];
 };
 
+/** The part of life a Pattern Type is about. */
+export type PatternArea =
+  "conflict" | "approval" | "control" | "achievement" | "relationships";
+
+/** How much one sign of a Pattern Type counts. */
+export type SignStrength = "weak" | "moderate" | "strong";
+
+/**
+ * The part of a Pattern a sign shows: the situation, what goes on inside
+ * the person, or the behaviour.
+ */
+export type SignPart = "situation" | "inside" | "behaviour";
+
+/** What happens to evidence gathered while an exclusion applies. */
+export type ExcludedEvidence = "ignored" | "counted_not_shared";
+
+/** Where a Pattern Type stands in review; only approved ones are shared. */
+export type PatternTypeStatus = "draft" | "approved" | "archived";
+
+/** One sign for or against a Pattern Type. */
+export type PatternSign = {
+  id: string;
+  text: string;
+  strength: SignStrength;
+  part: SignPart;
+};
+
+/**
+ * Something a Pattern Type can be mistaken for. `pattern_type_id` is null
+ * when the look-alike is not a Pattern Type.
+ */
+export type LookAlike = {
+  pattern_type_id: string | null;
+  name: string;
+  tells_apart: string;
+};
+
+/** A time in a User's life when a Pattern Type must not be shared. */
+export type PatternExclusion = { text: string; evidence: ExcludedEvidence };
+
+/**
+ * One Pattern Type of the Pattern Catalog, as Admins read it (ADR-0025).
+ * `anyone_would` is what anyone would do in the situation, which is no
+ * evidence of it. `approved_by` and `approved_on` are set once approved.
+ * `other_versions` are its other stored versions, newest first.
+ */
+export type PatternType = {
+  id: string;
+  version: string;
+  area: PatternArea;
+  name: string;
+  definition: string;
+  if_situation: string;
+  then_behaviour: string;
+  function: string;
+  frameworks: string[];
+  signs: PatternSign[];
+  signs_against: PatternSign[];
+  look_alikes: LookAlike[];
+  anyone_would: string;
+  exclusions: PatternExclusion[];
+  approved_wording: string;
+  prediction_wordings: string[];
+  numbers: { situations_needed: number; base_rate: number };
+  status: PatternTypeStatus;
+  approved_by: string | null;
+  approved_on: string | null;
+  loaded_at: string;
+  other_versions: string[];
+};
+
 /** Every call the Dashboard makes to the backend. */
 export type ApiClient = {
   getMe: () => Promise<Me>;
   updatePreferences: (changes: PreferenceChanges) => Promise<Me>;
+  markPatternNoticingTold: () => Promise<Me>;
   completeOnboarding: (answers: OnboardingAnswers) => Promise<Me>;
   deleteMyData: () => Promise<void>;
   deleteAccount: () => Promise<void>;
@@ -1248,6 +1622,8 @@ export type ApiClient = {
   deleteLifeThread: (id: string) => Promise<void>;
   listPatterns: () => Promise<Pattern[]>;
   deletePattern: (id: string) => Promise<void>;
+  listKeptQuotes: () => Promise<KeptQuote[]>;
+  deleteKeptQuote: (id: string) => Promise<void>;
   listMoveOutcomes: () => Promise<MoveOutcome[]>;
   deleteMoveOutcome: (id: string) => Promise<void>;
   getUserPortrait: () => Promise<UserPortrait | null>;
@@ -1274,6 +1650,7 @@ export type ApiClient = {
   getAdminSettings: () => Promise<AdminSettings>;
   getCopyPage: () => Promise<CopyTab[]>;
   saveCopyTab: (tab: string, texts: Copy) => Promise<CopyTab[]>;
+  getPatternCatalog: () => Promise<PatternType[]>;
   updateAdminSettings: (
     values: Record<string, SettingValue>,
   ) => Promise<AdminSettings>;
@@ -1369,6 +1746,25 @@ export type ApiClient = {
   ) => Promise<MemoryCategory>;
   archiveMemoryCategory: (id: string) => Promise<MemoryCategory>;
   restoreMemoryCategory: (id: string) => Promise<MemoryCategory>;
+  listThoughtExperiments: () => Promise<ThoughtExperimentList>;
+  addThoughtExperiment: (
+    input: ThoughtExperimentInput,
+    saveAnyway: boolean,
+  ) => Promise<ThoughtExperiment>;
+  updateThoughtExperiment: (
+    id: string,
+    input: ThoughtExperimentInput,
+    saveAnyway: boolean,
+  ) => Promise<ThoughtExperiment>;
+  archiveThoughtExperiment: (id: string) => Promise<ThoughtExperiment>;
+  listUnmatchedEntries: (
+    mark: UnmatchedMark | null,
+  ) => Promise<UnmatchedEntryList>;
+  markUnmatchedEntry: (
+    id: string,
+    mark: UnmatchedMark,
+    patternTypeId: string | null,
+  ) => Promise<UnmatchedEntry>;
   listKnowledgeDocuments: () => Promise<KnowledgeDocument[]>;
   getKnowledgeDocument: (id: string) => Promise<KnowledgeDocumentWithText>;
   updateKnowledgeDocumentDetails: (
@@ -1511,6 +1907,8 @@ export function createApiClient(
   return {
     getMe: () => request<Me>("/api/me"),
     updatePreferences: (changes) => request<Me>("/api/me", "PATCH", changes),
+    markPatternNoticingTold: () =>
+      request<Me>("/api/me/pattern-noticing-told", "POST"),
     completeOnboarding: (answers) =>
       request<Me>("/api/onboarding", "PUT", answers),
     deleteMyData: () => request<void>("/api/me/data", "DELETE"),
@@ -1545,6 +1943,9 @@ export function createApiClient(
     listPatterns: async () =>
       (await request<{ patterns: Pattern[] }>("/api/patterns")).patterns,
     deletePattern: (id) => request<void>(`/api/patterns/${id}`, "DELETE"),
+    listKeptQuotes: async () =>
+      (await request<{ quotes: KeptQuote[] }>("/api/kept-quotes")).quotes,
+    deleteKeptQuote: (id) => request<void>(`/api/kept-quotes/${id}`, "DELETE"),
     listMoveOutcomes: async () =>
       (await request<{ move_outcomes: MoveOutcome[] }>("/api/move-outcomes"))
         .move_outcomes,
@@ -1604,6 +2005,12 @@ export function createApiClient(
           { texts },
         )
       ).tabs,
+    getPatternCatalog: async () =>
+      (
+        await request<{ pattern_types: PatternType[] }>(
+          "/api/admin/pattern-catalog",
+        )
+      ).pattern_types,
     getCoreServices: () => request<CoreServices>("/api/admin/core-services"),
     listHelplines: () => request<Helplines>("/api/admin/helplines"),
     addHelpline: (helpline) =>
@@ -1866,6 +2273,34 @@ export function createApiClient(
       request<MemoryCategory>(
         `/api/admin/memory-categories/${id}/restore`,
         "POST",
+      ),
+    listThoughtExperiments: () =>
+      request<ThoughtExperimentList>("/api/admin/thought-experiments"),
+    addThoughtExperiment: (input, saveAnyway) =>
+      request<ThoughtExperiment>("/api/admin/thought-experiments", "POST", {
+        ...input,
+        save_anyway: saveAnyway,
+      }),
+    updateThoughtExperiment: (id, input, saveAnyway) =>
+      request<ThoughtExperiment>(
+        `/api/admin/thought-experiments/${id}`,
+        "PUT",
+        { ...input, save_anyway: saveAnyway },
+      ),
+    archiveThoughtExperiment: (id) =>
+      request<ThoughtExperiment>(
+        `/api/admin/thought-experiments/${id}/archive`,
+        "POST",
+      ),
+    listUnmatchedEntries: (mark) =>
+      request<UnmatchedEntryList>(
+        `/api/admin/unmatched-patterns${mark ? `?mark=${mark}` : ""}`,
+      ),
+    markUnmatchedEntry: (id, mark, patternTypeId) =>
+      request<UnmatchedEntry>(
+        `/api/admin/unmatched-patterns/${id}/mark`,
+        "PUT",
+        { mark, pattern_type_id: patternTypeId },
       ),
     listKnowledgeDocuments: async () =>
       (

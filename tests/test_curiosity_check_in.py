@@ -201,7 +201,10 @@ def test_a_reply_starts_a_conversation_the_curiosity_was_raised_in(
         "it went great!",
     ]
     reply_plan_saw = chat_model.reply_plan_calls[-1].history[0].text
-    assert "(raised 1 of at most 1 in this Conversation):\nNone." in reply_plan_saw
+    assert (
+        "(raised 1 of at most 1 in this Conversation; at most 0 in this reply):"
+        "\nNone." in reply_plan_saw
+    )
     assert WEDDING not in reply_plan_saw
     presentation, _ = stored_curiosities(engine)
     assert presentation["raised_conversation_id"] is not None
@@ -500,6 +503,7 @@ def test_admin_sees_the_kind_and_can_edit_its_wording_but_not_what_it_does(
         False,
         False,
         True,
+        False,
     ]
     [wondering] = [
         kind for kind in list_kinds(client, admin) if kind["raises_curiosity"]
@@ -586,6 +590,7 @@ def test_an_existing_install_gets_the_wondering_kind_last(
         ("A hello", False, 0),
         ("A nudge", False, 3),
         (WONDERING, True, 4),
+        ("Something I've noticed", False, 5),
     ]
 
 
@@ -600,8 +605,5 @@ def test_a_fresh_install_gets_the_wondering_kind_from_the_seed_file(
         migrate(database_url)
     seed_check_in_kinds(engine, CHECK_IN_KINDS_SEED_FILE)
 
-    assert [(name, flag) for name, flag, _ in stored_kinds(engine)][-1] == (
-        WONDERING,
-        True,
-    )
+    assert (WONDERING, True) in [(name, flag) for name, flag, _ in stored_kinds(engine)]
     assert sum(flag for _, flag, _ in stored_kinds(engine)) == 1

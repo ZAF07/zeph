@@ -11,6 +11,8 @@ from langchain_core.messages import (
 
 from companion.adapters.deepseek.chat_model import (
     MAX_TOOL_ROUNDS,
+    DeepSeekChatModel,
+    UnsupportedModelError,
     answer_with_tools,
     build_client,
     to_langchain_messages,
@@ -33,6 +35,31 @@ def test_history_becomes_langchain_messages_after_the_instructions() -> None:
         SystemMessage("You are Zeph."),
         HumanMessage("hi"),
         AIMessage("hey!"),
+    ]
+
+
+def test_the_two_instructions_are_sent_joined_with_the_fixed_part_first(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    chat = ScriptedLangChainModel(AIMessage("hey!"))
+    monkeypatch.setattr(
+        "companion.adapters.deepseek.chat_model.build_client",
+        lambda api_key, model, thinking: chat,
+    )
+
+    DeepSeekChatModel("key").generate(
+        model="deepseek/deepseek-v4-pro-0813",
+        thinking=False,
+        instructions="You are Zeph.",
+        history=[ChatLine(role=ChatRole.USER, text="hi")],
+        message_instructions="They just asked about work.",
+    )
+
+    assert chat.received == [
+        [
+            SystemMessage("You are Zeph.\n\nThey just asked about work."),
+            HumanMessage("hi"),
+        ]
     ]
 
 
@@ -256,3 +283,71 @@ def test_the_old_reasoner_name_asked_to_think_logs_no_warning(
 
     assert sent == ("deepseek-flash", {"thinking": {"type": "enabled"}})
     assert not caplog.text
+
+
+@pytest.mark.parametrize(
+    ("openrouter_name", "direct_name"),
+    [
+        ("deepseek/deepseek-v4.1-flash-1017", "deepseek-flash"),
+        ("deepseek/deepseek-v4-pro-0813", "deepseek-v4-pro"),
+    ],
+)
+def test_an_openrouter_deepseek_name_is_sent_as_its_direct_name(
+    openrouter_name: str, direct_name: str
+) -> None:
+    assert thinking_sent(openrouter_name, False) == (
+        direct_name,
+        {"thinking": {"type": "disabled"}},
+    )
+
+
+@pytest.mark.parametrize(
+    "model", ["anthropic/claude-sonnet-5.5", "deepseek/deepseek-unknown"]
+)
+def test_a_model_direct_deepseek_cant_call_fails_clearly(model: str) -> None:
+    with pytest.raises(UnsupportedModelError) as error:
+        build_client("key", model, False)
+
+    assert model in str(error.value)
+    assert "Pick a DeepSeek model" in str(error.value)
+
+
+MARKUP_REPLY = (
+    "<tool call>\n\n<function=web_search>\n"
+    "<parameter=query>seneca</parameter>\n</function>\n</tool_call>"
+)
+
+
+def test_a_tool_call_written_as_text_is_asked_again_once() -> None:
+    chat = ScriptedLangChainModel(
+        AIMessage(MARKUP_REPLY),
+        asks_for_search("seneca", "call_1"),
+        AIMessage("Seneca was a Stoic."),
+    )
+
+    reply = answer_with_tools(
+        chat.invoke,
+        ScriptedLangChainModel().invoke,
+        [SystemMessage("x")],
+        [search_tool()],
+    )
+
+    assert reply.text == "Seneca was a Stoic."
+    assert chat.received[1] == chat.received[0]
+    assert [call.name for call in reply.tool_calls] == ["web_search"]
+
+
+def test_tool_call_markup_still_there_after_asking_again_is_never_returned() -> None:
+    chat = ScriptedLangChainModel(
+        AIMessage(MARKUP_REPLY), AIMessage(f"Straight talk it is.\n\n{MARKUP_REPLY}")
+    )
+
+    reply = answer_with_tools(
+        chat.invoke,
+        ScriptedLangChainModel().invoke,
+        [SystemMessage("x")],
+        [search_tool()],
+    )
+
+    assert reply.text == "Straight talk it is."
+    assert len(chat.received) == 2

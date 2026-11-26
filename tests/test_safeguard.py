@@ -68,10 +68,12 @@ def test_safeguard_checks_every_message_before_the_reply_is_written(
         "understanding",
         "reply_plan",
         "reply",
+        "claim_check",
         "safeguard",
         "understanding",
         "reply_plan",
         "reply",
+        "claim_check",
     ]
     first, second = chat_model.safeguard_calls
     assert first.model == seeded_settings["safeguard_model"]
@@ -319,7 +321,7 @@ def test_safeguard_prompt_and_model_changes_apply_to_the_next_message(
         json={
             "values": {
                 "safeguard_prompt": "Classify the risk. Edited by an Admin.",
-                "safeguard_model": "deepseek-flash",
+                "safeguard_model": "deepseek/deepseek-v4.1-flash-1017",
                 "safeguard_thinking": False,
             }
         },
@@ -331,7 +333,7 @@ def test_safeguard_prompt_and_model_changes_apply_to_the_next_message(
     send_to_webhook(client, telegram_text_update("hi"))
 
     [call] = chat_model.safeguard_calls
-    assert call.model == "deepseek-flash"
+    assert call.model == "deepseek/deepseek-v4.1-flash-1017"
     assert call.thinking is False
 
 

@@ -1,6 +1,7 @@
+import logging
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from uuid import UUID
 
 from companion.core.features import FeatureService
@@ -21,8 +22,9 @@ from companion.core.platform_settings import (
     RESPONSE_MODEL,
     RESPONSE_PROMPT,
     RESPONSE_THINKING,
+    thinking_to_use,
 )
-from companion.core.ports import Repositories
+from companion.core.ports import ChatTool, Repositories
 from companion.core.recent_messages import (
     RecentMessages,
     describe_stand_ins,
@@ -39,6 +41,8 @@ from companion.core.reply_tools import (
 from companion.core.transcripts import readable_content
 from companion.core.usage import UsageRecordingChatModel
 
+logger = logging.getLogger(__name__)
+
 BLANK_LINE = re.compile(r"\n\s*\n")
 REPLY_TO_TEXT_MARKER = re.compile(r"^\[\s*re\s*(\d+)\s*\]\s*", re.IGNORECASE)
 MOST_REPLIES_TO_TEXTS = 2
@@ -48,13 +52,12 @@ PRIORITY_ORDER = (
     "1. Safety, privacy and their own boundaries.\n"
     "2. What they just asked or need right now.\n"
     "3. Today's guidance: what they need from you, the Moves and how to make "
-    "them.\n"
+    "them, and a question you planned to ask them.\n"
     "4. What you remember about them, used accurately. Never state something "
     "you only suspect as fact.\n"
     "5. Your voice, as described at the top.\n"
-    "6. Optional extras: a Check-in, something you've been wondering about "
-    "them, Knowledge passages, a sticker, a photo of theirs. Leave out any "
-    "that doesn't fit what they need right now."
+    "6. Optional extras: a Check-in, Knowledge passages, a sticker, a photo "
+    "of theirs. Leave out any that doesn't fit what they need right now."
 )
 BOUNDARIES_HEADING = "## 1. Safety, privacy and their boundaries"
 ASKED_NOW_HEADING = "## 2. What they just asked or need right now"
@@ -69,8 +72,47 @@ OPTIONAL_EXTRAS_HEADING = (
 )
 
 
+@dataclass(frozen=True)
+class ReplyInstructions:
+    """The reply's instructions, in the two parts the chat model is given.
+
+    They are kept apart so a provider's prompt cache can keep the fixed
+    part and read it back for the next reply.
+
+    Attributes:
+        fixed: The part that is the same for every reply: the Persona, the
+            response prompt and the priority order.
+        for_this_message: The part made for this User and Message: one
+            section per priority level that has something in it.
+    """
+
+    fixed: str
+    for_this_message: str
+
+
 class EmptyReplyError(Exception):
     """Raised when the chat model's reply has no text, sticker or photo."""
+
+
+class UnbackedClaimError(Exception):
+    """Raised when a reply written twice still says it did what it never did."""
+
+
+def corrections_for(offers: Sequence[ReplyOffer], reply: str) -> list[str]:
+    """Ask each offer whether the reply as written needs writing again.
+
+    Args:
+        offers: The offers the reply was given.
+        reply: The reply as written.
+
+    Returns:
+        What to tell the model before it writes the reply again; empty when
+        the reply may go as it is.
+    """
+    corrections = [
+        offer.correction(reply) for offer in offers if offer.correction is not None
+    ]
+    return [correction for correction in corrections if correction]
 
 
 @dataclass(frozen=True)
@@ -181,13 +223,14 @@ def write_instructions(
     guidance: str,
     memory: str,
     optional_extras: Sequence[str],
-) -> str:
+) -> ReplyInstructions:
     """Write the reply's instructions in their priority order.
 
     The voice and response prompt come first, then the priority order with
     its clash rule, then one section per level that has something in it.
     The "what they just asked" section always tells the reply to answer a
-    direct question first.
+    direct question first. Everything before the first section is the fixed
+    part; the sections are the part for this message.
 
     Args:
         voice: The Persona.
@@ -198,10 +241,10 @@ def write_instructions(
         guidance: Today's guidance from the Understanding; "" if none.
         memory: The User Memory that matters; "" if none.
         optional_extras: The extras the reply may leave out, e.g. a
-            Woven-in Check-in, Curiosities or Knowledge passages.
+            Woven-in Check-in or Knowledge passages.
 
     Returns:
-        The instructions.
+        The instructions, in their fixed part and their part for this message.
     """
     levels = (
         (BOUNDARIES_HEADING, list(boundaries)),
@@ -210,12 +253,16 @@ def write_instructions(
         (MEMORY_HEADING, [memory]),
         (OPTIONAL_EXTRAS_HEADING, list(optional_extras)),
     )
-    parts = [voice, response_prompt, PRIORITY_ORDER]
+    fixed_parts = (voice, response_prompt, PRIORITY_ORDER)
+    filled_levels = []
     for heading, sections in levels:
         filled = [section for section in sections if section]
         if filled:
-            parts.append("\n\n".join([heading, *filled]))
-    return "\n\n".join(part for part in parts if part)
+            filled_levels.append("\n\n".join([heading, *filled]))
+    return ReplyInstructions(
+        fixed="\n\n".join(part for part in fixed_parts if part),
+        for_this_message="\n\n".join(filled_levels),
+    )
 
 
 def to_chat_history(
@@ -313,6 +360,11 @@ class ResponseComposer:
         part the model starts with "[re 2]" is sent as a reply to that text
         (see `link_to_texts`).
 
+        A reply an offer finds untrue as written (it says a setting was
+        changed, but no settings tool was called) is written once more,
+        told so, and a sticker, photo or closing text the first one picked
+        is dropped; if the second one is no better, nothing of it is sent.
+
         Args:
             recent: The Recent Messages: the Conversation to reply in and every
                 message from the last hours, across Conversations.
@@ -333,6 +385,8 @@ class ResponseComposer:
 
         Raises:
             EmptyReplyError: If the reply has no text, sticker or photo.
+            UnbackedClaimError: If the reply, written twice, still says it
+                did what it never did.
         """
         settings = snapshot.settings
         context = ReplyContext(
@@ -362,7 +416,6 @@ class ResponseComposer:
             memory=remembered,
             optional_extras=(
                 *(offer.instructions for offer in optional_offers),
-                guidance.curiosities,
                 knowledge,
             ),
         )
@@ -375,15 +428,23 @@ class ResponseComposer:
             history.append(
                 numbered_message_line(message_texts, snapshot.user.time_zone)
             )
-        reply = self._chat_model.generate(
-            snapshot=snapshot,
-            step=ModelStep.REPLY,
-            model=settings.get(RESPONSE_MODEL),
-            thinking=settings.get(RESPONSE_THINKING),
-            instructions=instructions,
-            history=history,
-            tools=[tool for offer in offers for tool in offer.tools],
-        )
+        tools = [tool for offer in offers for tool in offer.tools]
+        reply = self._write(snapshot, instructions, history, tools)
+        corrections = corrections_for(offers, reply)
+        if corrections:
+            logger.warning("A reply said it did what it never did; writing it again")
+            corrected = replace(
+                instructions,
+                for_this_message="\n\n".join(
+                    [instructions.for_this_message, *corrections]
+                ),
+            )
+            for offer in offers:
+                offer.picked = None
+                offer.closing_text = ""
+            reply = self._write(snapshot, corrected, history, tools)
+            if corrections_for(offers, reply):
+                raise UnbackedClaimError
         reply_parts = link_to_texts(split_into_messages(reply), message_texts)
         reply_parts += [
             ReplyPart(offer.closing_text) for offer in offers if offer.closing_text
@@ -399,4 +460,34 @@ class ResponseComposer:
             raise EmptyReplyError
         return ComposedReply(
             parts=reply_parts, sticker=sticker, shared_photo=shared_photo
+        )
+
+    def _write(
+        self,
+        snapshot: UserSnapshot,
+        instructions: ReplyInstructions,
+        history: list[ChatLine],
+        tools: Sequence[ChatTool],
+    ) -> str:
+        """Ask the reply model to write the reply once.
+
+        Args:
+            snapshot: The User being replied to.
+            instructions: The reply's instructions, in their two parts.
+            history: The Recent Messages as chat turns.
+            tools: The tools the reply may call.
+
+        Returns:
+            The reply text.
+        """
+        settings = snapshot.settings
+        return self._chat_model.generate(
+            snapshot=snapshot,
+            step=ModelStep.REPLY,
+            model=settings.get(RESPONSE_MODEL),
+            thinking=thinking_to_use(settings, RESPONSE_MODEL, RESPONSE_THINKING),
+            instructions=instructions.fixed,
+            history=history,
+            tools=tools,
+            message_instructions=instructions.for_this_message,
         )

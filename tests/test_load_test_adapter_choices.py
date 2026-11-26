@@ -3,7 +3,6 @@ from collections.abc import Callable
 import pytest
 
 from companion.adapters.clerk.auth_verifier import ClerkAuthVerifier
-from companion.adapters.deepseek.chat_model import DeepSeekChatModel
 from companion.adapters.load_test.auth import LoadTestAccounts
 from companion.adapters.load_test.chat_channel import LoggingChatChannel
 from companion.adapters.load_test.chat_model import (
@@ -13,6 +12,7 @@ from companion.adapters.load_test.chat_model import (
 from companion.adapters.load_test.scheduler import TimedScheduler
 from companion.adapters.load_test.switch import LoadTestNotAllowedError
 from companion.adapters.load_test.web_search import EmptyWebSearch
+from companion.adapters.openrouter.chat_model import OpenRouterChatModel
 from companion.adapters.scheduler import InProcessScheduler
 from companion.adapters.tavily.web_search import TavilyWebSearch
 from companion.adapters.telegram.chat_channel import TelegramChatChannel
@@ -78,7 +78,7 @@ def test_the_load_test_switch_alone_changes_no_adapter(
     monkeypatch.setenv("LOAD_TEST_RUN", "true")
     settings = load_settings(COMPLETE_ENVIRONMENT)
 
-    assert isinstance(build_chat_model(settings), DeepSeekChatModel)
+    assert isinstance(build_chat_model(settings), OpenRouterChatModel)
     assert isinstance(build_web_search(settings), TavilyWebSearch)
     assert isinstance(build_chat_channel(settings), TelegramChatChannel)
     assert isinstance(build_auth_verifier(settings), ClerkAuthVerifier)

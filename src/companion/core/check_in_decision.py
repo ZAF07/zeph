@@ -29,6 +29,10 @@ class CheckInRules:
         curiosity_check_ins_per_week: The most Check-ins that ask a
             Curiosity one User gets in 7 days.
         kinds: Every Check-in Kind, in order.
+        pattern_share_wait: How long a ready Pattern waits for a moment in
+            chat before a Check-in may share it.
+        patterns_shared_per_week: The most new Patterns one User is told in
+            7 days.
     """
 
     frequency_gaps: Mapping[CheckInFrequency, timedelta]
@@ -36,6 +40,8 @@ class CheckInRules:
     ignore_threshold: int
     curiosity_check_ins_per_week: int
     kinds: tuple[CheckInKind, ...]
+    pattern_share_wait: timedelta
+    patterns_shared_per_week: int
 
 
 @dataclass(frozen=True)
@@ -61,6 +67,9 @@ class CheckInFacts:
             Curiosity were sent to them in the last 7 days.
         last_sent_at: When their newest sent Check-in was decided; None if
             none was sent.
+        pattern_waiting: Whether a ready Pattern of theirs has waited long
+            enough for a moment in chat, with Pattern sharing working and
+            the weekly limit not reached.
     """
 
     snapshot: UserSnapshot
@@ -73,6 +82,7 @@ class CheckInFacts:
     has_due_curiosity: bool
     curiosity_check_ins_this_week: int
     last_sent_at: datetime | None
+    pattern_waiting: bool
 
 
 @dataclass(frozen=True)
@@ -263,7 +273,9 @@ def kinds_that_may_be_sent(
 
     Photo Kinds are offered only with Shared Photos and Photo Viewing
     working. Kinds that ask a Curiosity are offered only with a Curiosity
-    due, Curiosities working and the weekly limit not reached.
+    due, Curiosities working and the weekly limit not reached. Kinds that
+    share a Pattern are offered only with a ready Pattern that has waited
+    long enough.
 
     Args:
         facts: What is known about the User.
@@ -286,7 +298,25 @@ def kinds_that_may_be_sent(
         for kind in rules.kinds
         if (photos_may_be_sent or not kind.sends_shared_photo)
         and (curiosity_may_be_asked or not kind.raises_curiosity)
+        and (facts.pattern_waiting or not kind.shares_pattern)
     )
+
+
+def kinds_with_pattern_settled(
+    kinds: tuple[CheckInKind, ...], has_pattern_to_share: bool
+) -> tuple[CheckInKind, ...]:
+    """Narrow the Kinds once it is known whether a Pattern can be shared now.
+
+    Args:
+        kinds: The Kinds that may be sent.
+        has_pattern_to_share: Whether a ready Pattern still passes its
+            checks and may be shared in this Check-in.
+
+    Returns:
+        Only the Kinds that share a Pattern when there is one, so a Pattern
+        that waited goes out; otherwise the Kinds that share none.
+    """
+    return tuple(kind for kind in kinds if kind.shares_pattern == has_pattern_to_share)
 
 
 def is_in_quiet_hours(settings: CheckInSettings, local_time: time) -> bool:

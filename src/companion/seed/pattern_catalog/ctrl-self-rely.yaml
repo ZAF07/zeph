@@ -1,0 +1,99 @@
+# One Pattern Type of the Pattern Catalog (ADR-0025). Loaded when the backend
+# starts. Any change needs a new `version`: a stored version never changes,
+# so a change that keeps its version is refused and the last catalog stays.
+
+id: CTRL.SELF.RELY
+version: 0.2.0
+area: control
+name: Doing it all themselves rather than leaning on others
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
+
+definition: >-
+  When a job could be shared or help is on offer, the person does it
+  themselves. Relying on others has let them down before, or they expect it
+  to, so carrying it alone feels safer than waiting on someone who might not
+  come through.
+
+if: A task could be shared or someone offers help
+then: Turns help down and does it all themselves
+function: To avoid being let down
+
+frameworks:
+  - Compulsive self-reliance in attachment theory (Bowlby)
+  - Young's mistrust and emotional deprivation schema themes
+  - Interpersonal trust (Rotter)
+  - Schwartz self-direction value
+
+signs:
+  - id: I1
+    text: Turns down an offer of help on something that is clearly too much for one person
+    strength: strong
+    part: behaviour
+  - id: I2
+    text: Says "it's quicker if I just do it myself"
+    strength: moderate
+    part: inside
+  - id: I3
+    text: Expects others to drop the ball, and names past times they did
+    strength: strong
+    part: inside
+  - id: I4
+    text: Redoes work someone else already finished
+    strength: moderate
+    part: behaviour
+  - id: I5
+    text: Feels uneasy owing anyone a favour
+    strength: weak
+    part: inside
+
+signs_against:
+  - id: D1
+    text: Hands over a part of something that matters and lets the other person do it their way
+    strength: strong
+    part: behaviour
+  - id: D2
+    text: Does things alone because they enjoy it, and accepts help when it's needed
+    strength: moderate
+    part: inside
+
+look_alikes:
+  - pattern_type: APPR.GIVE.NEEDED
+    tells_apart: >-
+      Keeps their own tasks so as not to depend on anyone; the other takes on
+      other people's tasks to be needed
+  - pattern_type: APPR.HIDE.BURDEN
+    tells_apart: >-
+      Keeps their tasks to themselves so as not to be let down; the other
+      keeps their troubles to themselves so as not to be a weight
+  - pattern_type: CTRL.UNCERT.PLAN
+    tells_apart: >-
+      Distrusts people to come through, even when the outcome is clear; the
+      other is uneasy about the outcome, whoever is doing it
+
+anyone_would: Doing a task alone when nobody else is free or able to help
+
+exclusions:
+  - text: Living alone through a crisis with nobody nearby to help
+    evidence: counted_not_shared
+
+approved_wording: >-
+  You seem to carry things yourself rather than lean on others, as if relying
+  on someone is the bigger risk.
+# Three Predictions, each testing a different side of the Pattern. Code gives
+# the first when the Pattern is shared, then one the User hasn't had.
+prediction_wordings:
+  - >-
+    Next time someone offers to help with {task}, notice whether you say
+    yes, and what you expect would happen if you did.
+  - >-
+    Next time you hand {task} to someone else, notice whether you check on
+    it or redo part of it.
+  - >-
+    Next time you're stretched thin, notice whether asking {person} for help
+    crosses your mind, and what you tell yourself about it.
+
+numbers:
+  situations_needed: 3
+  base_rate: 0.2

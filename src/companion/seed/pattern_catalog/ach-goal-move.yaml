@@ -1,0 +1,94 @@
+# One Pattern Type of the Pattern Catalog (ADR-0025). Loaded when the backend
+# starts. Any change needs a new `version`: a stored version never changes,
+# so a change that keeps its version is refused and the last catalog stays.
+
+id: ACH.GOAL.MOVE
+version: 0.2.0
+area: achievement
+name: Moving the goal as soon as they reach it
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
+
+definition: >-
+  When the person reaches a goal, they barely pause before setting a bigger
+  one. The win counts for little because the next target is already in
+  view. Keeping a goal ahead means never having to ask whether they've done
+  enough.
+
+if: Reaches a goal or gets a win
+then: Sets a new, bigger goal at once
+function: So "enough" never has to be faced
+
+frameworks:
+  - The hedonic treadmill (Brickman and Campbell)
+  - Self-discrepancy theory (Higgins)
+  - Young's unrelenting-standards schema theme
+  - Schwartz achievement value
+
+signs:
+  - id: I1
+    text: Talks about the next goal in the same breath as a win
+    strength: moderate
+    part: behaviour
+  - id: I2
+    text: Says reaching a goal "felt like nothing" or wore off in a day
+    strength: strong
+    part: inside
+  - id: I3
+    text: Can't name a point at which they would be satisfied
+    strength: strong
+    part: inside
+  - id: I4
+    text: Raises a target partway through because it now looks too easy
+    strength: moderate
+    part: behaviour
+  - id: I5
+    text: Skips or plays down marking a milestone
+    strength: weak
+    part: behaviour
+
+signs_against:
+  - id: D1
+    text: Takes time to enjoy a win before thinking about what's next
+    strength: strong
+    part: inside
+  - id: D2
+    text: Sets a new goal because they want it, not because the old one felt empty
+    strength: moderate
+    part: inside
+
+look_alikes:
+  - name: Ambition with satisfaction
+    tells_apart: >-
+      Aims higher after a win, but the win still felt good and counted
+  - pattern_type: ACH.WORTH.PERF
+    tells_apart: >-
+      Moves the goal after succeeding; the other judges themselves after
+      falling short
+
+anyone_would: Setting the next step in a fixed path, such as the next exam in a course
+
+exclusions:
+  - text: Money trouble that makes the next goal a real need
+    evidence: ignored
+
+approved_wording: >-
+  Each time you reach a goal, you seem to set the next one before the last
+  one has had a chance to count.
+# Three Predictions, each testing a different side of the Pattern. Code gives
+# the first when the Pattern is shared, then one the User hasn't had.
+prediction_wordings:
+  - >-
+    When you next reach {goal}, notice how long you stay with it before your
+    mind moves to what's next.
+  - >-
+    Next time someone congratulates you on {goal}, notice what you say back,
+    and whether you mention what's still left to do.
+  - >-
+    Next time you finish something small, like {task}, notice whether it
+    feels done, or whether a bigger version of it turns up at once.
+
+numbers:
+  situations_needed: 3
+  base_rate: 0.2

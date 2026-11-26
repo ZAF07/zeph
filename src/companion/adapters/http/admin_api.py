@@ -39,6 +39,8 @@ from companion.core.models import (
     CheckInOutcome,
     CheckInScheduleEntry,
     CheckInStatus,
+    CuriosityTreatment,
+    Familiarity,
     Feature,
     FeatureReason,
     FeatureStatus,
@@ -67,6 +69,7 @@ from companion.core.models import (
     MoveDirection,
     Need,
     NeedDetails,
+    PatternState,
     PauseLength,
     ReplyPlanShape,
     RiskType,
@@ -106,7 +109,9 @@ class AdminUserResponse(BaseModel):
     life_thread_count: int
     move_outcome_count: int
     has_portrait: bool
-    confirmed_pattern_count: int
+    pattern_counts: dict[PatternState, int]
+    kept_quote_count: int
+    familiarity: Familiarity
 
 
 class HeldBackResponse(BaseModel):
@@ -313,10 +318,12 @@ class CoreServiceResponse(BaseModel):
 
 
 class CoreServicesResponse(BaseModel):
-    """The core services and the models Admins can pick for them."""
+    """The core services, the models Admins can pick and how each can think."""
 
     services: list[CoreServiceResponse]
     model_choices: list[str]
+    models_that_cannot_think: list[str]
+    models_that_always_think: list[str]
 
 
 class HelplineResponse(BaseModel):
@@ -392,8 +399,9 @@ class SafeguardEventsResponse(BaseModel):
 class CheckInKindResponse(BaseModel):
     """A Check-in Kind as Admins see it, with its fixed behaviour.
 
-    `sends_shared_photo` and `raises_curiosity` say whether it sends a
-    Shared Photo or asks a Curiosity; Admins can't change them.
+    `sends_shared_photo`, `raises_curiosity` and `shares_pattern` say
+    whether it sends a Shared Photo, asks a Curiosity or shares a ready
+    Pattern; Admins can't change them.
     """
 
     id: str
@@ -401,6 +409,7 @@ class CheckInKindResponse(BaseModel):
     description: str
     sends_shared_photo: bool
     raises_curiosity: bool
+    shares_pattern: bool
 
 
 class CheckInKindOverviewResponse(CheckInKindResponse):
@@ -439,6 +448,7 @@ class NeedResponse(BaseModel):
     how_to_reply: str
     is_fallback: bool
     ruled_out_move_ids: list[str]
+    curiosities: CuriosityTreatment
 
 
 class NeedsResponse(BaseModel):
@@ -448,12 +458,13 @@ class NeedsResponse(BaseModel):
 
 
 class NeedRequest(BaseModel):
-    """A Need's name, when it fits, how to reply and the Moves it rules out."""
+    """A Need's texts, the Moves it rules out and how Curiosities are treated."""
 
     name: str
     when_it_fits: str
     how_to_reply: str
     ruled_out_move_ids: list[UUID]
+    curiosities: CuriosityTreatment
 
     def to_details(self) -> NeedDetails:
         """Turn the request into Need details.
@@ -466,6 +477,7 @@ class NeedRequest(BaseModel):
             when_it_fits=self.when_it_fits,
             how_to_reply=self.how_to_reply,
             ruled_out_move_ids=frozenset(self.ruled_out_move_ids),
+            curiosities=self.curiosities,
         )
 
 
@@ -619,6 +631,11 @@ class ReplyPlanShapeResponse(BaseModel):
     check_in_kind: str | None
     pattern_used: bool
     pattern_offered: bool
+    curiosities_offered: int | None
+    curiosity_asked: bool | None
+    pattern_to_share_offered: bool | None
+    pattern_share_planned: bool | None
+    pattern_shared: bool | None
 
 
 class CheckInShapeResponse(BaseModel):
@@ -626,6 +643,13 @@ class CheckInShapeResponse(BaseModel):
 
     kind: str
     brought_up: bool
+
+
+class TaggingShapeResponse(BaseModel):
+    """How many Observations a Pattern tagging call wrote and code dropped."""
+
+    tagged: int
+    dropped: int
 
 
 class ModelCallResponse(BaseModel):
@@ -645,6 +669,7 @@ class ModelCallResponse(BaseModel):
     understanding_shape: UnderstandingShapeResponse | None
     check_in_shape: CheckInShapeResponse | None
     reply_plan_shape: ReplyPlanShapeResponse | None
+    tagging_shape: TaggingShapeResponse | None
 
 
 class ModelCallTraceResponse(BaseModel):
@@ -893,6 +918,7 @@ def to_check_in_kind_response(kind: CheckInKind) -> CheckInKindResponse:
         description=kind.description,
         sends_shared_photo=kind.sends_shared_photo,
         raises_curiosity=kind.raises_curiosity,
+        shares_pattern=kind.shares_pattern,
     )
 
 
@@ -912,6 +938,7 @@ def to_need_response(need: Need) -> NeedResponse:
         how_to_reply=need.how_to_reply,
         is_fallback=need.is_fallback,
         ruled_out_move_ids=sorted(str(move_id) for move_id in need.ruled_out_move_ids),
+        curiosities=need.curiosities,
     )
 
 
@@ -1147,6 +1174,11 @@ def to_reply_plan_shape_response(shape: ReplyPlanShape) -> ReplyPlanShapeRespons
         check_in_kind=shape.check_in_kind,
         pattern_used=shape.pattern_used,
         pattern_offered=shape.pattern_offered,
+        curiosities_offered=shape.curiosities_offered,
+        curiosity_asked=shape.curiosity_asked,
+        pattern_to_share_offered=shape.pattern_to_share_offered,
+        pattern_share_planned=shape.pattern_share_planned,
+        pattern_shared=shape.pattern_shared,
     )
 
 
@@ -1189,6 +1221,13 @@ def to_model_call_response(call: ModelCall) -> ModelCallResponse:
         reply_plan_shape=(
             to_reply_plan_shape_response(call.reply_plan_shape)
             if call.reply_plan_shape
+            else None
+        ),
+        tagging_shape=(
+            TaggingShapeResponse(
+                tagged=call.tagging_shape.tagged, dropped=call.tagging_shape.dropped
+            )
+            if call.tagging_shape
             else None
         ),
     )
@@ -1319,7 +1358,9 @@ def to_admin_user_response(overview: UserOverview) -> AdminUserResponse:
         messages_sent=overview.messages_sent,
         life_thread_count=overview.life_thread_count,
         move_outcome_count=overview.move_outcome_count,
-        confirmed_pattern_count=overview.confirmed_pattern_count,
+        pattern_counts=dict(overview.pattern_counts),
+        kept_quote_count=overview.kept_quote_count,
+        familiarity=overview.user.familiarity,
         has_portrait=overview.has_portrait,
     )
 
@@ -1588,6 +1629,12 @@ def build_admin_api_router(
                 for service in CORE_SERVICES
             ],
             model_choices=platform_settings_service.model_choices(),
+            models_that_cannot_think=(
+                platform_settings_service.models_that_cannot_think()
+            ),
+            models_that_always_think=(
+                platform_settings_service.models_that_always_think()
+            ),
         )
 
     @router.get("/helplines")

@@ -30,7 +30,7 @@ describe("the /memories page", () => {
     loadCopy.mockResolvedValue(seedCopy());
   });
 
-  it("gives the page only its own Copy slots and the Shared Memory-off notes", async () => {
+  it("gives the page only its own Copy slots, the Shared Memory-off notes, the notice of what changed and the disagreed-Patterns switch", async () => {
     render(await MemoriesPage());
 
     expect(
@@ -39,10 +39,22 @@ describe("the /memories page", () => {
     const keys = Object.keys(memoriesCopy.mock.lastCall?.[0] ?? {});
     expect(keys.length).toBeGreaterThan(0);
     expect(keys).toContain("shared.memory_off.paused_title");
+    expect(keys).toContain("shared.pattern_noticing.got_it");
+    const switchSlots = [
+      "account.contested_gathering.title",
+      "account.contested_gathering.explanation",
+      "account.not_available",
+      "account.changed_in_chat",
+      "account.switch_save_failed",
+    ];
+    expect(keys).toEqual(expect.arrayContaining(switchSlots));
     expect(
       keys.every(
         (key) =>
-          key.startsWith("memories.") || key.startsWith("shared.memory_off."),
+          key.startsWith("memories.") ||
+          key.startsWith("shared.memory_off.") ||
+          key.startsWith("shared.pattern_noticing.") ||
+          switchSlots.includes(key),
       ),
     ).toBe(true);
   });

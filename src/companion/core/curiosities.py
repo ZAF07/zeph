@@ -1,11 +1,16 @@
 import json
 import logging
-from collections.abc import Sequence
+import re
+from collections.abc import Mapping, Sequence, Set
 from dataclasses import dataclass, replace
 from datetime import date, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+from companion.core.curiosity_pace import (
+    CuriosityPace,
+    may_offer_curiosity,
+)
 from companion.core.life_threads import (
     MOST_THREADS_AT_CONVERSATION_END,
     REACTION_WORDS,
@@ -16,38 +21,61 @@ from companion.core.life_threads import (
 )
 from companion.core.memory_retrieval import format_day
 from companion.core.models import (
+    AIMS_WRITTEN_BY_CODE,
     BringUpWay,
     ChatLine,
     ChatRole,
     ConversationMessage,
     Curiosity,
+    CuriosityAim,
     CuriosityChanges,
     CuriositySensitivity,
     CuriosityState,
     CuriosityToRaise,
+    CuriosityTreatment,
+    Directness,
     Feature,
     HowSure,
     LifeThread,
     MemoryItem,
     ModelStep,
+    Need,
     ReplyPlan,
+    Setting,
     ThreadReaction,
     UserSnapshot,
 )
 from companion.core.platform_settings import (
+    CHECK_IN_MODEL,
     CURIOSITIES_PER_CONVERSATION,
+    CURIOSITIES_PER_REPLY,
     CURIOSITIES_WAITING_LIMIT,
+    CURIOSITY_BACK_OFF,
+    CURIOSITY_BRUSH_OFFS_TO_BACK_OFF,
     CURIOSITY_KEEPING_MODEL,
     CURIOSITY_KEEPING_PROMPT,
     CURIOSITY_KEEPING_THINKING,
+    CURIOSITY_REPLIES_BETWEEN,
+    CURIOSITY_REPLIES_BETWEEN_DIRECT,
+    CURIOSITY_REPLIES_BETWEEN_GENTLE,
+    STARTER_THOUGHT_EXPERIMENT_DAYS,
+    thinking_for_model,
+    thinking_to_use,
 )
 from companion.core.ports import Clock, Embedder, Repositories
+from companion.core.starter_thought_experiments import starters_offered
 from companion.core.transcripts import to_transcript_lines
 from companion.core.usage import UsageRecordingChatModel
 
 logger = logging.getLogger(__name__)
 
 RECENTLY_RAISED_TO_SHOW = 10
+RAISED_FOR_PACE = 20
+CURIOSITY_REPLIES_BETWEEN_BY_DIRECTNESS: Mapping[Directness, Setting[int]] = {
+    Directness.GENTLE: CURIOSITY_REPLIES_BETWEEN_GENTLE,
+    Directness.BALANCED: CURIOSITY_REPLIES_BETWEEN,
+    Directness.DIRECT: CURIOSITY_REPLIES_BETWEEN_DIRECT,
+}
 HOW_TO_RAISE_WORDS = {
     BringUpWay.LEAD: "Open with it.",
     BringUpWay.WEAVE: (
@@ -55,6 +83,55 @@ HOW_TO_RAISE_WORDS = {
         "where you can."
     ),
 }
+AIM_WORDS = {
+    CuriosityAim.COMMITMENT: "how a commitment went",
+    CuriosityAim.LOOK_BACK: "how something went, or looks to them now",
+    CuriosityAim.GUESS: "whether a guess is right",
+    CuriosityAim.NEXT_MOVE: "where they've got to on help never given",
+    CuriosityAim.EXPLORATION: "something Zeph is exploring about them (the Agenda)",
+    CuriosityAim.STARTER: (
+        "how they would choose in a made-up situation, to start getting to "
+        "know them (a starter Thought Experiment)"
+    ),
+    CuriosityAim.PREDICTION: (
+        "how a Prediction went, or a new one to give, for a Pattern Zeph told them"
+    ),
+}
+TREATMENT_WORDS = {
+    CuriosityTreatment.ASK_BY_DEFAULT: (
+        "ask by default: ask one in this reply, or say why not"
+    ),
+    CuriosityTreatment.TEST_THE_WATER: (
+        "test the water: one light opener in a Conversation at most"
+    ),
+    CuriosityTreatment.ONLY_IF_IT_FITS: "only if it fits the moment",
+    CuriosityTreatment.NEVER: "never: ask none",
+}
+NO_REASON_GIVEN = "No reason given."
+ASK_WHY_FIRST_NOTE = (
+    "This reply also asks why they feel as they do. Ask that first, then this "
+    "after it, so the two read as one easy turn, not a list of questions."
+)
+DROPPED_TOPICS_HEADER = (
+    "They asked you to drop these. Never ask about them or bring them up, not "
+    "in a question of your own or a Move that asks one either, unless they "
+    "bring one up themselves in their latest message:"
+)
+DROPPED_TOPICS_FOR_REPLY = (
+    "They asked you to drop these topics. Don't ask about them or bring them "
+    "up unless they do:"
+)
+ASKED_CHECK_PROMPT = (
+    "You check whether a reply asked what it was meant to ask. You are given "
+    "what the reply was meant to ask and the reply as it was sent. Answer yes "
+    "if the reply asks it, or asks about the same thing in other words, even "
+    "briefly. Answer no if the reply leaves it out, or only mentions the "
+    "topic without asking about it. Answer with only yes or no."
+)
+MORE_THAN_ONE_QUESTION_NOTE = (
+    "This reply asks more than one question, which is fine this time, even if "
+    "you usually ask at most one. Keep each short."
+)
 
 
 @dataclass(frozen=True)
@@ -79,11 +156,19 @@ class DueCuriosities:
             once the Conversation has raised as many as it may.
         raised_here: How many were already raised in this Conversation.
         per_conversation: The most that may be raised in one Conversation.
+        per_reply: The most one reply may ask.
+        awaiting_reaction: The newest Curiosity raised in this Conversation
+            while how the User took it isn't known yet; None if there is none.
+        asked_to_drop: Every Curiosity the User asked Zeph to drop, however
+            long ago, newest raised first.
     """
 
     offered: tuple[NumberedCuriosity, ...]
     raised_here: int
     per_conversation: int
+    per_reply: int
+    awaiting_reaction: Curiosity | None = None
+    asked_to_drop: tuple[Curiosity, ...] = ()
 
     @property
     def left(self) -> int:
@@ -94,8 +179,19 @@ class DueCuriosities:
         """
         return max(self.per_conversation - self.raised_here, 0)
 
+    @property
+    def left_for_this_reply(self) -> int:
+        """How many this reply may ask: no more than one reply may, or than are left.
 
-NO_DUE_CURIOSITIES = DueCuriosities(offered=(), raised_here=0, per_conversation=0)
+        Returns:
+            The number; never below 0.
+        """
+        return min(self.left, self.per_reply)
+
+
+NO_DUE_CURIOSITIES = DueCuriosities(
+    offered=(), raised_here=0, per_conversation=0, per_reply=0
+)
 
 
 def format_date(day: date) -> str:
@@ -110,21 +206,52 @@ def format_date(day: date) -> str:
     return f"{day.day} {day:%b %Y}"
 
 
-def due_curiosities(waiting: Sequence[Curiosity], today: date) -> list[Curiosity]:
-    """Keep the waiting Curiosities whose day has come.
+def due_curiosities(
+    waiting: Sequence[Curiosity],
+    snapshot: UserSnapshot,
+    due_early_ids: Set[UUID] = frozenset(),
+) -> list[Curiosity]:
+    """Keep the waiting Curiosities whose day has come, code-written ones first.
 
     Args:
         waiting: A User's waiting Curiosities.
-        today: The day it is in the User's time zone.
+        snapshot: The User. Without Pattern exploring, no Curiosity an
+            Exploration or a starter Thought Experiment wrote is kept; a
+            starter is kept only while starters are still offered to them;
+            one about a Prediction is kept only while Pattern sharing works.
+        due_early_ids: The Curiosities that may be asked before their
+            "not before" day, since the User is talking about what they
+            ask about.
 
     Returns:
-        Those with no "not before" day or whose day has come, in order.
+        Those with no "not before" day, whose day has come or that are
+        due early, and whose last day, if any, hasn't passed: the ones
+        code wrote first, then the rest, each in order.
     """
-    return [
+    exploring = snapshot.works(Feature.PATTERN_EXPLORING)
+    starters = exploring and starters_offered(
+        snapshot.user.familiarity,
+        snapshot.user.created_at,
+        snapshot.local_now,
+        snapshot.settings.get(STARTER_THOUGHT_EXPERIMENT_DAYS),
+    )
+    may_be_asked = {
+        CuriosityAim.EXPLORATION: exploring,
+        CuriosityAim.STARTER: starters,
+        CuriosityAim.PREDICTION: snapshot.works(Feature.PATTERN_SHARING),
+    }
+    due = [
         curiosity
         for curiosity in waiting
-        if curiosity.not_before is None or curiosity.not_before <= today
+        if (
+            curiosity.not_before is None
+            or curiosity.not_before <= snapshot.today
+            or curiosity.id in due_early_ids
+        )
+        and (curiosity.not_after is None or snapshot.today <= curiosity.not_after)
+        and may_be_asked.get(curiosity.aim, True)
     ]
+    return sorted(due, key=lambda curiosity: curiosity.aim not in AIMS_WRITTEN_BY_CODE)
 
 
 def how_sure_word(how_sure: HowSure | None) -> str:
@@ -166,12 +293,13 @@ def describe_due_curiosities(due: DueCuriosities, time_zone: str | None) -> str:
         time_zone: The User's IANA time zone, for the days.
 
     Returns:
-        How many were raised of the most allowed, then one line per
-        Curiosity, with its guess if it holds one; "None." if none is
-        offered.
+        How many were raised of the most allowed and how many this reply may
+        ask, then one line per Curiosity, with its guess if it holds one;
+        "None." if none is offered.
     """
     lines = [
         f"[{item.number}] {item.curiosity.question} Why: {item.curiosity.why} "
+        f"Aim: {AIM_WORDS[item.curiosity.aim]}. "
         f"Sensitivity: {item.curiosity.sensitivity.value}."
         f"{describe_guess(item.curiosity.guess, item.curiosity.how_sure)} "
         f"Saved {format_day(item.curiosity.created_at, time_zone)}."
@@ -179,19 +307,158 @@ def describe_due_curiosities(due: DueCuriosities, time_zone: str | None) -> str:
     ]
     return (
         f"(raised {due.raised_here} of at most {due.per_conversation} in this "
-        f"Conversation):\n" + ("\n".join(lines) or "None.")
+        f"Conversation; at most {due.left_for_this_reply} in this reply):\n"
+        + ("\n".join(lines) or "None.")
     )
 
 
-def format_curiosities_for_reply(chosen: Sequence[CuriosityToRaise]) -> str:
-    """Write the reply's section on the Curiosities to bring up.
+def list_dropped_topics(asked_to_drop: Sequence[Curiosity]) -> str:
+    """List the topics a User asked Zeph to drop, one per line.
+
+    Args:
+        asked_to_drop: The Curiosities they asked Zeph to drop.
+
+    Returns:
+        E.g. "- How did the big presentation go?"; "" if there are none.
+    """
+    return "\n".join(f"- {curiosity.question}" for curiosity in asked_to_drop)
+
+
+def describe_dropped_topics(due: DueCuriosities) -> str:
+    """Write the topics the User asked to drop as the Reply Plan model reads them.
+
+    Args:
+        due: The Curiosities read for this reply, with those they asked to
+            drop.
+
+    Returns:
+        The rule and the topics, after a blank line; "" if they dropped none.
+    """
+    if not due.asked_to_drop:
+        return ""
+    return f"\n\n{DROPPED_TOPICS_HEADER}\n{list_dropped_topics(due.asked_to_drop)}"
+
+
+def format_dropped_topics_for_reply(due: DueCuriosities) -> str:
+    """Write the reply's section on the topics the User asked to drop.
+
+    Args:
+        due: The Curiosities read for this reply, with those they asked to
+            drop.
+
+    Returns:
+        The section, one of the User's boundaries; "" if they dropped none.
+    """
+    if not due.asked_to_drop:
+        return ""
+    return f"{DROPPED_TOPICS_FOR_REPLY}\n{list_dropped_topics(due.asked_to_drop)}"
+
+
+def describe_reply_for_asked_check(question: str, reply_parts: Sequence[str]) -> str:
+    """Write what the asked check is given: the question and the reply.
+
+    Args:
+        question: What the reply was meant to ask.
+        reply_parts: The reply's texts, in order.
+
+    Returns:
+        The question, then the reply.
+    """
+    reply = "\n".join(reply_parts)
+    return f"What the reply was meant to ask: {question}\n\nThe reply:\n{reply}"
+
+
+def read_asked_answer(answer: str) -> bool:
+    """Read the asked check's yes or no.
+
+    Args:
+        answer: The model's answer.
+
+    Returns:
+        False only for an answer whose first word is "no", in any case; any
+        other answer counts as asked, like a failed check, so a User is
+        never asked the same thing twice because an answer couldn't be read.
+    """
+    words = re.findall(r"[a-z]+", answer.lower())
+    return not words or words[0] != "no"
+
+
+def describe_curiosity_treatments(needs: Sequence[Need]) -> str:
+    """Write how each Need treats Curiosities, as the Reply Plan model reads it.
+
+    Args:
+        needs: Every Need, in order.
+
+    Returns:
+        One line per Need, e.g. "- Be heard: never: ask none".
+    """
+    return "\n".join(
+        f"- {need.name}: {TREATMENT_WORDS[need.curiosities]}" for need in needs
+    )
+
+
+def offered_under(need: Need, due: DueCuriosities) -> DueCuriosities:
+    """Keep the due Curiosities the picked Need lets the reply ask.
+
+    Args:
+        need: The Need the reply follows.
+        due: The Curiosities whose day has come.
+
+    Returns:
+        The same Curiosities; none when the Need never asks one, or tests the
+        water and this Conversation already raised one.
+    """
+    if need.curiosities == CuriosityTreatment.NEVER:
+        return replace(due, offered=())
+    if need.curiosities == CuriosityTreatment.TEST_THE_WATER and due.raised_here:
+        return replace(due, offered=())
+    return due
+
+
+def why_none_asked(
+    need: Need,
+    due: DueCuriosities,
+    chosen: Sequence[CuriosityToRaise],
+    reason: str,
+) -> str:
+    """Work out the reason to save when a reply asks no Curiosity.
+
+    Args:
+        need: The Need the reply follows.
+        due: The Curiosities it could ask under that Need.
+        chosen: The Curiosities it asks.
+        reason: The reason the Reply Plan gave; "" if it gave none.
+
+    Returns:
+        The reason, when the Need asks by default, one was offered and none
+        is asked; "" otherwise.
+    """
+    owes_a_reason = (
+        need.curiosities == CuriosityTreatment.ASK_BY_DEFAULT
+        and bool(due.offered)
+        and not chosen
+    )
+    if not owes_a_reason:
+        return ""
+    return reason or NO_REASON_GIVEN
+
+
+def format_curiosities_for_reply(
+    chosen: Sequence[CuriosityToRaise], need: Need, also_asks_why: bool
+) -> str:
+    """Write the reply's section on the Curiosity it is to ask.
 
     Args:
         chosen: The Curiosities the Reply Plan chose, and how.
+        need: The Need the reply follows; one that tests the water asks it
+            lightly, as something they can let pass.
+        also_asks_why: Whether the reply also asks why they feel as they do;
+            then it is told to ask that first and this after it.
 
     Returns:
-        The section, with each one's guess to check if it holds one; "" if
-        none was chosen.
+        The section, with each one's guess to check if it holds one, and a
+        note that more than one question is fine when the reply asks more
+        than one; "" if none was chosen.
     """
     if not chosen:
         return ""
@@ -200,71 +467,236 @@ def format_curiosities_for_reply(chosen: Sequence[CuriosityToRaise]) -> str:
         f"{item.why}{describe_guess(item.guess, item.how_sure)}"
         for item in chosen
     ]
-    return (
-        "Something you've been wondering about them, to ask the way a friend "
-        "would:\n" + "\n".join(lines)
+    how_to_ask = (
+        "Ask them this lightly, in passing, as something they can let go"
+        if need.curiosities == CuriosityTreatment.TEST_THE_WATER
+        else "Ask them this in this reply, the way a friend would"
     )
+    section = (
+        f"{how_to_ask}. It is part of the plan, not an extra to leave out:\n"
+        + "\n".join(lines)
+    )
+    notes = [
+        *([ASK_WHY_FIRST_NOTE] if also_asks_why else []),
+        *([MORE_THAN_ONE_QUESTION_NOTE] if len(chosen) + also_asks_why > 1 else []),
+    ]
+    return "\n".join([section, *notes])
 
 
 class CuriosityRaiser:
     """Offers the Reply Plan the Curiosities whose day has come.
 
-    No model call: it lists the User's waiting Curiosities whose "not
-    before" day has come in their time zone, until the Conversation has
-    raised as many as Admins allow, and marks raised the ones a reply
-    brought up.
+    It lists the User's waiting Curiosities whose "not before" day has come
+    in their time zone, until the Conversation has raised as many as Admins
+    allow, never while they are struggling or before the pace allows one,
+    with every topic they asked Zeph to drop. Once a reply is sent, a small
+    model call checks whether it really asked each Curiosity the Reply Plan
+    picked, and only those are marked raised. It also saves how the User
+    took the last one, as the Reply Plan read it.
     """
 
-    def __init__(self, repositories: Repositories, clock: Clock) -> None:
+    def __init__(
+        self,
+        repositories: Repositories,
+        chat_model: UsageRecordingChatModel,
+        clock: Clock,
+    ) -> None:
         """Set up the raiser.
 
         Args:
             repositories: Where Curiosities are stored.
+            chat_model: Makes the asked check and records the tokens used.
             clock: Tells the current time.
         """
         self._repositories = repositories
+        self._chat_model = chat_model
         self._clock = clock
 
-    def due(self, snapshot: UserSnapshot, conversation_id: UUID) -> DueCuriosities:
+    def due(
+        self,
+        snapshot: UserSnapshot,
+        conversation_id: UUID,
+        struggling: bool,
+        due_early_ids: Set[UUID] = frozenset(),
+    ) -> DueCuriosities:
         """List the Curiosities the Reply Plan may bring up now.
+
+        Args:
+            snapshot: The User being answered.
+            conversation_id: The Conversation the Message is in.
+            struggling: Whether the Understanding found them struggling.
+            due_early_ids: The Curiosities that may be asked before their
+                "not before" day, since the User is talking about what
+                they ask about.
+
+        Returns:
+            The due Curiosities, oldest first; none when Curiosities doesn't
+            work for the User, they are struggling, the Conversation raised
+            as many as it may, or the pace doesn't allow one yet. The
+            topics they asked to drop are always there.
+        """
+        store = self._repositories.curiosities
+        asked_to_drop = tuple(store.list_asked_to_drop(snapshot.user.id))
+        if not snapshot.works(Feature.CURIOSITIES):
+            return replace(NO_DUE_CURIOSITIES, asked_to_drop=asked_to_drop)
+        per_conversation = snapshot.settings.get(CURIOSITIES_PER_CONVERSATION)
+        raised_here = store.list_raised_in(conversation_id)
+        newest_here = raised_here[-1] if raised_here else None
+        due_here = DueCuriosities(
+            offered=(),
+            raised_here=len(raised_here),
+            per_conversation=per_conversation,
+            per_reply=snapshot.settings.get(CURIOSITIES_PER_REPLY),
+            awaiting_reaction=(
+                newest_here
+                if newest_here is not None and newest_here.reaction is None
+                else None
+            ),
+            asked_to_drop=asked_to_drop,
+        )
+        if (
+            struggling
+            or len(raised_here) >= per_conversation
+            or not self._pace_allows(snapshot, conversation_id)
+        ):
+            return due_here
+        waiting = due_curiosities(
+            store.list_waiting(snapshot.user.id), snapshot, due_early_ids
+        )
+        return replace(
+            due_here,
+            offered=tuple(
+                NumberedCuriosity(number, curiosity)
+                for number, curiosity in enumerate(waiting, start=1)
+            ),
+        )
+
+    def _pace_allows(self, snapshot: UserSnapshot, conversation_id: UUID) -> bool:
+        """Check the pace and backing off allow a Curiosity in this reply.
 
         Args:
             snapshot: The User being answered.
             conversation_id: The Conversation the Message is in.
 
         Returns:
-            The due Curiosities, oldest first; none when Curiosities doesn't
-            work for the User.
+            Whether one may be offered.
         """
-        if not snapshot.works(Feature.CURIOSITIES):
-            return NO_DUE_CURIOSITIES
-        store = self._repositories.curiosities
-        per_conversation = snapshot.settings.get(CURIOSITIES_PER_CONVERSATION)
-        raised_here = len(store.list_raised_in(conversation_id))
-        if raised_here >= per_conversation:
-            return DueCuriosities((), raised_here, per_conversation)
-        waiting = due_curiosities(store.list_waiting(snapshot.user.id), snapshot.today)
-        return DueCuriosities(
-            offered=tuple(
-                NumberedCuriosity(number, curiosity)
-                for number, curiosity in enumerate(waiting, start=1)
+        settings = snapshot.settings
+        recently_raised = self._repositories.curiosities.list_recently_raised(
+            snapshot.user.id, RAISED_FOR_PACE
+        )
+        newest = recently_raised[0] if recently_raised else None
+        replies_since_last = (
+            self._repositories.reply_plans.count_since(
+                snapshot.user.id, newest.raised_at
+            )
+            if newest is not None and newest.raised_at is not None
+            else None
+        )
+        return may_offer_curiosity(
+            recently_raised,
+            conversation_id,
+            replies_since_last,
+            self._clock.now(),
+            CuriosityPace(
+                replies_between=settings.get(
+                    CURIOSITY_REPLIES_BETWEEN_BY_DIRECTNESS[snapshot.user.directness]
+                ),
+                brush_offs_to_back_off=settings.get(CURIOSITY_BRUSH_OFFS_TO_BACK_OFF),
+                back_off_for=settings.get(CURIOSITY_BACK_OFF),
             ),
-            raised_here=raised_here,
-            per_conversation=per_conversation,
         )
 
-    def mark_raised(
-        self, conversation_id: UUID, raised: Sequence[CuriosityToRaise]
+    def record_reaction(
+        self, due: DueCuriosities, reaction: ThreadReaction | None
     ) -> None:
-        """Note that the reply just sent brought up some Curiosities.
+        """Save how the User took the Curiosity Zeph asked in its last reply.
+
+        The Conversation-end step judges it again from the whole
+        Conversation.
 
         Args:
-            conversation_id: The Conversation the reply was sent in.
-            raised: The Curiosities the Reply Plan chose to bring up.
+            due: The Curiosities offered to this reply, with the one awaiting
+                a reaction.
+            reaction: How the Reply Plan read they took it; None if it
+                couldn't tell.
         """
-        self._repositories.curiosities.mark_raised(
-            [item.curiosity_id for item in raised], conversation_id, self._clock.now()
+        if due.awaiting_reaction is None or reaction is None:
+            return
+        self._repositories.curiosities.save_changes(
+            CuriosityChanges(
+                added=[], updated=[], reactions={due.awaiting_reaction.id: reaction}
+            )
         )
+
+    def mark_asked(
+        self,
+        snapshot: UserSnapshot,
+        conversation_id: UUID,
+        picked: Sequence[CuriosityToRaise],
+        reply_parts: Sequence[str],
+    ) -> list[CuriosityToRaise]:
+        """Mark raised the picked Curiosities the reply just sent really asked.
+
+        One the reply left out stays waiting, so it can be offered again
+        and is never read as brushed off.
+
+        Args:
+            snapshot: The User the reply went to.
+            conversation_id: The Conversation the reply was sent in.
+            picked: The Curiosities the Reply Plan chose to bring up.
+            reply_parts: The reply's texts, in order.
+
+        Returns:
+            The Curiosities the reply asked.
+        """
+        asked = [
+            item
+            for item in picked
+            if self._was_asked(snapshot, item.question, reply_parts)
+        ]
+        self._repositories.curiosities.mark_raised(
+            [item.curiosity_id for item in asked], conversation_id, self._clock.now()
+        )
+        return asked
+
+    def _was_asked(
+        self, snapshot: UserSnapshot, question: str, reply_parts: Sequence[str]
+    ) -> bool:
+        """Ask a small model call whether the reply asked a picked Curiosity.
+
+        It uses the Check-in model, without thinking unless that model
+        always thinks. It never raises: a failed call, or an answer that
+        can't be read, counts as asked, so a User is never asked the same
+        thing twice because a check failed.
+
+        Args:
+            snapshot: The User the reply went to.
+            question: What the reply was meant to ask.
+            reply_parts: The reply's texts, in order.
+
+        Returns:
+            True if the reply asked it.
+        """
+        model = snapshot.settings.get(CHECK_IN_MODEL)
+        try:
+            answer = self._chat_model.generate(
+                snapshot=snapshot,
+                step=ModelStep.CURIOSITY_ASKED_CHECK,
+                model=model,
+                thinking=thinking_for_model(snapshot.settings, model, wanted=False),
+                instructions=ASKED_CHECK_PROMPT,
+                history=[
+                    ChatLine(
+                        role=ChatRole.USER,
+                        text=describe_reply_for_asked_check(question, reply_parts),
+                    )
+                ],
+            )
+        except Exception:
+            logger.exception("The asked check failed; counting the Curiosity as asked")
+            return True
+        return read_asked_answer(answer)
 
 
 @dataclass(frozen=True)
@@ -359,6 +791,30 @@ def read_how_sure(value: Any) -> HowSure:
     return HowSure.LOW
 
 
+def read_aim(entry: dict[str, Any]) -> CuriosityAim | None:
+    """Read the aim the model gave a new Curiosity.
+
+    One that holds a guess aims at checking it, whatever the model wrote.
+    The aims only code writes are never the model's to give.
+
+    Args:
+        entry: The Curiosity, as the model wrote it.
+
+    Returns:
+        The aim; None if it names none of the model's aims, or says "guess"
+        with no guess.
+    """
+    if read_text(entry, "guess"):
+        return CuriosityAim.GUESS
+    value = entry.get("aim")
+    aims_without_a_guess = [
+        aim.value
+        for aim in CuriosityAim
+        if aim != CuriosityAim.GUESS and aim not in AIMS_WRITTEN_BY_CODE
+    ]
+    return CuriosityAim(value) if value in aims_without_a_guess else None
+
+
 def read_number(entry: dict[str, Any], key: str) -> int | None:
     """Read a number the model wrote for something it was shown.
 
@@ -386,13 +842,18 @@ def plan_new_curiosity(
 
     Returns:
         The Curiosity, with its guess and how sure the model is if it wrote
-        one; None if it has no question or a "not before" day that can't be
-        read. An unknown Memory Item or Thread number is left out.
+        one; None if it has no question, no aim or a "not before" day that
+        can't be read. An unknown Memory Item or Thread number is left out.
     """
     question = read_text(entry, "ask")
+    aim = read_aim(entry)
     not_before_given = entry.get("not_before")
     not_before = read_day(not_before_given)
-    if question is None or (not_before_given is not None and not_before is None):
+    if (
+        question is None
+        or aim is None
+        or (not_before_given is not None and not_before is None)
+    ):
         return None
     item = context.items.get(read_number(entry, "memory_item") or 0)
     thread = context.threads.get(read_number(entry, "thread") or 0)
@@ -408,6 +869,7 @@ def plan_new_curiosity(
         ),
         state=CuriosityState.WAITING,
         created_at=context.now,
+        aim=aim,
         source_memory_item_id=item.id if item else None,
         source_life_thread_id=thread.id if thread else None,
         guess=guess,
@@ -577,6 +1039,7 @@ def describe_curiosities_to_keep(
     unmade_next_move: str,
     messages: list[ConversationMessage],
     snapshot: UserSnapshot,
+    asked_to_drop: Sequence[Curiosity] = (),
 ) -> str:
     """Write what the Curiosity keeping model is given.
 
@@ -589,10 +1052,13 @@ def describe_curiosities_to_keep(
             made, with why, or "None.".
         messages: The Conversation's messages, oldest first.
         snapshot: The User whose Conversation it was.
+        asked_to_drop: Every Curiosity they asked Zeph to drop, however long
+            ago.
 
     Returns:
         Today's date, the Memory Items, Threads and Curiosities, those asked
-        recently, the unmade next Move, and the Conversation.
+        recently, those they asked to drop, the unmade next Move, and the
+        Conversation.
     """
     time_zone = snapshot.user.time_zone
     item_lines = "\n".join(
@@ -617,6 +1083,7 @@ def describe_curiosities_to_keep(
         + ")"
         for curiosity in recently_raised
     )
+    dropped_lines = "\n".join(f"- {curiosity.question}" for curiosity in asked_to_drop)
     return (
         f"Today: {snapshot.today:%A} {format_date(snapshot.today)}\n\n"
         f"What Zeph remembers about them:\n{item_lines or 'Nothing yet.'}\n\n"
@@ -624,6 +1091,8 @@ def describe_curiosities_to_keep(
         f"Curiosities waiting or brought up in this Conversation:\n"
         f"{curiosity_lines or 'None yet.'}\n\n"
         f"Asked recently, don't ask again:\n{recent_lines or 'Nothing yet.'}\n\n"
+        f"They asked Zeph to drop these; never ask about them again unless they "
+        f"bring it up:\n{dropped_lines or 'None.'}\n\n"
         f"A next Move Zeph had in mind but never made:\n{unmade_next_move}\n\n"
         f"The Conversation:\n{to_transcript_lines(messages, time_zone)}"
     )
@@ -683,7 +1152,11 @@ class CuriosityKeeper:
             return
         store = self._repositories.curiosities
         user_id = snapshot.user.id
-        waiting = store.list_waiting(user_id)
+        waiting = [
+            curiosity
+            for curiosity in store.list_waiting(user_id)
+            if curiosity.aim not in AIMS_WRITTEN_BY_CODE
+        ]
         raised_here = store.list_raised_in(conversation_id)
         threads = {
             thread.id: thread
@@ -731,6 +1204,7 @@ class CuriosityKeeper:
                 unmade_next_move,
                 messages,
                 snapshot,
+                store.list_asked_to_drop(user_id),
             ),
         )
         if entries is None:
@@ -760,7 +1234,9 @@ class CuriosityKeeper:
                 snapshot=snapshot,
                 step=ModelStep.CURIOSITIES,
                 model=settings.get(CURIOSITY_KEEPING_MODEL),
-                thinking=settings.get(CURIOSITY_KEEPING_THINKING),
+                thinking=thinking_to_use(
+                    settings, CURIOSITY_KEEPING_MODEL, CURIOSITY_KEEPING_THINKING
+                ),
                 instructions=settings.get(CURIOSITY_KEEPING_PROMPT),
                 history=[ChatLine(role=ChatRole.USER, text=description)],
             )

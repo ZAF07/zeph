@@ -1,0 +1,107 @@
+# One Pattern Type of the Pattern Catalog (ADR-0025). Loaded when the backend
+# starts. Any change needs a new `version`: a stored version never changes,
+# so a change that keeps its version is refused and the last catalog stays.
+
+id: REL.CHECK.SECURE
+version: 0.2.0
+area: relationships
+name: Reading silence as something wrong and reaching out to check
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
+
+definition: >-
+  When someone close goes quiet, replies late or seems distant, the person
+  reads it as a sign that something is wrong between them and reaches out
+  to check. The checking is about the bond, and it settles them only once
+  they hear things are okay.
+
+if: Someone close goes quiet or seems distant
+then: Reads it as trouble and reaches out to check
+function: To feel secure in the bond
+
+frameworks:
+  - Attachment theory, the closeness-seeking end (Bowlby; Fraley and Shaver)
+  - Rejection sensitivity (Downey and Feldman)
+  - Excessive reassurance seeking (Coyne; Joiner)
+  - Mind-reading and jumping to conclusions (Beck)
+
+signs:
+  - id: I1
+    text: Sends a "are we okay?" or "did I do something?" message after a slow reply
+    strength: strong
+    part: behaviour
+  - id: I2
+    text: Reads a short or late reply as a sign the other person is upset with them
+    strength: strong
+    part: inside
+  - id: I3
+    text: Checks when someone was last online or re-reads past messages for clues
+    strength: moderate
+    part: behaviour
+  - id: I4
+    text: Can't settle until they've heard back
+    strength: moderate
+    part: inside
+  - id: I5
+    text: Sends a second message before the first has been answered
+    strength: weak
+    part: behaviour
+
+signs_against:
+  - id: D1
+    text: Assumes a quiet partner or friend is just busy and carries on with their day
+    strength: strong
+    part: inside
+  - id: D2
+    text: Checks in only after a real change, such as a missed plan or a row
+    strength: moderate
+    part: situation
+
+look_alikes:
+  - pattern_type: APPR.CONFIRM.CHOICE
+    tells_apart: >-
+      Checks whether the bond is still okay; the other checks whether they
+      chose right
+  - pattern_type: CTRL.UNCERT.PLAN
+    tells_apart: >-
+      The not knowing is only about people and how they feel about them; the
+      other is uneasy about any unknown outcome
+  - pattern_type: REL.MOOD.FIX
+    tells_apart: >-
+      Reads distance as trouble for the bond and asks about it; the other
+      reads a mood as theirs to fix and sets about fixing it
+
+anyone_would: Checking on someone who has gone silent after saying they were travelling or unwell
+
+exclusions:
+  - text: Any sign of abuse, threats or controlling behaviour in the relationship; that stays with the Safeguard
+    evidence: ignored
+  - text: The other person really is in danger or missing
+    evidence: ignored
+  - text: A breakup, separation or affair in the last month
+    evidence: counted_not_shared
+  - text: Grief, including the loss of a pet
+    evidence: ignored
+  - text: A long-distance relationship across time zones in its first weeks
+    evidence: counted_not_shared
+
+approved_wording: >-
+  When someone close goes quiet, you seem to read it as something wrong
+  between you, and you need to check before you can settle.
+# Three Predictions, each testing a different side of the Pattern. Code gives
+# the first when the Pattern is shared, then one the User hasn't had.
+prediction_wordings:
+  - >-
+    Next time {person} takes a while to reply, notice what story you tell
+    yourself about why, and what you do with it.
+  - >-
+    Next time you reach out to check on things with {person}, notice how
+    long the relief lasts after they answer.
+  - >-
+    Next time someone you're less close to goes quiet, like {person}, notice
+    whether you read anything into it.
+
+numbers:
+  situations_needed: 3
+  base_rate: 0.2

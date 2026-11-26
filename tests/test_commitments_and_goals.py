@@ -19,7 +19,7 @@ from tests.fakes import (
 )
 from tests.telegram_helpers import connect_telegram
 from tests.test_curiosities import end_conversation, new_curiosity, stored_curiosities
-from tests.test_moves_migration import downgrade_to
+from tests.test_moves_migration import downgrade_to, upgrade_to
 
 CALL_MUM_FOLLOW_UP = "Did you get to call your mum?"
 CALL_MUM_WHY = "They agreed to call their mum tonight after the argument."
@@ -103,7 +103,7 @@ def test_the_curiosity_keeping_prompt_follows_up_a_commitment_after_its_day(
 ) -> None:
     prompt = one_line(seeded_settings["curiosity_keeping_prompt"])
 
-    assert "A commitment they agreed to" in prompt
+    assert "a commitment they agreed to" in prompt
     assert "not_before at least the day after it was due" in prompt
 
 
@@ -132,16 +132,18 @@ def test_a_commitment_follow_up_from_the_keeping_step_is_saved_with_its_day(
                 why=CALL_MUM_WHY,
                 not_before="2026-11-12",
                 sensitivity="medium",
+                aim="commitment",
             )
         ],
     )
     keeper_instructions = one_line(chat_model.curiosity_keeping_calls[-1].instructions)
     [row] = stored_curiosities(engine)
 
-    assert "A commitment they agreed to" in keeper_instructions
-    assert (row["question"], row["not_before"]) == (
+    assert "a commitment they agreed to" in keeper_instructions
+    assert (row["question"], row["not_before"], row["aim"]) == (
         CALL_MUM_FOLLOW_UP,
         date(2026, 11, 12),
+        "commitment",
     )
 
 
@@ -203,8 +205,8 @@ def test_the_migration_keeps_prompts_and_wording_an_admin_edited(
         store_prompts_and_challenges_description(
             engine, edited_prompts, "Admin's own Challenges wording."
         )
+        upgrade_to(database_url, "0065")
+        assert stored_prompts(engine) == edited_prompts
     finally:
         migrate(database_url)
-
-    assert stored_prompts(engine) == edited_prompts
     assert challenges_description(engine) == "Admin's own Challenges wording."

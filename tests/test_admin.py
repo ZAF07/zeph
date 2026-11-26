@@ -87,7 +87,18 @@ def test_admin_sees_every_user_with_counts_but_no_message_text(
         "life_thread_count": 0,
         "move_outcome_count": 0,
         "has_portrait": False,
-        "confirmed_pattern_count": 0,
+        "pattern_counts": {
+            "noticed": 0,
+            "suspected": 0,
+            "ready": 0,
+            "shared": 0,
+            "confirmed": 0,
+            "contested": 0,
+            "closed": 0,
+            "unmatched": 0,
+        },
+        "kept_quote_count": 0,
+        "familiarity": "new",
     }
     assert rows["user_ren@example.com"]["telegram_connected"] is False
     assert rows["user_ren@example.com"]["messages_sent"] == 0

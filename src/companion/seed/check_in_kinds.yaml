@@ -7,8 +7,12 @@
 # working and at least one Shared Photo. A Kind with `raises_curiosity: true`
 # asks one of the User's Curiosities; it is offered only to Users with
 # Curiosities working, a Curiosity whose day has come, and fewer than
-# `curiosity_check_ins_per_week` such Check-ins in the last 7 days. Admins
-# can't change either flag.
+# `curiosity_check_ins_per_week` such Check-ins in the last 7 days. A Kind
+# with `shares_pattern: true` tells the User a ready Pattern; it is offered
+# only while Pattern sharing works for them, a ready Pattern has waited
+# `pattern_share_wait_days` for a moment in chat and fewer than
+# `patterns_shared_per_week` were shared in the last 7 days. Admins can't
+# change these flags.
 
 - name: A casual hello
   description: Just checking how you are.
@@ -29,3 +33,7 @@
 - name: Something I've been wondering
   description: A question about something you mentioned, asked when the time is right.
   raises_curiosity: true
+
+- name: Something I've noticed
+  description: Something Zeph has noticed about you across different parts of your life, with your own words and one thing to watch for.
+  shares_pattern: true

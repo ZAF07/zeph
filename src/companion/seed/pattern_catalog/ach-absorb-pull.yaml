@@ -1,0 +1,94 @@
+# One Pattern Type of the Pattern Catalog (ADR-0025). Loaded when the backend
+# starts. Any change needs a new `version`: a stored version never changes,
+# so a change that keeps its version is refused and the last catalog stays.
+
+id: ACH.ABSORB.PULL
+version: 0.2.0
+area: achievement
+name: Everything else goes quiet when something grabs them
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
+
+definition: >-
+  When a task, project or interest grabs them, the person goes all in and
+  the rest of life drops away: meals, sleep, messages, plans. Being in the
+  pull of it feels so good that stepping out feels like a loss.
+
+if: Something grabs their interest
+then: Goes all in and lets everything else drop
+function: To stay in the pull of it
+
+frameworks:
+  - Flow (Csikszentmihalyi)
+  - Obsessive versus harmonious passion (Vallerand)
+  - Big Five openness and low orderliness
+  - Schwartz stimulation value
+
+signs:
+  - id: I1
+    text: Loses whole evenings or nights to one thing without noticing the time
+    strength: moderate
+    part: behaviour
+  - id: I2
+    text: Misses meals, sleep or plans because they were caught up in something
+    strength: strong
+    part: behaviour
+  - id: I3
+    text: Leaves messages unanswered for days while on a project
+    strength: moderate
+    part: behaviour
+  - id: I4
+    text: Feels flat or irritable when made to stop
+    strength: strong
+    part: inside
+  - id: I5
+    text: Moves from one all-consuming interest to the next
+    strength: weak
+    part: situation
+
+signs_against:
+  - id: D1
+    text: Gets deeply into something and still stops for meals, sleep and people
+    strength: strong
+    part: behaviour
+  - id: D2
+    text: Only goes all in near a real deadline, then goes back to normal
+    strength: moderate
+    part: situation
+
+look_alikes:
+  - name: Healthy focus
+    tells_apart: >-
+      Deep focus that they can step out of when life needs them, with nothing
+      important dropped
+  - pattern_type: REL.DISTANCE.INDEP
+    tells_apart: >-
+      People drop away because something else has their attention; the other
+      pulls away because the person is getting closer
+
+anyone_would: Working long hours in the last days before a real deadline
+
+exclusions:
+  - text: Using absorption to get through a loss or crisis
+    evidence: counted_not_shared
+
+approved_wording: >-
+  When something grabs you, everything else seems to go quiet, and coming
+  back to the rest of life can feel like a loss.
+# Three Predictions, each testing a different side of the Pattern. Code gives
+# the first when the Pattern is shared, then one the User hasn't had.
+prediction_wordings:
+  - >-
+    Next time {interest} pulls you in, notice what you let drop, and how you
+    feel when something makes you stop.
+  - >-
+    Next time you're deep in {interest}, notice the first thing that pulls
+    you away, and how long it takes before you want to go back.
+  - >-
+    On a day when nothing has grabbed you, notice how the ordinary things
+    feel, and whether you go looking for the next thing to fall into.
+
+numbers:
+  situations_needed: 3
+  base_rate: 0.2

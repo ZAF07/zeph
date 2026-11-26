@@ -1,0 +1,109 @@
+# One Pattern Type of the Pattern Catalog (ADR-0025). Loaded when the backend
+# starts. Any change needs a new `version`: a stored version never changes,
+# so a change that keeps its version is refused and the last catalog stays.
+
+id: REL.DISTANCE.INDEP
+version: 0.2.0
+area: relationships
+name: Pulling back when someone gets closer or needs more
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
+
+definition: >-
+  When someone wants to get closer, asks for more time or leans on them,
+  the person pulls back: slower replies, fewer plans, a sudden need for
+  space. Closeness that grows feels like a claim on them, and stepping back
+  keeps them their own.
+
+if: Someone gets closer or needs more of them
+then: Pulls back and makes more room
+function: To protect their independence
+
+frameworks:
+  - Attachment theory, the self-reliant end (Bowlby; Fraley and Shaver)
+  - Closeness and autonomy needs in couples (Baxter's dialectics)
+  - Reactance theory (Brehm)
+  - Self-determination theory, autonomy need (Deci and Ryan)
+
+signs:
+  - id: I1
+    text: Wants more space soon after a relationship gets more serious
+    strength: strong
+    part: behaviour
+  - id: I2
+    text: Feels crowded or smothered when someone asks to see them more
+    strength: strong
+    part: inside
+  - id: I3
+    text: Goes cold on someone after a warm, close evening
+    strength: moderate
+    part: behaviour
+  - id: I4
+    text: Keeps parts of their life apart from a partner or close friend on purpose
+    strength: moderate
+    part: behaviour
+  - id: I5
+    text: Finds a fault in someone just as they start to like them
+    strength: weak
+    part: inside
+
+signs_against:
+  - id: D1
+    text: Welcomes a partner or friend wanting more time together and makes room for it
+    strength: strong
+    part: behaviour
+  - id: D2
+    text: Asks for space for a clear reason, such as a busy week, and comes back
+    strength: moderate
+    part: situation
+
+look_alikes:
+  - pattern_type: CONF.WITHDRAW.HURT
+    tells_apart: >-
+      Pulls away when things get close, with no hurt before it; the other
+      pulls away after being hurt
+  - pattern_type: CTRL.OPEN.FREEDOM
+    tells_apart: >-
+      Protects room from a person getting closer; the other protects
+      freedom around choices and plans
+  - pattern_type: ACH.ABSORB.PULL
+    tells_apart: >-
+      Pulls away because the person is getting closer; the other lets people
+      drop because something else has their attention
+
+anyone_would: Keeping a stranger or new acquaintance who pushes for closeness at arm's length
+anyone_would_when:
+  - relationship: [stranger, acquaintance]
+
+exclusions:
+  - text: Any sign of abuse, threats or controlling behaviour in the relationship; that stays with the Safeguard
+    evidence: ignored
+  - text: The other person is pushing past a no, or won't respect a limit
+    evidence: ignored
+  - text: A breakup, separation or affair in the last month
+    evidence: counted_not_shared
+  - text: Grief
+    evidence: ignored
+  - text: Caring for a new baby, or a family member who is ill
+    evidence: counted_not_shared
+
+approved_wording: >-
+  When someone starts getting closer or needing more of you, you seem to
+  step back to keep some room that's yours.
+# Three Predictions, each testing a different side of the Pattern. Code gives
+# the first when the Pattern is shared, then one the User hasn't had.
+prediction_wordings:
+  - >-
+    Next time {person} asks for more of your time, notice what you feel
+    first, and whether you make a little more distance afterwards.
+  - >-
+    After your next long stretch of time with {person}, notice whether you
+    want room to yourself, and how you go about getting it.
+  - >-
+    Next time {person} gives you space without being asked, notice whether
+    you move a little closer.
+
+numbers:
+  situations_needed: 3
+  base_rate: 0.2

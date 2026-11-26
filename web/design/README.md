@@ -50,6 +50,7 @@ Translate inline styles to Tailwind classes using the tokens, with arbitrary val
 | `AdminCheckInLog` | `/admin/check-in-log` | Also the **table template**. |
 | `AdminPersona`, `AdminPersonaOutlook` | `/admin/persona`, `?tab=outlook` | Voice and Outlook tabs. `AdminPersona` is also the **form template**. |
 | `AdminPrompts` | `/admin/prompts` | Prompts & models. One folding card per core service, as in the card-list template, with "Model & settings" and "Prompts" groups inside. |
+| `AdminPatternCatalog` | `/admin/pattern-catalog` | The Pattern Catalog, read only. One folding card per Pattern Type, as in the card-list template, with no add button and no save bar. |
 | `AdminModelCallTrace` | `/admin/model-calls/design-trace` | One trace from the Model call log. |
 | `AdminEvalDaySummaryCase` | `/admin/evals/cases/day_summary/new` | The Day Summary Eval case form, and how a result reads. |
 | `AdminCheckInKinds` | `/admin/check-in-kinds` | Also the **card-list template**. |
@@ -253,6 +254,14 @@ The design changed for the issues in `.scratch/message-pipeline/issues`. Build e
 **Fixtures.** Fixture mode must show exactly what is drawn. Prompts & models lists four services, in this order: Understanding, Reply Plan, Reply, Pattern keeping. The trace at `/admin/model-calls/design-trace` is the one drawn, an Admin's own, with all Content closed. The new Day Summary case form opens filled in as drawn. Alex has the two Patterns drawn. The annotation rows and the samples under them are rendered in fixture mode, as on the other template pages.
 
 **Baselines.** After any change to `reference/`, Zaf runs `node design/shoot.cjs` on his own machine to rebuild `baseline/`. Baselines made on another machine render type differently and will not pass.
+
+## Pattern-pipeline additions (25 Nov 2026)
+
+| Issue | What changed in the design | Reference files |
+|---|---|---|
+| 18 | The Patterns tab shows the Patterns Zeph told the User under four headings (Being tested, Confirmed, You disagreed, Didn't hold up). Each card has the wording, where it shows, the day Zeph told them, their quotes by part of life, and what Zeph asked them to notice with how it went. Under "You disagreed" is the "Keep noticing after I disagree" card from `Account`. Built from the old Patterns card's parts and the Memories group heading. | `Memories--tab-patterns`, `M-Memories--tab-patterns`, `States` (empty state) |
+
+**Fixtures.** Alex has the four Patterns drawn, one under each heading.
 
 ## Build order (the redesign, finished)
 

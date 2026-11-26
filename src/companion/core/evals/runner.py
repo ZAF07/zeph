@@ -1,5 +1,6 @@
 import logging
 import time
+from dataclasses import replace
 from itertools import product
 from uuid import UUID, uuid4
 
@@ -31,8 +32,8 @@ from companion.core.evals.setting_overrides import (
     variant_needs,
     variant_settings,
 )
-from companion.core.models import ModelCall
-from companion.core.platform_settings import EVAL_RUN_TOKEN_LIMIT
+from companion.core.models import ModelCall, PlatformSettings
+from companion.core.platform_settings import EVAL_RUN_TOKEN_LIMIT, thinking_for_model
 from companion.core.ports import (
     Clock,
     MoveRepository,
@@ -211,6 +212,12 @@ class EvalRunner:
 
         try:
             judge = JudgeSettings.from_values(snapshot.judge)
+            judge = replace(
+                judge,
+                thinking=thinking_for_model(
+                    PlatformSettings(snapshot.settings), judge.model, judge.thinking
+                ),
+            )
             images = self._images.get_many(
                 image_names(CASE_SHAPES[case.eval], case.content)
             )

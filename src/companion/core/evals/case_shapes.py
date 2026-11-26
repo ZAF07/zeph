@@ -1,13 +1,15 @@
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, time
 from enum import StrEnum
 from typing import Any
 
 from companion.core.errors import InvalidError
 from companion.core.evals.models import EvalName
+from companion.core.models import Audience, Stakes, StateGoingIn
 
 TIME_FORMATS = ("%I:%M %p", "%I:%M%p", "%H:%M")
+MUST_BE_EMPTY = "empty"
 
 
 class InvalidFormError(InvalidError):
@@ -468,6 +470,34 @@ def text_list_field(
         required=required,
         item_label=item_label,
         default=[],
+    )
+
+
+def expected_condition_field(
+    name: str, label: str, description: str, values: type[StrEnum]
+) -> ShapeField:
+    """Build the choice of a Condition a Tagging case expects on an Observation.
+
+    Args:
+        name: The Condition's name in the content.
+        label: Its name on the form.
+        description: What the Condition means.
+        values: Its fixed list.
+
+    Returns:
+        The field: left empty the Condition isn't checked; otherwise the
+        kept Observation must hold the value picked, or none for "Must be
+        empty".
+    """
+    return ShapeField(
+        name,
+        label,
+        f"{description} Leave empty to not check it.",
+        FieldKind.CHOICE,
+        options=[
+            ChoiceOption(MUST_BE_EMPTY, "Must be empty"),
+            *(ChoiceOption(value.value, value.value.capitalize()) for value in values),
+        ],
     )
 
 
@@ -933,6 +963,242 @@ MOVE_RESULT_OPTIONS = [
     ChoiceOption("mixed", "Mixed"),
 ]
 
+MADE_UP_OBSERVATION_FIELDS = [
+    long_text_field(
+        "quote", "Quote", "The User's own words, as they said them back then."
+    ),
+    text_field(
+        "sign",
+        "Sign",
+        "The ID of the sign it matched in its Pattern Type, e.g. I2. A sign "
+        "the Pattern Type doesn't have makes the case an Error.",
+    ),
+    ShapeField(
+        "direction",
+        "For or against",
+        "Whether it counts for the Pattern Type or against it.",
+        FieldKind.CHOICE,
+        required=True,
+        options=[ChoiceOption("for", "For"), ChoiceOption("against", "Against")],
+        default="for",
+    ),
+    long_text_field(
+        "context",
+        "Context",
+        "What was going on, in Zeph's words. Zeph points at the story with "
+        "this line, so never say he or she.",
+    ),
+    text_field("about", "Who it's about", "E.g. Mei, their sister."),
+    ShapeField(
+        "days_ago",
+        "Days ago",
+        "How many days before the case's time they said it.",
+        FieldKind.WHOLE_NUMBER,
+        required=True,
+        minimum=1,
+        default=1,
+    ),
+    text_field(
+        "second_pattern_type",
+        "Second Pattern Type",
+        "The look-alike Pattern Type it can't be told apart from, by ID, "
+        "which makes it unclear. Leave empty for a clear one.",
+        required=False,
+    ),
+    text_field(
+        "thread",
+        "Life Thread",
+        "The title of the Life Thread it belongs to. Leave empty for none.",
+        required=False,
+    ),
+    ShapeField(
+        "setting",
+        "Setting",
+        "Where it happened. The Agenda asks about a setting not seen yet once "
+        "the stories are one-sided.",
+        FieldKind.CHOICE,
+        options=[
+            ChoiceOption("home", "Home"),
+            ChoiceOption("work", "Work"),
+            ChoiceOption("social", "With friends"),
+            ChoiceOption("online", "Online"),
+        ],
+    ),
+    ShapeField(
+        "relationship",
+        "Who they are to the User",
+        "Zeph asks whether it would differ with someone else, never this one.",
+        FieldKind.CHOICE,
+        options=[
+            ChoiceOption("partner", "Partner"),
+            ChoiceOption("family", "Family"),
+            ChoiceOption("friend", "Friend"),
+            ChoiceOption("acquaintance", "Acquaintance"),
+            ChoiceOption("colleague", "Colleague"),
+            ChoiceOption("stranger", "Stranger"),
+        ],
+    ),
+    ShapeField(
+        "audience",
+        "Audience",
+        "Who else was there. Leave empty when the story doesn't say.",
+        FieldKind.CHOICE,
+        options=[
+            ChoiceOption("one-to-one", "One-to-one"),
+            ChoiceOption("group", "Group"),
+            ChoiceOption("in front of others", "In front of others"),
+        ],
+    ),
+    ShapeField(
+        "stakes",
+        "Stakes",
+        "Whether something that matters to them could be lost. Leave empty "
+        "when the story doesn't say.",
+        FieldKind.CHOICE,
+        options=[ChoiceOption("low", "Low"), ChoiceOption("high", "High")],
+    ),
+    ShapeField(
+        "state_going_in",
+        "State going in",
+        "How they were before it happened. Leave empty when the story doesn't say.",
+        FieldKind.CHOICE,
+        options=[
+            ChoiceOption("worn out", "Worn out"),
+            ChoiceOption("under pressure", "Under pressure"),
+            ChoiceOption("low", "Low"),
+            ChoiceOption("steady", "Steady"),
+        ],
+    ),
+]
+
+EXPLORATION_NEED_OPTIONS = [
+    ChoiceOption("unclear", "An unclear story"),
+    ChoiceOption("counter_test", "A counter-test"),
+    ChoiceOption("missing_condition", "A missing Condition"),
+]
+
+STORY_FOLLOW_UP_OPTION = ChoiceOption("story_follow_up", "Story follow-up")
+WOULD_IT_DIFFER_OPTION = ChoiceOption(
+    "would_it_differ", "Would it have gone differently"
+)
+NOTICE_THIS_WEEK_OPTION = ChoiceOption("notice_this_week", "Notice this week")
+
+MADE_UP_PATTERNS_FIELD = group_list_field(
+    "patterns",
+    "Suspected Patterns",
+    "Patterns Zeph suspects of the User. With any, the User has Pattern "
+    "noticing and Pattern exploring on. These are saved as real rows, then "
+    "the real Agenda code writes the Agenda and the aimed Curiosity. A "
+    "Pattern that isn't suspected from its Observations makes the case an "
+    "Error.",
+    "Suspected Pattern",
+    [
+        text_field(
+            "pattern_type",
+            "Pattern Type",
+            "Its ID in the Pattern Catalog, e.g. CONF.AVOID.BELONG.",
+        ),
+        group_list_field(
+            "observations",
+            "Observations",
+            "Its evidence. To be suspected it needs enough points in at least "
+            "two situations (two Life Threads, or two people and parts of "
+            "life).",
+            "Observation",
+            MADE_UP_OBSERVATION_FIELDS,
+            required=True,
+        ),
+        group_list_field(
+            "tries",
+            "Tries already made",
+            "Aimed Curiosities Zeph already asked about it. The Agenda picks "
+            "the next Approach from the last one, waits after one with nothing "
+            "and never tries two Conversations in a row.",
+            "Try",
+            [
+                ShapeField(
+                    "need",
+                    "Aimed at",
+                    "What it tried to learn. The Pattern must have this need "
+                    "open, or the case is an Error.",
+                    FieldKind.CHOICE,
+                    required=True,
+                    options=EXPLORATION_NEED_OPTIONS,
+                    default="unclear",
+                ),
+                ShapeField(
+                    "approach",
+                    "Approach",
+                    "How it asked.",
+                    FieldKind.CHOICE,
+                    required=True,
+                    options=[
+                        STORY_FOLLOW_UP_OPTION,
+                        WOULD_IT_DIFFER_OPTION,
+                        NOTICE_THIS_WEEK_OPTION,
+                    ],
+                    default="story_follow_up",
+                ),
+                ShapeField(
+                    "outcome",
+                    "How it came back",
+                    "Asked to drop makes the real Agenda code rest the Exploration.",
+                    FieldKind.CHOICE,
+                    required=True,
+                    options=[
+                        ChoiceOption("useful", "Useful"),
+                        ChoiceOption("vague", "Vague"),
+                        ChoiceOption("brushed_off", "Brushed off"),
+                        ChoiceOption("asked_to_drop", "Asked to drop"),
+                    ],
+                    default="vague",
+                ),
+                ShapeField(
+                    "days_ago",
+                    "Days ago",
+                    "How many days before the case's time it was asked. It was "
+                    "asked in the made-up Conversation of that day; when that "
+                    "is the newest one, no new aimed Curiosity is written.",
+                    FieldKind.WHOLE_NUMBER,
+                    required=True,
+                    minimum=1,
+                    default=1,
+                ),
+            ],
+        ),
+    ],
+    unique_by="pattern_type",
+)
+
+MADE_UP_THOUGHT_EXPERIMENTS_FIELD = group_list_field(
+    "thought_experiments",
+    "Thought Experiments",
+    "The only Thought Experiments on the platform for this case. Leave empty "
+    "to keep the seeded ones.",
+    "Thought Experiment",
+    [
+        long_text_field(
+            "wording",
+            "Wording",
+            "The made-up situation and its question, as the User hears it.",
+        ),
+        text_field(
+            "pattern_type",
+            "Pattern Type",
+            "One of the two look-alike Pattern Types it tells apart, by ID.",
+        ),
+        text_field("other_pattern_type", "Other Pattern Type", "The other one."),
+        ShapeField(
+            "sensitivity",
+            "Sensitivity",
+            "How carefully it must be asked. Empty means low.",
+            FieldKind.CHOICE,
+            options=LOW_MEDIUM_HIGH_OPTIONS,
+            default="low",
+        ),
+    ],
+)
+
 UNDERSTANDING_MEMORY_FIELD = ShapeField(
     "memory",
     "Made-up User Memory",
@@ -1072,6 +1338,8 @@ UNDERSTANDING_MEMORY_FIELD = ShapeField(
                 ),
             ],
         ),
+        MADE_UP_PATTERNS_FIELD,
+        MADE_UP_THOUGHT_EXPERIMENTS_FIELD,
     ],
 )
 
@@ -1178,6 +1446,45 @@ UNDERSTANDING_EXPECT_FIELD = ShapeField(
             "curiosity_raised",
             "Brings up a Curiosity",
             "Reply Plan: whether it must bring up a waiting Curiosity.",
+        ),
+        yes_no_unchecked_field(
+            "agenda_shown",
+            "Shown the Agenda",
+            "Reply Plan: whether it must be shown the Agenda, with something "
+            "an Exploration still needs to learn. Needs a suspected Pattern "
+            "in the memory.",
+        ),
+        yes_no_unchecked_field(
+            "aimed_raised",
+            "Brings up the aimed Curiosity",
+            "Reply Plan: Yes, it must bring up a Curiosity the Agenda code "
+            "wrote for an Exploration. No, it must bring up none of them.",
+        ),
+        ShapeField(
+            "aimed_need",
+            "Aimed at",
+            "Reply Plan: what the aimed Curiosity it brings up must aim at.",
+            FieldKind.CHOICE,
+            options=EXPLORATION_NEED_OPTIONS,
+        ),
+        ShapeField(
+            "aimed_approach",
+            "Aimed Approach",
+            "Reply Plan: how the aimed Curiosity it brings up must ask.",
+            FieldKind.CHOICE,
+            options=[
+                STORY_FOLLOW_UP_OPTION,
+                WOULD_IT_DIFFER_OPTION,
+                ChoiceOption("thought_experiment", "A Thought Experiment"),
+                NOTICE_THIS_WEEK_OPTION,
+            ],
+        ),
+        text_field(
+            "aimed_pattern_type",
+            "Aimed Pattern Type",
+            "Reply Plan: the ID of the Pattern Type the aimed Curiosity it "
+            "brings up must be for, e.g. the top one of two Explorations.",
+            required=False,
         ),
         yes_no_unchecked_field(
             "asked_why",
@@ -1507,6 +1814,267 @@ DAY_SUMMARY_SHAPE = FormShape(
     ]
 )
 
+TAGGING_SHAPE = FormShape(
+    [
+        ShapeSection(
+            "When",
+            "The time the ended Conversation started.",
+            [
+                ShapeField(
+                    "now",
+                    "When the first message was sent",
+                    "In UTC, which is also the User's time zone. The messages "
+                    "come a minute apart from it.",
+                    FieldKind.DATE_TIME,
+                    required=True,
+                ),
+            ],
+        ),
+        ShapeSection(
+            "Life Threads it touched",
+            "The made-up User's Life Threads this Conversation started, "
+            "changed or brought up. The tagging step is shown them numbered, "
+            "in this order.",
+            [
+                group_list_field(
+                    "threads",
+                    "Life Threads",
+                    "Leave empty when the Conversation touched none.",
+                    "Life Thread",
+                    [
+                        text_field("title", "Title", "The Thread's title."),
+                        long_text_field("story", "Story", "What happened so far."),
+                        text_list_field(
+                            "people",
+                            "People",
+                            "The people or things in it, e.g. Mei.",
+                            "Person",
+                        ),
+                    ],
+                ),
+            ],
+        ),
+        ShapeSection(
+            "Unclear stories they already have",
+            "Unclear Observations from earlier Conversations. One marked as "
+            "asked about was asked by an aimed Curiosity in this "
+            "Conversation, so the real tagging step is shown it and may "
+            "settle it.",
+            [
+                group_list_field(
+                    "unclear",
+                    "Unclear stories",
+                    "Leave empty when the User has none.",
+                    "Unclear story",
+                    [
+                        text_field(
+                            "pattern_type",
+                            "Pattern Type",
+                            "The first of its two Pattern Types, by ID.",
+                        ),
+                        *(
+                            replace(shape_field, required=True)
+                            if shape_field.name == "second_pattern_type"
+                            else shape_field
+                            for shape_field in MADE_UP_OBSERVATION_FIELDS
+                        ),
+                        ShapeField(
+                            "asked",
+                            "Asked about in this Conversation",
+                            "On when an aimed Curiosity asked about it here.",
+                            FieldKind.ON_OFF,
+                            default=True,
+                        ),
+                        text_field(
+                            "ends_clear_for",
+                            "Ends clear for",
+                            "The Pattern Type, one of its two, it must end "
+                            "clear for. Leave empty when it must stay unclear.",
+                            required=False,
+                        ),
+                    ],
+                ),
+            ],
+        ),
+        ShapeSection(
+            "The ended Conversation",
+            "Every message, oldest first. The real tagging step reads all of "
+            "it, with the whole Pattern Catalog, when the Conversation ends.",
+            [
+                group_list_field(
+                    "messages",
+                    "Messages",
+                    "What the User and Zeph said, in order. Only the User's own "
+                    "words can be quoted.",
+                    "Message",
+                    [
+                        ShapeField(
+                            "who",
+                            "From",
+                            "",
+                            FieldKind.CHOICE,
+                            required=True,
+                            options=[
+                                ChoiceOption("person", "User"),
+                                ChoiceOption("zeph", "Zeph"),
+                            ],
+                            default="person",
+                        ),
+                        long_text_field("text", "Text", ""),
+                    ],
+                    required=True,
+                ),
+            ],
+        ),
+        ShapeSection(
+            "Observations to expect",
+            "What code must keep after its checks. The case passes only when "
+            "every one below is kept and nothing else is. Leave empty when "
+            "there is nothing to tag.",
+            [
+                group_list_field(
+                    "observations",
+                    "Observations",
+                    "Several quotes kept for one Observation below still match it.",
+                    "Observation",
+                    [
+                        text_field(
+                            "pattern_type",
+                            "Pattern Type",
+                            "Its ID in the Pattern Catalog, e.g. "
+                            "CONF.AVOID.BELONG. When unclear, either of the two.",
+                        ),
+                        ShapeField(
+                            "direction",
+                            "For or against",
+                            "Whether it counts for the Pattern Type or against it.",
+                            FieldKind.CHOICE,
+                            required=True,
+                            options=[
+                                ChoiceOption("for", "For"),
+                                ChoiceOption("against", "Against"),
+                            ],
+                            default="for",
+                        ),
+                        ShapeField(
+                            "unclear",
+                            "Unclear",
+                            "On when it could be either of two look-alike "
+                            "Pattern Types.",
+                            FieldKind.ON_OFF,
+                            default=False,
+                        ),
+                        ShapeField(
+                            "situational",
+                            "Anyone would",
+                            "On when anyone would have acted the same there, "
+                            "so it counts for nothing.",
+                            FieldKind.ON_OFF,
+                            default=False,
+                        ),
+                        expected_condition_field(
+                            "audience",
+                            "Audience",
+                            "Who else was there, when the User's story says so.",
+                            Audience,
+                        ),
+                        expected_condition_field(
+                            "stakes",
+                            "Stakes",
+                            "Whether something that matters to the User could "
+                            "be lost, when their story says so.",
+                            Stakes,
+                        ),
+                        expected_condition_field(
+                            "state_going_in",
+                            "State going in",
+                            "How the User was before it happened, in their own "
+                            "words. Never how they felt after.",
+                            StateGoingIn,
+                        ),
+                    ],
+                ),
+            ],
+        ),
+    ]
+)
+
+WHOLE_PIPELINE_SHAPE = FormShape(
+    [
+        ShapeSection(
+            "When",
+            "The time the made-up User's story starts.",
+            [
+                ShapeField(
+                    "now",
+                    "When the story starts",
+                    "In UTC, which is also the User's time zone. The first "
+                    "Conversation starts its days after this.",
+                    FieldKind.DATE_TIME,
+                    required=True,
+                ),
+            ],
+        ),
+        ShapeSection(
+            "Hidden true Patterns",
+            "What is true of the made-up User. The app is never told. The "
+            "case passes only when every Pattern that became ready or was "
+            "shared is one of these; true ones never found are counted as "
+            "missed and don't fail it.",
+            [
+                text_list_field(
+                    "true_pattern_types",
+                    "True Pattern Types",
+                    "Their IDs in the Pattern Catalog, e.g. CONF.AVOID.BELONG. "
+                    "Leave empty when no Pattern may become ready.",
+                    "Pattern Type ID",
+                ),
+            ],
+        ),
+        ShapeSection(
+            "Conversations",
+            "The script, in order. Every text goes through the real reply "
+            "path, and when a Conversation is over the clock moves past the "
+            "Conversation quiet gap and every Conversation-end step runs, as "
+            "in the live app. Pattern noticing, exploring and sharing are on "
+            "for the made-up User.",
+            [
+                group_list_field(
+                    "conversations",
+                    "Conversations",
+                    "A Pattern needs evidence from several Conversations and "
+                    "situations before it can be ready, so write several.",
+                    "Conversation",
+                    [
+                        ShapeField(
+                            "days_later",
+                            "Days after the one before",
+                            "How far the clock moves before this Conversation "
+                            "starts; for the first one, after the story's "
+                            "start. 0 starts it right after the one before "
+                            "ended.",
+                            FieldKind.WHOLE_NUMBER,
+                            required=True,
+                            minimum=0,
+                            default=1,
+                        ),
+                        text_list_field(
+                            "messages",
+                            "The User's texts",
+                            "What they send, in order, a minute apart. Zeph's "
+                            "replies are the real ones, so write texts that "
+                            "make sense whatever Zeph says.",
+                            "Text",
+                            required=True,
+                        ),
+                    ],
+                    required=True,
+                ),
+            ],
+        ),
+    ]
+)
+
 CASE_SHAPES: dict[EvalName, FormShape] = {
     EvalName.SAFEGUARD: SAFEGUARD_SHAPE,
     EvalName.PERSONA: PERSONA_SHAPE,
@@ -1516,4 +2084,6 @@ CASE_SHAPES: dict[EvalName, FormShape] = {
     EvalName.UNDERSTANDING: UNDERSTANDING_SHAPE,
     EvalName.MOVE_OUTCOME: MOVE_OUTCOME_SHAPE,
     EvalName.DAY_SUMMARY: DAY_SUMMARY_SHAPE,
+    EvalName.TAGGING: TAGGING_SHAPE,
+    EvalName.WHOLE_PIPELINE: WHOLE_PIPELINE_SHAPE,
 }

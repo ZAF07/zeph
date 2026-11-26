@@ -1,6 +1,7 @@
 "use client";
 
 import { DeleteAccountSection } from "@/components/DeleteAccountSection";
+import { DirectnessSetting } from "@/components/DirectnessSetting";
 import { LoadFailed } from "@/components/LoadFailed";
 import { LoadingPanel } from "@/components/LoadingPanel";
 import { MemoryOffNotice } from "@/components/MemoryOffNotice";
@@ -14,10 +15,11 @@ import { useMe, usePlatformContent } from "@/lib/queries";
 
 /**
  * The editable parts of the Account & privacy page: Profile, User Memory,
- * Photo Viewing, Your stickers, Delete my data and Delete account. Every
- * word is the Account tab's Copy, with the location labels from
- * Onboarding's and the User Memory explanation and Memory-off notes from
- * Shared.
+ * Photo Viewing, How direct Zeph is, Keep noticing after I disagree (only
+ * while Pattern sharing works for them), Your stickers, Delete my data and
+ * Delete account. Every word is the Account tab's Copy, with the location
+ * labels from Onboarding's and the User Memory explanation and Memory-off
+ * notes from Shared.
  *
  * @param props - `copy` holds the Account page's Copy slots, onboarding's
  *   location labels and the Shared Memory slots.
@@ -72,6 +74,24 @@ export function AccountSettings({ copy }: { copy: Copy }) {
         changedInChatAt={me.changed_in_chat.photo_viewing}
         timeZone={me.time_zone ?? undefined}
       />
+      <DirectnessSetting
+        directness={me.directness}
+        changedInChatAt={me.changed_in_chat.directness}
+        timeZone={me.time_zone ?? undefined}
+        copy={copy}
+      />
+      {me.pattern_sharing_works ? (
+        <PreferenceSwitch
+          preference="contested_gathering_enabled"
+          title={accountCopy("contested_gathering.title")}
+          copy={copy}
+          enabled={me.contested_gathering_enabled}
+          available
+          explanation={accountCopy("contested_gathering.explanation")}
+          changedInChatAt={me.changed_in_chat.contested_gathering}
+          timeZone={me.time_zone ?? undefined}
+        />
+      ) : null}
       <PersonalStickersSection
         available={me.personal_stickers_available}
         copy={copy}

@@ -2,7 +2,7 @@ import json
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -23,11 +23,13 @@ from companion.core.models import (
     ModelStep,
     Pattern,
     PatternEvidence,
-    PatternReaction,
     PatternState,
     PatternToSave,
+    PatternType,
     UserSnapshot,
 )
+from companion.core.observations import may_keep_observations
+from companion.core.pattern_catalog import PatternCatalogService
 from companion.core.platform_settings import (
     LIFE_THREADS_TEXTS_TO_SEARCH,
     PATTERN_CLOSENESS_PERCENT,
@@ -36,35 +38,28 @@ from companion.core.platform_settings import (
     PATTERN_KEEPING_PROMPT,
     PATTERN_KEEPING_THINKING,
     PATTERN_KEEPING_THREADS,
-    PATTERN_PUSHED_BACK_WAIT,
+    thinking_to_use,
 )
 from companion.core.ports import Clock, Embedder, Repositories
 from companion.core.timing import day_span, users_today
 from companion.core.transcripts import to_transcript_lines
+from companion.core.unmatched_review import (
+    UnmatchedGrouper,
+    needs_general_description,
+    read_general_description,
+)
 from companion.core.usage import UsageRecordingChatModel
 
 logger = logging.getLogger(__name__)
 
 FEWEST_THREADS_TO_START_A_PATTERN = 2
 MOST_PATTERNS_IN_MIND = 10
-OFFERED_HERE_WORDS = (
-    "offered to them in this Conversation: judge how they took it from the Conversation"
-)
-STATE_WORDS = {
-    PatternState.SUSPECTED: "suspected",
-    PatternState.CONFIRMED: "confirmed",
-    PatternState.CLOSED: "closed: never change it or start it again",
-}
-REACTION_WORDS = {
-    PatternReaction.AGREED: "they agreed",
-    PatternReaction.PUSHED_BACK: "they pushed back",
-    PatternReaction.BRUSHED_OFF: "they brushed it off",
-}
+NEEDS_GENERAL_DESCRIPTION = "(needs a general description) "
 
 
 @dataclass(frozen=True)
 class PlannedPatterns:
-    """The Patterns a keeping answer starts and changes.
+    """The unmatched Patterns a keeping answer starts and adds evidence to.
 
     Attributes:
         added: The new Patterns, each with its evidence.
@@ -105,82 +100,36 @@ class RemindedPattern:
     pattern: Pattern
 
 
-def describe_pattern(
-    pattern: Pattern, time_zone: str | None, offered_here: bool = False
-) -> str:
-    """Write a Pattern, its state, when it was last offered and its evidence.
+def describe_pattern(pattern: Pattern) -> str:
+    """Write a Pattern, its state and its evidence.
 
     Args:
         pattern: The Pattern.
-        time_zone: The User's IANA time zone, for the days.
-        offered_here: Whether a Reply Plan in the Conversation being kept
-            offered it to the User.
 
     Returns:
-        E.g. "(suspected; last offered 3 Nov 2026, they pushed back) When
-        something grabs them... Evidence:" then one "- " line per piece.
+        E.g. "(unmatched) When something grabs them... Evidence:" then one
+        "- " line per piece.
     """
-    notes = [STATE_WORDS[pattern.state]]
-    if offered_here:
-        notes.append(OFFERED_HERE_WORDS)
-    if pattern.last_offered_at is not None:
-        reaction = (
-            REACTION_WORDS[pattern.last_reaction]
-            if pattern.last_reaction
-            else "not known how they took it"
-        )
-        notes.append(
-            f"last offered {format_day(pattern.last_offered_at, time_zone)}, {reaction}"
-        )
     evidence_lines = "\n".join(
         f"  - {format_calendar_day(item.day)}, {item.thread_title}: {item.line}"
         for item in pattern.evidence
     )
-    return f"({'; '.join(notes)}) {pattern.pattern} Evidence:\n{evidence_lines}"
+    return f"({pattern.state.value}) {pattern.pattern} Evidence:\n{evidence_lines}"
 
 
-def may_come_to_mind(
-    pattern: Pattern, now: datetime, pushed_back_wait: timedelta
-) -> bool:
-    """Say whether a Pattern may come to mind for a reply.
-
-    A closed Pattern never does. One the User pushed back on waits the
-    Admin-set time after it was offered.
-
-    Args:
-        pattern: The Pattern.
-        now: The current time.
-        pushed_back_wait: How long to wait after they pushed back.
-
-    Returns:
-        True if it may come to mind.
-    """
-    if pattern.state == PatternState.CLOSED:
-        return False
-    return not (
-        pattern.last_reaction == PatternReaction.PUSHED_BACK
-        and pattern.last_offered_at is not None
-        and now < pattern.last_offered_at + pushed_back_wait
-    )
-
-
-def describe_patterns_in_mind(
-    reminded: Sequence[RemindedPattern], time_zone: str | None
-) -> str:
+def describe_patterns_in_mind(reminded: Sequence[RemindedPattern]) -> str:
     """Write the Patterns in mind as the Reply Plan model reads them.
 
     Args:
         reminded: The Patterns, numbered.
-        time_zone: The User's IANA time zone, for the days.
 
     Returns:
-        One block per Pattern, with its state, when it was last offered and
-        how they took it, and its evidence; "None." if there are none.
+        One block per Pattern, with its state and its evidence; "None." if
+        there are none.
     """
     return (
         "\n".join(
-            f"[{item.number}] {describe_pattern(item.pattern, time_zone)}"
-            for item in reminded
+            f"[{item.number}] {describe_pattern(item.pattern)}" for item in reminded
         )
         or "None."
     )
@@ -231,39 +180,62 @@ def describe_days_behind_evidence(
     return "\n\n".join(blocks) or "None."
 
 
+def describe_pattern_types_looked_for(pattern_types: Sequence[PatternType]) -> str:
+    """Write the Pattern Types, so the keeping model leaves them to tagging.
+
+    Args:
+        pattern_types: Every Pattern Type in the catalog now.
+
+    Returns:
+        One line per Pattern Type: its name, its if / then / function and
+        what it is; "None." if there are none.
+    """
+    return (
+        "\n".join(
+            f"- {pattern_type.name}. If: {pattern_type.if_situation}. "
+            f"Then: {pattern_type.then_behaviour}. "
+            f"Function: {pattern_type.function}. {pattern_type.definition}"
+            for pattern_type in pattern_types
+        )
+        or "None."
+    )
+
+
 def describe_patterns_to_keep(
     touched: dict[int, LifeThread],
     closest: dict[int, LifeThread],
+    pattern_types: Sequence[PatternType],
     known: dict[int, Pattern],
     days: Sequence[DayBehindEvidence],
     messages: list[ConversationMessage],
     conversation_day: date,
     now: datetime,
     time_zone: str | None,
-    offered_ids: set[UUID] | None = None,
 ) -> str:
     """Write what the Pattern keeping model is given.
 
     Args:
         touched: The Threads the Conversation touched, by number.
         closest: The User's other Threads closest in meaning, by number.
-        known: The User's Patterns, by number.
+        pattern_types: The Pattern Types tagging looks for, for this User;
+            none while Pattern noticing doesn't work for them.
+        known: The User's Patterns with no Pattern Type, by number.
         days: The days behind the evidence in play, newest first.
         messages: The Conversation's messages, oldest first.
         conversation_day: The day the Conversation started.
         now: The current time.
         time_zone: The User's IANA time zone, for the days.
-        offered_ids: The IDs of the Patterns the Conversation's Reply Plans
-            offered to the User.
 
     Returns:
-        Today's date, the Threads, the Patterns (each offered one marked),
-        the days behind their evidence and the Conversation under the day
-        it started.
+        Today's date, the Threads, the Pattern Types, the Patterns, the
+        days behind their evidence and the Conversation under the day it
+        started. An unmatched Pattern with no general description yet is
+        marked as needing one.
     """
-    offered = offered_ids or set()
     pattern_lines = "\n".join(
-        f"[{number}] {describe_pattern(pattern, time_zone, pattern.id in offered)}"
+        f"[{number}] "
+        f"{NEEDS_GENERAL_DESCRIPTION if needs_general_description(pattern) else ''}"
+        f"{describe_pattern(pattern)}"
         for number, pattern in known.items()
     )
     touched_lines = describe_numbered_threads(touched, time_zone)
@@ -273,6 +245,8 @@ def describe_patterns_to_keep(
         f"Today: {format_day(now, time_zone)}\n\n"
         f"Life Threads this Conversation touched:\n{touched_lines}\n\n"
         f"Their other Life Threads closest in meaning:\n{closest_lines}\n\n"
+        f"Pattern Types Zeph already looks for:\n"
+        f"{describe_pattern_types_looked_for(pattern_types)}\n\n"
         f"Patterns kept so far:\n{pattern_lines or 'None yet.'}\n\n"
         f"The days behind that evidence:\n{evidence_days}\n\n"
         f"The Conversation, on {format_calendar_day(conversation_day)}:\n"
@@ -365,71 +339,47 @@ def read_evidence(
     return evidence
 
 
-def apply_reaction(entry: dict[str, Any], pattern: Pattern, now: datetime) -> Pattern:
-    """Record how the User took a view offered from a Pattern in this Conversation.
-
-    It is confirmed only when they agreed, and closed only when they pushed
-    back; brushing it off changes neither.
-
-    Args:
-        entry: The Pattern, as the model wrote it.
-        pattern: The Pattern so far.
-        now: When the view was judged.
-
-    Returns:
-        The Pattern with when it was offered, how they took it and its new
-        state (and when it was first confirmed); unchanged if the model gave
-        no reaction.
-    """
-    reaction = entry.get("reaction")
-    if reaction not in {value.value for value in PatternReaction}:
-        return pattern
-    reacted = replace(
-        pattern, last_offered_at=now, last_reaction=PatternReaction(reaction)
-    )
-    state_allowed_by_reaction = {
-        PatternReaction.AGREED: PatternState.CONFIRMED,
-        PatternReaction.PUSHED_BACK: PatternState.CLOSED,
-    }
-    allowed_state = state_allowed_by_reaction.get(PatternReaction(reaction))
-    if allowed_state is None or entry.get("state") != allowed_state.value:
-        return reacted
-    if allowed_state == PatternState.CONFIRMED and pattern.confirmed_at is None:
-        return replace(reacted, state=allowed_state, confirmed_at=now)
-    return replace(reacted, state=allowed_state)
-
-
-def change_known_pattern(
+def add_new_evidence(
     entry: dict[str, Any],
     existing: Pattern,
     threads: dict[int, LifeThread],
+    user_name: str | None,
     conversation_day: date,
     now: datetime,
 ) -> Pattern:
-    """Apply what the model wrote about a Pattern already kept.
+    """Add what the model wrote to an unmatched Pattern already kept.
 
-    Its new evidence is added, and how the User took a view offered from it
-    is recorded (see `apply_reaction`). A closed Pattern never changes.
+    Only an unmatched Pattern changes, and only by gaining evidence or, if
+    it has none yet, its general description: its state never does, and a
+    general description once kept is never rewritten.
 
     Args:
         entry: The Pattern, as the model wrote it.
         existing: The Pattern kept so far.
         threads: The Threads it was shown, by number.
+        user_name: What the Companion calls the User, which a general
+            description may not hold.
         conversation_day: The day the Conversation started, for evidence
             with no readable day.
         now: When the change is made.
 
     Returns:
-        The Pattern, changed or not.
+        The Pattern, with what is new or as it was.
     """
-    if existing.state == PatternState.CLOSED:
+    if existing.state != PatternState.UNMATCHED:
         return existing
-    changed = existing
     new_evidence = read_evidence(entry, threads, conversation_day)
-    if new_evidence:
-        changed = replace(changed, evidence=(*changed.evidence, *new_evidence))
-    changed = apply_reaction(entry, changed, now)
-    return replace(changed, updated_at=now) if changed != existing else existing
+    general_description = existing.general_description or read_general_description(
+        entry.get("general"), user_name
+    )
+    if not new_evidence and general_description == existing.general_description:
+        return existing
+    return replace(
+        existing,
+        evidence=(*existing.evidence, *new_evidence),
+        general_description=general_description,
+        updated_at=now,
+    )
 
 
 def plan_pattern_changes(
@@ -437,22 +387,28 @@ def plan_pattern_changes(
     threads: dict[int, LifeThread],
     known: dict[int, Pattern],
     user_id: UUID,
+    user_name: str | None,
     conversation_day: date,
     now: datetime,
 ) -> PlannedPatterns:
-    """Turn the Patterns the model wrote into new and changed Patterns to save.
+    """Turn the Patterns the model wrote into unmatched Patterns to save.
 
-    An entry whose "pattern" is a known Pattern's number changes it; one
-    whose "pattern" is text starts a suspected Pattern, only if its evidence
-    comes from two or more different Threads; if a view from it was offered
-    in this Conversation, how the User took it is recorded too. An unknown number or one
-    already used is skipped.
+    An entry whose "pattern" is a known Pattern's number adds evidence to
+    it, if it is unmatched, and its general description if it has none; one
+    whose "pattern" is text starts an unmatched Pattern, only if its
+    evidence comes from two or more different Threads. An unknown number or
+    one already used is skipped. Whatever state or reaction the model
+    writes is ignored: no Pattern's state ever changes here. A general
+    description that could tell who it is about is dropped, and the Pattern
+    is kept without one.
 
     Args:
         entries: The Patterns, as the model wrote them.
         threads: The Threads it was shown, by number.
         known: The Patterns it was shown, by number.
         user_id: The User whose Patterns they are.
+        user_name: What the Companion calls the User, which a general
+            description may not hold.
         conversation_day: The day the Conversation started, for evidence
             with no readable day.
         now: When the changes are made.
@@ -473,16 +429,20 @@ def plan_pattern_changes(
             thread_ids = {item.thread_id for item in evidence}
             if not text or len(thread_ids) < FEWEST_THREADS_TO_START_A_PATTERN:
                 continue
-            new_pattern = Pattern(
-                id=uuid4(),
-                user_id=user_id,
-                pattern=text,
-                state=PatternState.SUSPECTED,
-                evidence=tuple(evidence),
-                started_at=now,
-                updated_at=now,
+            added.append(
+                Pattern(
+                    id=uuid4(),
+                    user_id=user_id,
+                    pattern=text,
+                    state=PatternState.UNMATCHED,
+                    evidence=tuple(evidence),
+                    started_at=now,
+                    updated_at=now,
+                    general_description=read_general_description(
+                        entry.get("general"), user_name
+                    ),
+                )
             )
-            added.append(apply_reaction(entry, new_pattern, now))
             continue
         if not isinstance(value, int) or isinstance(value, bool):
             continue
@@ -490,7 +450,9 @@ def plan_pattern_changes(
         if existing is None or value in used_numbers:
             continue
         used_numbers.add(value)
-        pattern = change_known_pattern(entry, existing, threads, conversation_day, now)
+        pattern = add_new_evidence(
+            entry, existing, threads, user_name, conversation_day, now
+        )
         if pattern != existing:
             changed.append(pattern)
     return PlannedPatterns(added=added, changed=changed)
@@ -533,10 +495,9 @@ class PatternReminder:
         mind, then those that came to mind earlier in the Conversation, at
         most `MOST_PATTERNS_IN_MIND`. The search uses what the User means
         and their latest texts, as many as Life Threads are searched on,
-        with the Life Thread closeness bar. A closed Pattern never comes to
-        mind, and one they pushed back on waits the Admin-set time. Each one
-        found is kept in mind for the rest of the Conversation. If the
-        search can't be embedded, Patterns come only through their Threads.
+        with the Life Thread closeness bar. Each one found is kept in mind
+        for the rest of the Conversation. If the search can't be embedded,
+        Patterns come only through their Threads.
 
         Args:
             snapshot: The User being answered.
@@ -549,25 +510,23 @@ class PatternReminder:
             The Patterns, numbered from 1.
         """
         now = self._clock.now()
-        wait = snapshot.settings.get(PATTERN_PUSHED_BACK_WAIT)
         pattern_repository = self._repositories.patterns
-        allowed = {
+        patterns_by_id = {
             pattern.id: pattern
             for pattern in pattern_repository.list_for_user(snapshot.user.id)
-            if may_come_to_mind(pattern, now, wait)
         }
-        if not allowed:
+        if not patterns_by_id:
             return []
         thread_ids = {item.thread.id for item in threads}
         linked_ids = [
             pattern.id
-            for pattern in allowed.values()
+            for pattern in patterns_by_id.values()
             if pattern.thread_ids & thread_ids
         ]
         close_ids = [
             pattern_id
             for pattern_id in self._find_close_ids(snapshot, conversation_id, meaning)
-            if pattern_id in allowed
+            if pattern_id in patterns_by_id
         ]
         found_ids = list(dict.fromkeys([*close_ids, *linked_ids]))
         pattern_repository.keep_in_mind(conversation_id, found_ids, now)
@@ -575,7 +534,9 @@ class PatternReminder:
             [*found_ids, *pattern_repository.list_in_mind_ids(conversation_id)]
         )
         in_mind = [
-            allowed[pattern_id] for pattern_id in in_mind_ids if pattern_id in allowed
+            patterns_by_id[pattern_id]
+            for pattern_id in in_mind_ids
+            if pattern_id in patterns_by_id
         ]
         return [
             RemindedPattern(number=number, pattern=pattern)
@@ -617,14 +578,22 @@ class PatternReminder:
 
 
 class PatternKeeper:
-    """Keeps a User's Patterns when a Conversation ends, after its Life Threads.
+    """Notes a User's unmatched Patterns when a Conversation ends.
 
-    New Patterns are embedded, so they can be found by meaning.
+    It runs after the Life Threads are kept, and only notes what recurs
+    across two or more Threads and fits no Pattern Type. It never starts,
+    confirms or closes a Pattern of a Pattern Type: code does, from
+    Observations (ADR-0024). New Patterns are embedded, so they can be
+    found by meaning. Each unmatched Pattern also gets a general
+    description with nothing about the User, grouped with like ones from
+    other Users for Admins to review.
     """
 
     def __init__(
         self,
         repositories: Repositories,
+        pattern_catalog: PatternCatalogService,
+        unmatched_grouper: UnmatchedGrouper,
         chat_model: UsageRecordingChatModel,
         embedder: Embedder,
         clock: Clock,
@@ -634,11 +603,16 @@ class PatternKeeper:
         Args:
             repositories: Where Life Threads, Patterns, Conversations and
                 Day Summaries are stored.
+            pattern_catalog: Reads the Pattern Types in the catalog now.
+            unmatched_grouper: Groups unmatched Patterns by their general
+                descriptions.
             chat_model: Writes the Patterns and records the tokens used.
             embedder: Embeds the touched Threads and each new Pattern.
             clock: Tells the current time.
         """
         self._repositories = repositories
+        self._pattern_catalog = pattern_catalog
+        self._unmatched_grouper = unmatched_grouper
         self._chat_model = chat_model
         self._embedder = embedder
         self._clock = clock
@@ -650,16 +624,20 @@ class PatternKeeper:
         messages: list[ConversationMessage],
         touched: Sequence[LifeThread],
     ) -> None:
-        """Update the User's Patterns from an ended Conversation.
+        """Note the User's unmatched Patterns from an ended Conversation.
 
-        Runs whenever the User wrote something, so a view they took is
-        always judged. The model sees the Threads the Conversation touched,
-        the User's other Threads closest in meaning to those and to their
-        texts, however old (up to the Admin-set number), all their Patterns
-        (those a Reply Plan offered in the Conversation marked as offered),
-        and the days behind the evidence of the Patterns linked to those
-        Threads (up to the Admin-set number). An unreadable answer is asked
-        again once; if it is still unreadable nothing changes.
+        Runs whenever the User wrote something. The model sees the Threads
+        the Conversation touched, the User's other Threads closest in
+        meaning to those and to their texts, however old (up to the
+        Admin-set number), the Pattern Types in the catalog (only while
+        tagging notes the evidence for those, so nothing that recurs is
+        left unkept for a User without Pattern noticing), all their
+        Patterns with no Pattern Type, and the days behind the evidence of
+        the Patterns linked to those Threads (up to the Admin-set number).
+        An unreadable answer is asked again once; if it is still unreadable
+        nothing changes. Every unmatched Pattern with a general description
+        and no unmatched entry yet, new or kept earlier, is grouped under
+        one.
 
         Args:
             snapshot: The User whose Conversation it was; User Memory works
@@ -693,38 +671,50 @@ class PatternKeeper:
             {thread.id for thread in threads.values()},
             settings.get(PATTERN_KEEPING_DAYS),
         )
-        offered_ids = {
-            reply_plan.form.pattern_offered.pattern_id
-            for reply_plan in self._repositories.reply_plans.list_for_conversation(
-                conversation_id
-            )
-            if reply_plan.form.pattern_offered is not None
-        }
+        pattern_types = (
+            [entry.pattern_type for entry in self._pattern_catalog.catalog()]
+            if may_keep_observations(snapshot)
+            else []
+        )
         entries = self._ask(
             snapshot,
             describe_patterns_to_keep(
                 touched_by_number,
                 closest_by_number,
+                pattern_types,
                 known,
                 days,
                 messages,
                 conversation_day,
                 now,
                 time_zone,
-                offered_ids,
             ),
         )
         if entries is None:
             logger.warning("Pattern keeping gave no readable answer")
             return
         planned = plan_pattern_changes(
-            entries, threads, known, user_id, conversation_day, now
+            entries,
+            threads,
+            known,
+            user_id,
+            snapshot.user.name,
+            conversation_day,
+            now,
         )
+        kept = {pattern.id: pattern for pattern in known.values()}
+        latest = kept | {pattern.id: pattern for pattern in planned.changed}
         self._repositories.patterns.save_many(
-            added=[self._to_save(pattern) for pattern in planned.added],
+            added=[
+                self._to_save(pattern)
+                for pattern in self._unmatched_grouper.link(settings, planned.added)
+            ],
             changed=[
                 PatternToSave(pattern=pattern, embedding=None)
-                for pattern in planned.changed
+                for pattern in self._unmatched_grouper.link(
+                    settings, list(latest.values())
+                )
+                if pattern != kept[pattern.id]
             ],
         )
 
@@ -855,7 +845,9 @@ class PatternKeeper:
                 snapshot=snapshot,
                 step=ModelStep.PATTERNS,
                 model=settings.get(PATTERN_KEEPING_MODEL),
-                thinking=settings.get(PATTERN_KEEPING_THINKING),
+                thinking=thinking_to_use(
+                    settings, PATTERN_KEEPING_MODEL, PATTERN_KEEPING_THINKING
+                ),
                 instructions=settings.get(PATTERN_KEEPING_PROMPT),
                 history=[ChatLine(role=ChatRole.USER, text=description)],
             )

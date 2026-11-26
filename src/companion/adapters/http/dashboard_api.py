@@ -16,9 +16,11 @@ from companion.core.models import (
     CheckInOutcome,
     CheckInSettings,
     CheckInStatus,
+    Condition,
     ConnectionToken,
     ConnectionTokenStatus,
     DaySummary,
+    Directness,
     LifeThread,
     MemoryGroup,
     MemoryItem,
@@ -26,10 +28,12 @@ from companion.core.models import (
     MoveOutcome,
     MoveResult,
     MoveRole,
+    Observation,
     OnboardingAnswers,
-    Pattern,
+    PatternState,
     PauseLength,
     PersonalSticker,
+    PredictionOutcome,
     PreferenceChanges,
     SharedPhoto,
     User,
@@ -39,6 +43,7 @@ from companion.core.personal_stickers import PersonalStickerService
 from companion.core.photos import PhotoService
 from companion.core.platform_settings import PlatformSettingsService
 from companion.core.telegram_connection import TelegramConnectionService
+from companion.core.told_patterns import ToldPattern
 from companion.core.user_data import UserDataService
 from companion.core.user_memory import UserMemoryService
 from companion.core.users import UserService
@@ -59,7 +64,11 @@ class MeResponse(BaseModel):
     user_memory_available: bool
     photo_viewing_enabled: bool
     photo_viewing_available: bool
+    directness: Directness
+    contested_gathering_enabled: bool
+    pattern_sharing_works: bool
     personal_stickers_available: bool
+    show_pattern_noticing_notice: bool
     onboarding_completed_at: datetime | None
     role: UserRole
     changed_in_chat: dict[ChatSetting, datetime]
@@ -92,6 +101,8 @@ class PreferencesRequest(BaseModel):
     name: str | None = None
     user_memory_enabled: bool | None = None
     photo_viewing_enabled: bool | None = None
+    directness: Directness | None = None
+    contested_gathering_enabled: bool | None = None
     country: str | None = None
     time_zone: str | None = None
 
@@ -293,27 +304,77 @@ class MoveOutcomesResponse(BaseModel):
     move_outcomes: list[MoveOutcomeResponse]
 
 
-class PatternEvidenceResponse(BaseModel):
-    """One time a Pattern showed up: the day, its Life Thread and what happened."""
+class WhereItShowsResponse(BaseModel):
+    """Where a Pattern shows and where it was shown not to happen.
 
+    `condition` names the Condition; the two lists hold its values as stored.
+    """
+
+    condition: Condition
+    shows_with: list[str]
+    not_with: list[str]
+
+
+class PatternQuoteResponse(BaseModel):
+    """One of the User's quotes behind a Pattern, and the day they said it."""
+
+    quote: str
     day: date
-    thread: str
-    line: str
+
+
+class PatternQuoteGroupResponse(BaseModel):
+    """A Pattern's quotes from one Life Thread; `life_thread` is None for no Thread."""
+
+    life_thread: str | None
+    quotes: list[PatternQuoteResponse]
+
+
+class PredictionResponse(BaseModel):
+    """A Prediction given for a Pattern; `outcome` is None until it is known."""
+
+    wording: str
+    made_at: datetime
+    outcome: PredictionOutcome | None
 
 
 class PatternResponse(BaseModel):
-    """A Pattern the User agreed with, when they agreed and what it is based on."""
+    """A Pattern Zeph told the User about, in words and evidence, with no score.
+
+    `state` is shared (being tested), confirmed, contested (they disagreed)
+    or closed (it didn't hold up).
+    """
 
     id: str
+    state: PatternState
     pattern: str
-    agreed_at: datetime
-    evidence: list[PatternEvidenceResponse]
+    where_it_shows: list[WhereItShowsResponse]
+    told_at: datetime
+    quote_groups: list[PatternQuoteGroupResponse]
+    predictions: list[PredictionResponse]
 
 
 class PatternsResponse(BaseModel):
-    """A User's confirmed Patterns, newest agreed first."""
+    """The Patterns Zeph told a User about: tested, confirmed, contested, closed."""
 
     patterns: list[PatternResponse]
+
+
+class KeptQuoteResponse(BaseModel):
+    """A quote Zeph keeps as evidence: the User's words, Zeph's note and the day.
+
+    No Pattern Type or Pattern is named.
+    """
+
+    id: str
+    quote: str
+    context: str
+    day: date
+
+
+class KeptQuotesResponse(BaseModel):
+    """The quotes Zeph keeps as evidence for a User, newest day first."""
+
+    quotes: list[KeptQuoteResponse]
 
 
 class UserPortraitResponse(BaseModel):
@@ -397,25 +458,64 @@ def to_life_thread_response(thread: LifeThread) -> LifeThreadResponse:
     )
 
 
-def to_pattern_response(pattern: Pattern) -> PatternResponse:
-    """Describe a confirmed Pattern for the Dashboard.
+def to_kept_quote_response(observation: Observation) -> KeptQuoteResponse:
+    """Describe a kept quote for the Dashboard, naming no Pattern.
 
     Args:
-        pattern: The confirmed Pattern.
+        observation: The Observation whose quote Zeph keeps.
 
     Returns:
-        The pattern, when the User agreed with it, and its evidence newest
-        day first.
+        Its quote, context line and day.
     """
+    return KeptQuoteResponse(
+        id=str(observation.id),
+        quote=observation.quote,
+        context=observation.context,
+        day=observation.day,
+    )
+
+
+def to_pattern_response(told: ToldPattern) -> PatternResponse:
+    """Describe a Pattern Zeph told the User about for the Dashboard.
+
+    Args:
+        told: The Pattern as the User sees it.
+
+    Returns:
+        Its state, wording, where it shows, when it was told, its quotes
+        by Life Thread and its Predictions; never a score.
+    """
+    pattern = told.pattern
     return PatternResponse(
         id=str(pattern.id),
-        pattern=pattern.pattern,
-        agreed_at=pattern.confirmed_at or pattern.updated_at,
-        evidence=[
-            PatternEvidenceResponse(
-                day=item.day, thread=item.thread_title, line=item.line
+        state=pattern.state,
+        pattern=told.wording,
+        where_it_shows=[
+            WhereItShowsResponse(
+                condition=where.condition,
+                shows_with=list(where.shows_with),
+                not_with=list(where.not_with),
             )
-            for item in reversed(pattern.evidence)
+            for where in told.where_it_shows
+        ],
+        told_at=told.told_at,
+        quote_groups=[
+            PatternQuoteGroupResponse(
+                life_thread=group.life_thread,
+                quotes=[
+                    PatternQuoteResponse(quote=quote.quote, day=quote.day)
+                    for quote in group.quotes
+                ],
+            )
+            for group in told.quote_groups
+        ],
+        predictions=[
+            PredictionResponse(
+                wording=prediction.wording,
+                made_at=prediction.made_at,
+                outcome=prediction.outcome,
+            )
+            for prediction in told.predictions
         ],
     )
 
@@ -559,7 +659,11 @@ def to_me_response(me: Me) -> MeResponse:
         user_memory_available=me.user_memory_available,
         photo_viewing_enabled=user.photo_viewing_enabled,
         photo_viewing_available=me.photo_viewing_available,
+        directness=user.directness,
+        contested_gathering_enabled=user.contested_gathering_enabled,
+        pattern_sharing_works=me.pattern_sharing_works,
         personal_stickers_available=me.personal_stickers_available,
+        show_pattern_noticing_notice=me.show_pattern_noticing_notice,
         onboarding_completed_at=user.onboarding_completed_at,
         role=user.role,
         changed_in_chat=user.settings_changed_in_chat,
@@ -746,7 +850,7 @@ def build_dashboard_api_router(
     def update_me(
         user: Annotated[User, Depends(current_user)], request: PreferencesRequest
     ) -> MeResponse:
-        """Change the User's name, own Feature switches, country or time zone.
+        """Change the User's name, own switches, directness, country or time zone.
 
         Args:
             user: The signed-in User.
@@ -763,10 +867,26 @@ def build_dashboard_api_router(
             name=request.name,
             user_memory_enabled=request.user_memory_enabled,
             photo_viewing_enabled=request.photo_viewing_enabled,
+            directness=request.directness,
+            contested_gathering_enabled=request.contested_gathering_enabled,
             country=request.country,
             time_zone=request.time_zone,
         )
         return me_response(user_service.update_preferences(user, changes))
+
+    @router.post("/me/pattern-noticing-told")
+    def mark_pattern_noticing_told(
+        user: Annotated[User, Depends(current_user)],
+    ) -> MeResponse:
+        """Save that the User pressed "Got it" on the Pattern noticing notice.
+
+        Args:
+            user: The signed-in User.
+
+        Returns:
+            The updated User, whose notice no longer shows.
+        """
+        return me_response(user_service.mark_pattern_noticing_told(user))
 
     @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
     def delete_account(user: Annotated[User, Depends(current_user)]) -> Response:
@@ -1109,18 +1229,19 @@ def build_dashboard_api_router(
     def list_patterns(
         user: Annotated[User, Depends(current_user)],
     ) -> PatternsResponse:
-        """Return the Patterns the User agreed with, newest agreed first.
+        """Return the Patterns Zeph has told the User about.
 
         Args:
             user: The signed-in User.
 
         Returns:
-            The confirmed Patterns, each with its evidence.
+            The Patterns being tested, confirmed, contested and closed after
+            being told, each with its quotes and Predictions.
         """
         return PatternsResponse(
             patterns=[
-                to_pattern_response(pattern)
-                for pattern in user_memory_service.list_confirmed_patterns(user.id)
+                to_pattern_response(told)
+                for told in user_memory_service.list_told_patterns(user.id)
             ]
         )
 
@@ -1128,7 +1249,7 @@ def build_dashboard_api_router(
     def delete_pattern(
         user: Annotated[User, Depends(current_user)], pattern_id: UUID
     ) -> Response:
-        """Delete one of the User's confirmed Patterns.
+        """Delete one of the Patterns Zeph told the User about, with its quotes.
 
         Args:
             user: The signed-in User.
@@ -1138,9 +1259,49 @@ def build_dashboard_api_router(
             An empty response.
 
         Raises:
-            CoreError: 404 if the User has no such confirmed Pattern.
+            CoreError: 404 if the User has no such Pattern they were told.
         """
         user_memory_service.delete_pattern(user.id, pattern_id)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @router.get("/kept-quotes")
+    def list_kept_quotes(
+        user: Annotated[User, Depends(current_user)],
+    ) -> KeptQuotesResponse:
+        """Return the quotes Zeph keeps as evidence for the User, newest day first.
+
+        Args:
+            user: The signed-in User.
+
+        Returns:
+            Each quote with its context line and day, and no Pattern named.
+        """
+        return KeptQuotesResponse(
+            quotes=[
+                to_kept_quote_response(observation)
+                for observation in user_memory_service.list_kept_quotes(user.id)
+            ]
+        )
+
+    @router.delete(
+        "/kept-quotes/{observation_id}", status_code=status.HTTP_204_NO_CONTENT
+    )
+    def delete_kept_quote(
+        user: Annotated[User, Depends(current_user)], observation_id: UUID
+    ) -> Response:
+        """Delete one of the User's kept quotes, so it is never used again.
+
+        Args:
+            user: The signed-in User.
+            observation_id: The kept quote's ID.
+
+        Returns:
+            An empty response.
+
+        Raises:
+            CoreError: 404 if the User has no such kept quote.
+        """
+        user_memory_service.delete_kept_quote(user.id, observation_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     @router.get("/move-outcomes")

@@ -31,6 +31,7 @@ const beHeard: Need = {
   how_to_reply: "Listen and reflect back.",
   is_fallback: false,
   ruled_out_move_ids: ["move-push"],
+  curiosities: "never",
 };
 
 const advice: Need = {
@@ -40,6 +41,7 @@ const advice: Need = {
   how_to_reply: "Give a real view.",
   is_fallback: false,
   ruled_out_move_ids: [],
+  curiosities: "only_if_it_fits",
 };
 
 const askMore: Need = {
@@ -49,6 +51,7 @@ const askMore: Need = {
   how_to_reply: "Ask one short question.",
   is_fallback: true,
   ruled_out_move_ids: [],
+  curiosities: "only_if_it_fits",
 };
 
 const calm: Move = {
@@ -143,6 +146,7 @@ describe("NeedsManager", () => {
       when_it_fits: "They ask what to do.",
       how_to_reply: "One idea only.",
       ruled_out_move_ids: [],
+      curiosities: "only_if_it_fits",
     });
     expect(await screen.findByText("Saved Advice.")).toBeInTheDocument();
   });
@@ -170,6 +174,45 @@ describe("NeedsManager", () => {
       when_it_fits: "They are venting.",
       how_to_reply: "Listen and reflect back.",
       ruled_out_move_ids: ["move-calm"],
+      curiosities: "never",
+    });
+  });
+
+  it("shows how each Need treats Curiosities, with a hint", async () => {
+    renderWithQueries(<NeedsManager />);
+
+    const card = await findCard("Be heard");
+    expect(card.getByLabelText("Curiosities")).toHaveValue("never");
+    expect(
+      card.getByText(
+        "Whether the Reply Plan asks a due Curiosity while this Need is picked. Ask by default means it asks one or says why not.",
+      ),
+    ).toBeVisible();
+    expect(
+      within(card.getByLabelText("Curiosities"))
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["Ask by default", "Test the water", "Only if it fits", "Never"]);
+  });
+
+  it("saves a Need's changed Curiosities choice", async () => {
+    apiClient.updateNeed.mockResolvedValue(advice);
+    const user = userEvent.setup();
+    renderWithQueries(<NeedsManager />);
+    const card = await findCard("Advice");
+
+    await user.selectOptions(
+      card.getByLabelText("Curiosities"),
+      "Ask by default",
+    );
+    await user.click(card.getByRole("button", { name: "Save" }));
+
+    expect(apiClient.updateNeed).toHaveBeenCalledWith("need-advice", {
+      name: "Advice",
+      when_it_fits: "They ask what to do.",
+      how_to_reply: "Give a real view.",
+      ruled_out_move_ids: [],
+      curiosities: "ask_by_default",
     });
   });
 
@@ -191,6 +234,7 @@ describe("NeedsManager", () => {
       when_it_fits: "Good news.",
       how_to_reply: "Cheer them on.",
       ruled_out_move_ids: ["move-push"],
+      curiosities: "only_if_it_fits",
     });
     expect(await screen.findByText("Added Celebrate.")).toBeInTheDocument();
   });

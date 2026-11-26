@@ -1,0 +1,250 @@
+# Whole-pipeline eval. Each case is a made-up User with hidden true Pattern
+# Types and a script of several Conversations. Every text goes through the
+# real reply path; when a Conversation is over the clock moves past the
+# Conversation quiet gap and every Conversation-end step runs, as in the live
+# app. Pattern noticing, exploring and sharing are on for the made-up User.
+# The app is never told which Pattern Types are true.
+#
+# A case passes when every Pattern that became ready or was shared is one of
+# its true ones, at least one of its true ones became ready (when it has any),
+# and no Conversation-end step failed. A true one missed beside one found is
+# counted as missed and doesn't fail it.
+# Target for a run: at least 70% of ready Patterns true.
+#
+# Drafted by Claude to start; the owner corrects them. A model wrote these
+# Users and a model tags them, so they tend to agree: this Eval catches
+# breakage, not truth. See docs/pattern-evals/README.md.
+#
+# It costs far more than the other Evals (every text is a full reply, every
+# Conversation a full Conversation end), so `make eval` runs it only when it
+# is named: make eval EVALS=whole_pipeline
+#
+# `now` is when the story starts (UTC, which is also the person's time zone).
+# A case can set its own `now`.
+#
+# true_pattern_types: [<Pattern Type ID>]   leave out when none is true, so no
+#                                           Pattern may become ready
+# conversations:
+#   - days_later: <whole number>   days after the Conversation before (for the
+#                                  first one, after `now`); 0 starts it right
+#                                  after the one before ended
+#     messages: [<text>]           the person's texts, a minute apart. Zeph's
+#                                  replies are the real ones, so each text must
+#                                  make sense whatever Zeph says.
+#
+# What a Pattern needs to be ready, with the starting numbers: 3 situations,
+# 2 Conversations, 300 points (a strong sign told as a real story is 140) and
+# an answered counter-test (any Observation against). Evidence against with a
+# different kind of person than all the evidence for only narrows it. Keep the
+# "it doesn't happen with…" story to one text that names the person: a second
+# line that only compares ("it's only with mum and friends that I cave") can be
+# tagged as evidence against with no person, and then nothing is narrowed and
+# the counter-test check stops the Pattern. A story about a parent or a boss
+# may be tagged "above", which for some Pattern Types is what anyone would do
+# and counts for nothing: use people on the same footing.
+
+now: 2026-11-02T19:30:00
+
+cases:
+  # One true Pattern, with three people and a clear "not with my partner".
+
+  - id: folds-with-sister-and-friends
+    true_pattern_types: [CONF.AVOID.BELONG]
+    conversations:
+      - days_later: 0
+        messages:
+          - "ugh. my sister Mei just asked if I can host the family dinner again this month"
+          - "third time in a row. I said yes straight away, told her it's fine. and now I'm sat here properly annoyed about it"
+          - "honestly I'd rather cook for twelve than have her go cold on me for a week. her being angry at me is worse than the dinner"
+      - days_later: 2
+        messages:
+          - "so my friend Dan wants us all to go to that music festival in March. everyone's in"
+          - "I don't even like camping and it's 300 dollars. I said sounds great in the group chat"
+          - "then spent the whole evening stewing about it. I always do this with Dan, agree first and resent it after"
+          - "I did type out a message saying I'd skip it. rewrote it like five times so he wouldn't be upset, then deleted it"
+      - days_later: 3
+        messages:
+          - "my flatmate Priya has her boyfriend over basically every night now"
+          - "she asked if I mind and I said no no it's totally fine. it is not fine, I haven't had the living room to myself in weeks"
+          - "I just can't face her being annoyed with me in my own home. I'd rather keep the peace than have it out"
+      - days_later: 2
+        messages:
+          - "funny thing, with my boyfriend Sam I don't do any of this"
+          - "he wanted to spend Christmas at his parents and I just told him no, I want us at mine this year. said it straight, we talked, sorted in ten minutes"
+          - "didn't feel bad about it at all. it's only with Mei and my friends that I fold"
+      - days_later: 1
+        messages:
+          - "long day. Mei texted about the dinner menu and I just went along with what she wanted again"
+          - "anyway. how do I stop saying yes when I mean no"
+
+  # Two true Patterns that are look-alikes of each other: going quiet when
+  # hurt, and hiding what's hard so as not to be a burden.
+
+  - id: goes-quiet-and-says-fine
+    true_pattern_types: [CONF.WITHDRAW.HURT, APPR.HIDE.BURDEN]
+    conversations:
+      - days_later: 0
+        messages:
+          - "my best friend Lena forgot my birthday yesterday. not even a text"
+          - "she messaged today like nothing happened and I've just been sending one word replies. ok. sure. fine"
+          - "I'm not going to tell her it hurt. saying that out loud would make me look so needy"
+      - days_later: 2
+        messages:
+          - "this week at work has been brutal. two people quit and I'm covering all of it, barely sleeping"
+          - "mum called and asked how things are and I said all good, just busy"
+          - "I don't want to dump my problems on her, she's got enough going on"
+      - days_later: 2
+        messages:
+          - "family dinner last night. my brother Tom made a joke in front of everyone about me still renting at 34"
+          - "it stung way more than I let on. I went quiet for the rest of the night and haven't answered his messages since"
+          - "he should know what he did. I'm not going to spell out that it hurt, I'd feel pathetic"
+      - days_later: 3
+        messages:
+          - "car died on monday. the repair is 1800 and I don't have it right now, it's been a really hard week"
+          - "Lena asked how I'm doing and I told her I'm fine, all good"
+          - "I hate the idea of being the friend who unloads on people. nobody wants that"
+      - days_later: 2
+        messages:
+          - "Kai cancelled our anniversary dinner an hour before, because of a work thing"
+          - "I said no worries. then I basically stopped talking to him all evening, short flat answers to everything"
+          - "I couldn't make myself say I was hurt. it feels weak to admit I needed him to show up"
+          - "and when he asked how the car stuff is going I said it's all sorted, it's fine. it isn't. I just didn't want to be a burden on top of his work stress"
+      - days_later: 2
+        messages:
+          - "weird one. at work it's different"
+          - "my teammate Jo presented my slides as hers on tuesday. I told her that same afternoon that it hurt and I wasn't ok with it. no drama, we sorted it"
+          - "and when the deadline got too much I just told Jo I was struggling and asked her to take two of my tickets. easy"
+          - "so why can't I do that with the people I'm actually close to"
+
+  # No true Pattern: an ordinary fortnight. It has moments anyone would have
+  # (saying ok to a manager, planning a trip, taking fair feedback).
+
+  - id: ordinary-fortnight
+    conversations:
+      - days_later: 0
+        messages:
+          - "finally friday. made that miso aubergine thing again, turned out great"
+          - "work was fine, the usual. my manager moved the deadline up and I just said ok, not much to argue with there"
+          - "planning to do nothing all weekend"
+      - days_later: 3
+        messages:
+          - "booked flights to Lisbon for April! compared a few airlines last night, picked the cheapest direct one, done"
+          - "my friend Ana is coming too, she picked the hotel, looks nice"
+          - "any food I should try there"
+      - days_later: 2
+        messages:
+          - "got a bit of feedback on my report today, my lead said the intro was too long. fair enough, I trimmed it"
+          - "started watching that baking show everyone talks about, two episodes then bed"
+          - "my brother's visiting sunday, we'll probably just get noodles"
+      - days_later: 4
+        messages:
+          - "brother's visit was nice. he was a bit grumpy about his job, I let him vent, then we ate"
+          - "ran 5k this morning, slow but fine"
+          - "thinking of repainting the hallway. green or off-white?"
+
+  # One true Pattern (control under uncertainty) whose look-alike is not true:
+  # they never ask anyone to confirm a choice they made.
+
+  - id: cannot-stand-waiting
+    true_pattern_types: [CTRL.UNCERT.PLAN]
+    conversations:
+      - days_later: 0
+        messages:
+          - "had the final interview for the product job on monday. they said I'd hear this week"
+          - "I've refreshed my inbox maybe forty times today. I can't do anything about it and I still keep checking"
+          - "last night I caught myself hoping they'd just email a rejection so it would be over. the waiting is worse than a no would be, a no I can deal with"
+          - "I've already drafted what I'll do if it's a no, and a list of three other places to apply. and a budget in case I'm out of work by February, which is not even likely"
+      - days_later: 2
+        messages:
+          - "still nothing from the job. separate thing though, our lease is up in January and the landlord hasn't said if he'll renew"
+          - "I've emailed him twice. I'd rather he just said no than leave me hanging like this, not knowing is the worst part"
+          - "so I've viewed two other flats already just in case, and worked out moving costs for each"
+      - days_later: 3
+        messages:
+          - "got the job!! start in January. accepted on the spot, didn't need to ask anyone, I knew I wanted it"
+          - "now it's the trip with my uni friends. six of us, nobody will confirm dates"
+          - "I couldn't stand waiting on them so I just took over, made the spreadsheet, picked the dates and booked the house myself"
+          - "before that, when the group chat went quiet again, I told them I'd rather cancel the whole trip than stay in limbo, and I meant it. not knowing felt worse than no trip"
+      - days_later: 2
+        messages:
+          - "landlord finally replied, he's renewing. so all that flat hunting was for nothing, typical"
+          - "funny though, with my girlfriend Mia it's different. our June holiday isn't planned at all, could be Spain, could be nowhere. she asked last night if that bothers me and it honestly doesn't, I've left it open for weeks and I'm relaxed"
+      - days_later: 1
+        messages:
+          - "new thing to wait on, the contract from HR. they said end of week. guess who's checked the portal six times"
+          - "why am I like this with waiting"
+
+  # One true Pattern (moving the goal) and one bad day that sounds like its
+  # look-alike, performance-contingent self-worth, which must not become ready
+  # from a single story.
+
+  - id: never-arrives
+    true_pattern_types: [ACH.GOAL.MOVE]
+    conversations:
+      - days_later: 0
+        messages:
+          - "ran my first half marathon on sunday. 1:58, I'd been training since june for sub two"
+          - "and it felt like nothing. I crossed the line and by the evening I'd already signed up for a full marathon in the spring"
+          - "everyone wanted to celebrate and I was just looking at training plans"
+      - days_later: 3
+        messages:
+          - "got promoted to senior designer today. two years I've wanted that title"
+          - "the buzz wore off by lunchtime, honestly. I'm already looking at what it takes to make lead"
+          - "my partner asked when it will be enough and I couldn't answer. I don't think there is a point where I'd say that's it, I'm happy here"
+      - days_later: 2
+        messages:
+          - "bad day. sent the client deck with last quarter's numbers in it, my mistake, fixed it within the hour"
+          - "felt like an idiot for a bit, I'm so useless sometimes. anyway it's sorted, the client didn't mind"
+      - days_later: 3
+        messages:
+          - "hit my savings goal this week, 50k, the number I set three years ago"
+          - "I looked at the balance for about a minute and felt flat. then I moved the goal to 100k"
+          - "I don't even need the money for anything. the old number just stopped meaning anything the second I reached it"
+      - days_later: 2
+        messages:
+          - "passed my Spanish B2 exam! results came this morning"
+          - "and yes, I booked the C1 course before I'd even told anyone I passed. the pass felt empty within the hour"
+          - "the pottery class is the one exception. I signed up for the next level there because I just love it, not because finishing the first one felt hollow"
+      - days_later: 1
+        messages:
+          - "my sister asked what I'm aiming for after the marathon. I said an ultra, without even thinking"
+          - "do you think I'll ever just get somewhere and stay"
+
+  # One true Pattern, and the last two Conversations ask Zeph what it has
+  # noticed, so a ready Pattern can be shared. Zeph shares at most one Pattern
+  # a week and only when it isn't worried about them, so the asking is calm.
+
+  - id: asks-what-zeph-noticed
+    true_pattern_types: [CONF.AVOID.BELONG]
+    conversations:
+      - days_later: 0
+        messages:
+          - "my brother Omar just rang, he wants me to drive him to the airport on saturday. two hours each way"
+          - "I had the whole day planned. I said of course, no problem. now I'm fuming at myself"
+          - "if I say no he goes quiet and hurt for days and I can't stand it. I'd rather lose the saturday than have him upset with me"
+      - days_later: 2
+        messages:
+          - "my friend Rosa asked to borrow my car for the weekend. again"
+          - "last time it came back with an empty tank and a scratch. I said sure, take it"
+          - "I wanted to say no so badly. but she'd think I'm being petty and I don't want things to get weird between us, so I just smiled and handed over the keys"
+      - days_later: 3
+        messages:
+          - "at work my teammate Ben asked me to swap on-call weeks so he can go to a gig. it's the third swap this year"
+          - "I said yeah fine, happy to. I'm not happy to, it's my only free weekend this month"
+          - "I don't want to be the difficult one on the team. him being off with me would be worse than a lost weekend"
+      - days_later: 2
+        messages:
+          - "strange thing is I'm not like this with my husband Idris"
+          - "he wanted to book his parents in for two weeks over new year and I just told Idris no, one week is my limit. plainly. we argued for a bit and settled on eight days, and saying no to him didn't scare me at all"
+      - days_later: 1
+        messages:
+          - "Omar again. he's now added a stop at his storage unit on the way on saturday and I said great, sure"
+          - "I keep agreeing to things and then seething about it afterwards"
+      - days_later: 2
+        messages:
+          - "calmer day today. saturday went ok in the end"
+          - "you've heard a fair bit from me by now. is there anything you've noticed about me? a pattern in how I deal with people, anything. I'd really like to hear it"
+      - days_later: 1
+        messages:
+          - "I've been thinking about what you see in me from all these chats"
+          - "if there's something you think keeps showing up in what I tell you, say it straight. I'm asking"

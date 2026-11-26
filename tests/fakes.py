@@ -10,6 +10,8 @@ from typing import Any
 
 from companion.adapters.evals.stand_ins import InlineUserWorkQueue
 from companion.adapters.postgres.tables import EMBEDDING_SIZE
+from companion.core.chat_settings import CLAIM_CHECK_PROMPT
+from companion.core.curiosities import ASKED_CHECK_PROMPT
 from companion.core.incoming_messages import MESSAGE_WAIT_PREFIX
 from companion.core.models import (
     AccountIdentity,
@@ -20,8 +22,11 @@ from companion.core.models import (
     StickerImage,
     ToolCallRecord,
     WebSearchResult,
+    join_instructions,
 )
+from companion.core.pattern_sharing import SHARED_CHECK_PROMPT
 from companion.core.ports import ChatTool
+from companion.core.predictions import GIVEN_CHECK_PROMPT
 from companion.core.typing_keeper import TYPING_WAIT_PREFIX
 from companion.core.woven_check_ins import BROUGHT_UP_CHECK_PROMPT
 
@@ -341,10 +346,12 @@ class ChatModelCall:
     Attributes:
         model: The model name asked for.
         thinking: Whether the model was asked to think first.
-        instructions: The instructions given.
+        instructions: The instructions given, as the one text the model reads.
         history: The Conversation so far.
         tools: The tools the model was offered.
         tool_results: What each scripted tool call returned, in order.
+        fixed_instructions: The instructions given as the same for every call.
+        message_instructions: The instructions given as made for this one call.
     """
 
     model: str
@@ -353,6 +360,8 @@ class ChatModelCall:
     history: list[ChatLine]
     tools: list[ChatTool] = field(default_factory=list)
     tool_results: list[str] = field(default_factory=list)
+    fixed_instructions: str = ""
+    message_instructions: str = ""
 
 
 @dataclass(frozen=True)
@@ -548,6 +557,12 @@ def reply_plan_answer(
     check_in: object = None,
     patterns_used: Sequence[object] = (),
     offer_pattern: object = None,
+    no_curiosity_why: object = None,
+    curiosity_taken: object = None,
+    share_pattern: object = False,
+    raised_pattern: object = None,
+    named_pattern: object = None,
+    asked_for_patterns: object = False,
 ) -> str:
     """Build the form the Reply Plan model answers with.
 
@@ -584,6 +599,20 @@ def reply_plan_answer(
             on, or anything else a model might write there.
         offer_pattern: The number of the Pattern the reply offers, or
             anything else a model might write there; None for none.
+        no_curiosity_why: Why no Curiosity is asked, or anything else a
+            model might write there; None for no reason.
+        curiosity_taken: How they took the Curiosity asked in the last
+            reply, or anything else a model might write there; None for not
+            said.
+        share_pattern: Whether the reply tells them the ready Pattern, or
+            anything else a model might write there.
+        raised_pattern: The number of the Pattern they disagreed with and
+            raised themselves, or anything else a model might write there.
+        named_pattern: The number of the Pattern Zeph told them that the
+            reply links today's story to, or anything else a model might
+            write there.
+        asked_for_patterns: Whether they ask what patterns Zeph sees in
+            them, or anything else a model might write there.
 
     Returns:
         The form as JSON.
@@ -614,6 +643,12 @@ def reply_plan_answer(
         "check_in": check_in,
         "patterns_used": list(patterns_used),
         "offer_pattern": offer_pattern,
+        "no_curiosity_why": no_curiosity_why,
+        "curiosity_taken": curiosity_taken,
+        "share_pattern": share_pattern,
+        "raised_pattern": raised_pattern,
+        "named_pattern": named_pattern,
+        "asked_for_patterns": asked_for_patterns,
     }
     if ask_why is not None:
         answer["ask_why"] = ask_why
@@ -633,8 +668,12 @@ class ScriptedChatModel:
     reply calls, each with its own script. The Safeguard defaults to "none",
     the Understanding to `understanding_answer()`, the Reply Plan to
     `reply_plan_answer()`, Life Thread, Pattern, Curiosity and Move Outcome
-    keeping to none kept, Portrait writing to an empty answer (no
-    Portrait), the brought-up check to "no" and drafting to
+    keeping to none kept, arguing the other side to no better
+    explanation, Portrait writing to an empty answer (no
+    Portrait), the brought-up check to "no", the check that a reply asked
+    its Curiosity to "yes", the check that a reply says a setting changed
+    to "no", the check that a Pattern was
+    shared to not shared and drafting to
     `DEFAULT_WHEN_IT_HELPS`, so tests about replies don't have to script
     them too. Set
     `before_next_reply` to run something once while the next reply is being
@@ -657,6 +696,9 @@ class ScriptedChatModel:
         curiosity_keeping_prompt: str = "",
         move_outcome_keeping_prompt: str = "",
         pattern_keeping_prompt: str = "",
+        pattern_tagging_prompt: str = "",
+        pattern_matching_prompt: str = "",
+        pattern_other_side_prompt: str = "",
     ) -> None:
         """Start with no replies scripted, no calls and no delay.
 
@@ -682,6 +724,12 @@ class ScriptedChatModel:
                 Outcome keeping call.
             pattern_keeping_prompt: The instructions that mark a Pattern
                 keeping call.
+            pattern_tagging_prompt: The instructions that mark a Pattern
+                tagging call.
+            pattern_matching_prompt: The instructions that mark a Pattern
+                matching call.
+            pattern_other_side_prompt: The instructions that mark a call
+                arguing the other side of a Pattern.
         """
         self._replies: list[str | Exception | ToolCall] = []
         self._safeguard_answers: list[str | Exception] = []
@@ -696,6 +744,13 @@ class ScriptedChatModel:
         self._brought_up_check_answers: list[str | Exception] = []
         self._move_outcome_keeping_answers: list[str | Exception] = []
         self._pattern_keeping_answers: list[str | Exception] = []
+        self._pattern_tagging_answers: list[str | Exception] = []
+        self._pattern_matching_answers: list[str | Exception] = []
+        self._other_side_answers: list[str | Exception] = []
+        self._shared_check_answers: list[str | Exception] = []
+        self._given_check_answers: list[str | Exception] = []
+        self._asked_check_answers: list[str | Exception] = []
+        self._claim_check_answers: list[str | Exception] = []
         self.safeguard_prompt = safeguard_prompt
         self.memory_processing_prompt = memory_processing_prompt
         self.understanding_prompt = understanding_prompt
@@ -707,6 +762,9 @@ class ScriptedChatModel:
         self.portrait_prompt = portrait_prompt
         self.move_outcome_keeping_prompt = move_outcome_keeping_prompt
         self.pattern_keeping_prompt = pattern_keeping_prompt
+        self.pattern_tagging_prompt = pattern_tagging_prompt
+        self.pattern_matching_prompt = pattern_matching_prompt
+        self.pattern_other_side_prompt = pattern_other_side_prompt
         self.calls: list[ChatModelCall] = []
         self.safeguard_calls: list[ChatModelCall] = []
         self.processing_calls: list[ChatModelCall] = []
@@ -720,6 +778,13 @@ class ScriptedChatModel:
         self.brought_up_check_calls: list[ChatModelCall] = []
         self.move_outcome_keeping_calls: list[ChatModelCall] = []
         self.pattern_keeping_calls: list[ChatModelCall] = []
+        self.pattern_tagging_calls: list[ChatModelCall] = []
+        self.pattern_matching_calls: list[ChatModelCall] = []
+        self.other_side_calls: list[ChatModelCall] = []
+        self.shared_check_calls: list[ChatModelCall] = []
+        self.given_check_calls: list[ChatModelCall] = []
+        self.asked_check_calls: list[ChatModelCall] = []
+        self.claim_check_calls: list[ChatModelCall] = []
         self.call_order: list[str] = []
         self.delay_seconds = 0.0
         self.before_next_reply: Callable[[], None] | None = None
@@ -821,6 +886,69 @@ class ScriptedChatModel:
         """
         self._pattern_keeping_answers.extend(answers)
 
+    def script_pattern_tagging(self, *answers: str | Exception) -> None:
+        """Queue Pattern tagging answers, one per call.
+
+        Args:
+            answers: The JSON answers; an exception is raised instead of
+                returned, to act like a failing model.
+        """
+        self._pattern_tagging_answers.extend(answers)
+
+    def script_pattern_matching(self, *answers: str | Exception) -> None:
+        """Queue Pattern matching answers, one per call.
+
+        Args:
+            answers: The JSON answers; an exception is raised instead of
+                returned, to act like a failing model.
+        """
+        self._pattern_matching_answers.extend(answers)
+
+    def script_other_side(self, *answers: str | Exception) -> None:
+        """Queue answers of the call arguing the other side, one per call.
+
+        Args:
+            answers: The JSON answers; an exception is raised instead of
+                returned, to act like a failing model.
+        """
+        self._other_side_answers.extend(answers)
+
+    def script_shared_check(self, *answers: str | Exception) -> None:
+        """Queue answers to whether a message shared its Pattern, one per call.
+
+        Args:
+            answers: The JSON answers; an exception is raised instead of
+                returned, to act like a failing model.
+        """
+        self._shared_check_answers.extend(answers)
+
+    def script_given_check(self, *answers: str | Exception) -> None:
+        """Queue answers to whether a message gave a Prediction, one per call.
+
+        Args:
+            answers: The JSON answers; an exception is raised instead of
+                returned, to act like a failing model.
+        """
+        self._given_check_answers.extend(answers)
+
+    def script_asked_check(self, *answers: str | Exception) -> None:
+        """Queue answers to whether a reply asked its Curiosity, one per call.
+
+        Args:
+            answers: "yes" or "no"; an exception is raised instead of
+                returned, to act like a failing model.
+        """
+        self._asked_check_answers.extend(answers)
+
+    def script_claim_check(self, *answers: str | Exception) -> None:
+        """Queue answers to whether a reply says a setting changed, one per call.
+
+        Args:
+            answers: "yes" or "no"; an exception is raised instead of
+                returned, to act like a failing model.
+        """
+        self._claim_check_answers.extend(answers)
+
     def script_brought_up_check(self, *answers: str | Exception) -> None:
         """Queue answers to whether a reply brought up its Check-in, one per call.
 
@@ -855,6 +983,7 @@ class ScriptedChatModel:
         instructions: str,
         history: list[ChatLine],
         tools: Sequence[ChatTool] = (),
+        message_instructions: str = "",
     ) -> ModelAnswer:
         """Record the call and return the next scripted reply or answer.
 
@@ -864,17 +993,22 @@ class ScriptedChatModel:
             instructions: The instructions given.
             history: The Conversation so far.
             tools: The tools the model may call.
+            message_instructions: The instructions made for this one call.
 
         Returns:
             The next scripted reply, or Safeguard answer for a Safeguard call,
             with the same token counts for every call.
         """
+        fixed_instructions = instructions
+        instructions = join_instructions(fixed_instructions, message_instructions)
         call = ChatModelCall(
             model=model,
             thinking=thinking,
             instructions=instructions,
             history=history,
             tools=list(tools),
+            fixed_instructions=fixed_instructions,
+            message_instructions=message_instructions,
         )
         tool_calls: list[ToolCallRecord] = []
         if self.safeguard_prompt and instructions == self.safeguard_prompt:
@@ -910,6 +1044,38 @@ class ScriptedChatModel:
                 self._move_outcome_keeping_answers.pop(0)
                 if self._move_outcome_keeping_answers
                 else json.dumps({"move_outcomes": []})
+            )
+        elif (
+            self.pattern_tagging_prompt and instructions == self.pattern_tagging_prompt
+        ):
+            self.pattern_tagging_calls.append(call)
+            self.call_order.append("pattern_tagging")
+            answer = (
+                self._pattern_tagging_answers.pop(0)
+                if self._pattern_tagging_answers
+                else json.dumps({"observations": []})
+            )
+        elif (
+            self.pattern_matching_prompt
+            and instructions == self.pattern_matching_prompt
+        ):
+            self.pattern_matching_calls.append(call)
+            self.call_order.append("pattern_matching")
+            answer = (
+                self._pattern_matching_answers.pop(0)
+                if self._pattern_matching_answers
+                else json.dumps({"pattern_type": None})
+            )
+        elif (
+            self.pattern_other_side_prompt
+            and instructions == self.pattern_other_side_prompt
+        ):
+            self.other_side_calls.append(call)
+            self.call_order.append("pattern_other_side")
+            answer = (
+                self._other_side_answers.pop(0)
+                if self._other_side_answers
+                else json.dumps({"better_explanation": False, "why": "It fits."})
             )
         elif (
             self.pattern_keeping_prompt and instructions == self.pattern_keeping_prompt
@@ -986,6 +1152,34 @@ class ScriptedChatModel:
                 self._when_it_helps_answers.pop(0)
                 if self._when_it_helps_answers
                 else DEFAULT_WHEN_IT_HELPS
+            )
+        elif instructions == SHARED_CHECK_PROMPT:
+            self.shared_check_calls.append(call)
+            self.call_order.append("shared_check")
+            answer = (
+                self._shared_check_answers.pop(0)
+                if self._shared_check_answers
+                else json.dumps({"shared": False, "prediction": ""})
+            )
+        elif instructions == GIVEN_CHECK_PROMPT:
+            self.given_check_calls.append(call)
+            self.call_order.append("given_check")
+            answer = (
+                self._given_check_answers.pop(0)
+                if self._given_check_answers
+                else json.dumps({"given": False, "prediction": ""})
+            )
+        elif instructions == ASKED_CHECK_PROMPT:
+            self.asked_check_calls.append(call)
+            self.call_order.append("asked_check")
+            answer = (
+                self._asked_check_answers.pop(0) if self._asked_check_answers else "yes"
+            )
+        elif instructions == CLAIM_CHECK_PROMPT:
+            self.claim_check_calls.append(call)
+            self.call_order.append("claim_check")
+            answer = (
+                self._claim_check_answers.pop(0) if self._claim_check_answers else "no"
             )
         elif instructions == BROUGHT_UP_CHECK_PROMPT:
             self.brought_up_check_calls.append(call)

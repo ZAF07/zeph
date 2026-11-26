@@ -5,6 +5,8 @@ import time
 from collections.abc import Callable, Sequence
 from enum import StrEnum
 
+from companion.core.chat_settings import CLAIM_CHECK_PROMPT
+from companion.core.curiosities import ASKED_CHECK_PROMPT
 from companion.core.models import ChatLine, ModelAnswer, PhotoImage, PlatformSettings
 from companion.core.platform_settings import (
     CHECK_IN_PROMPT,
@@ -14,6 +16,7 @@ from companion.core.platform_settings import (
     MEMORY_PROCESSING_PROMPT,
     MOVE_OUTCOME_KEEPING_PROMPT,
     PATTERN_KEEPING_PROMPT,
+    PATTERN_TAGGING_PROMPT,
     PERSONAL_STICKER_KEEPING_PROMPT,
     PORTRAIT_PROMPT,
     REPLY_PLAN_PROMPT,
@@ -46,8 +49,11 @@ class CallShape(StrEnum):
     REPLY = "reply"
     CHECK_IN = "check-in"
     BROUGHT_UP_CHECK = "brought-up check"
+    SETTINGS_CLAIM_CHECK = "settings claim check"
+    CURIOSITY_ASKED_CHECK = "curiosity asked check"
     CONVERSATION_END = "conversation end"
     LIFE_THREADS = "life threads"
+    PATTERN_TAGGING = "pattern tagging"
     PATTERNS = "patterns"
     CURIOSITIES = "curiosities"
     MOVE_OUTCOMES = "move outcomes"
@@ -84,6 +90,7 @@ def shape_of(instructions: str, settings: PlatformSettings) -> CallShape:
         settings.get(UNDERSTANDING_PROMPT): CallShape.UNDERSTANDING,
         settings.get(MEMORY_PROCESSING_PROMPT): CallShape.CONVERSATION_END,
         settings.get(LIFE_THREAD_KEEPING_PROMPT): CallShape.LIFE_THREADS,
+        settings.get(PATTERN_TAGGING_PROMPT): CallShape.PATTERN_TAGGING,
         settings.get(PATTERN_KEEPING_PROMPT): CallShape.PATTERNS,
         settings.get(CURIOSITY_KEEPING_PROMPT): CallShape.CURIOSITIES,
         settings.get(MOVE_OUTCOME_KEEPING_PROMPT): CallShape.MOVE_OUTCOMES,
@@ -93,6 +100,8 @@ def shape_of(instructions: str, settings: PlatformSettings) -> CallShape:
             CallShape.KNOWLEDGE_WHEN_IT_HELPS
         ),
         BROUGHT_UP_CHECK_PROMPT: CallShape.BROUGHT_UP_CHECK,
+        CLAIM_CHECK_PROMPT: CallShape.SETTINGS_CLAIM_CHECK,
+        ASKED_CHECK_PROMPT: CallShape.CURIOSITY_ASKED_CHECK,
     }
     if instructions in whole_prompts:
         return whole_prompts[instructions]
@@ -212,6 +221,7 @@ class LoadTestChatModel:
         instructions: str,
         history: list[ChatLine],
         tools: Sequence[ChatTool] = (),
+        message_instructions: str = "",
     ) -> ModelAnswer:
         """Wait, then give a canned answer that fits the call.
 
@@ -221,6 +231,8 @@ class LoadTestChatModel:
             instructions: The call's instructions, which tell its shape.
             history: The call's history; a Check-in's lists its Kinds.
             tools: The tools offered; never called.
+            message_instructions: The instructions made for this one call;
+                not used.
 
         Returns:
             The canned answer.
@@ -253,12 +265,16 @@ class LoadTestChatModel:
                 return reply_plan_answer(self._first_need())
             case CallShape.CHECK_IN:
                 return self._check_in_answer(history)
-            case CallShape.BROUGHT_UP_CHECK:
+            case CallShape.BROUGHT_UP_CHECK | CallShape.SETTINGS_CLAIM_CHECK:
                 return "no"
+            case CallShape.CURIOSITY_ASKED_CHECK:
+                return "yes"
             case CallShape.CONVERSATION_END:
                 return conversation_end_answer()
             case CallShape.LIFE_THREADS:
                 return json.dumps({"threads": []})
+            case CallShape.PATTERN_TAGGING:
+                return json.dumps({"observations": []})
             case CallShape.PATTERNS:
                 return json.dumps({"patterns": []})
             case CallShape.CURIOSITIES:
@@ -296,9 +312,7 @@ class LoadTestChatModel:
         offered = [
             kind
             for kind in self._repositories.check_ins.list_kinds()
-            if f"- {kind.name}:" in description
-            and not kind.sends_shared_photo
-            and not kind.raises_curiosity
+            if f"- {kind.name}:" in description and not kind.has_fixed_behaviour
         ]
         if not offered:
             return json.dumps({"decision": "skip", "reason": "No plain Kind offered."})

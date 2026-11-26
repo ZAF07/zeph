@@ -1,0 +1,99 @@
+# One Pattern Type of the Pattern Catalog (ADR-0025). Loaded when the backend
+# starts. Any change needs a new `version`: a stored version never changes,
+# so a change that keeps its version is refused and the last catalog stays.
+
+id: CONF.DEFEND.SELF
+version: 0.2.0
+area: conflict
+name: Pushing back at once when criticised
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
+
+definition: >-
+  When someone points out a fault or questions what the person did, they
+  answer straight away with a counter-attack or a long explanation. The
+  criticism lands as a threat to how they see themselves, so it has to be
+  dealt with now, before it can be weighed.
+
+if: Criticised or told they got something wrong
+then: Hits back or explains themselves at once
+function: To protect how they see themselves
+
+frameworks:
+  - Self-verification and self-image threat (Swann; Baumeister)
+  - Contingencies of self-worth (Crocker)
+  - Gottman's defensiveness in close relationships
+  - Big Five agreeableness, low end
+
+signs:
+  - id: I1
+    text: Replies to a complaint with a complaint of their own about the other person
+    strength: strong
+    part: behaviour
+  - id: I2
+    text: Gives a long account of why it wasn't their fault before taking in what was said
+    strength: moderate
+    part: behaviour
+  - id: I3
+    text: Describes a small remark as an attack on who they are
+    strength: strong
+    part: inside
+  - id: I4
+    text: Replays the criticism later, building the case they wish they'd made
+    strength: moderate
+    part: inside
+  - id: I5
+    text: Says feedback "came out of nowhere" when the other person had raised it before
+    strength: weak
+    part: situation
+
+signs_against:
+  - id: D1
+    text: Asks what the other person meant, or agrees with part of it, before answering
+    strength: strong
+    part: behaviour
+  - id: D2
+    text: Pushes back only when the criticism is clearly unfair and says why calmly
+    strength: moderate
+    part: inside
+
+look_alikes:
+  - pattern_type: ACH.WORTH.PERF
+    tells_apart: >-
+      Turns the criticism outward and answers back; the other turns it inward
+      and judges themselves
+  - pattern_type: CONF.WITHDRAW.HURT
+    tells_apart: >-
+      Moves toward the other person to answer back; the other goes quiet and
+      moves away
+
+anyone_would: Standing up for themselves when someone is openly hostile or insulting
+anyone_would_when:
+  - stance: [hostile]
+
+exclusions:
+  - text: The criticism came during a formal complaint, dismissal or legal dispute
+    evidence: ignored
+  - text: Grief
+    evidence: ignored
+
+approved_wording: >-
+  When someone finds fault with you, you seem to answer it straight away,
+  before you've had a chance to weigh whether any of it is fair.
+# Three Predictions, each testing a different side of the Pattern. Code gives
+# the first when the Pattern is shared, then one the User hasn't had.
+prediction_wordings:
+  - >-
+    Next time {person} points out something you did, notice what you say in
+    the first few seconds, and whether it's an answer or a question.
+  - >-
+    Next time {person} points out something you did, notice what you think
+    about it an hour later, once it has cooled.
+  - >-
+    Next time you spot a mistake of your own before anyone else does, notice
+    how you talk to yourself about it.
+
+numbers:
+  situations_needed: 3
+  base_rate: 0.2

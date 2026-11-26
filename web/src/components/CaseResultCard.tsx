@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { DaySummaryAnswers } from "@/components/DaySummaryAnswers";
 import { EvalPill } from "@/components/EvalPill";
+import { TaggingObservations } from "@/components/TaggingObservations";
+import { WholePipelinePatterns } from "@/components/WholePipelinePatterns";
 import type { CaseResult } from "@/lib/api-client";
 import { countOf, evalDetails, groupChecks, outcomeLabels } from "@/lib/evals";
 import { formatDuration, formatTokens } from "@/lib/model-calls";
@@ -10,8 +12,10 @@ import { formatDuration, formatTokens } from "@/lib/model-calls";
  * One Case Result: its outcome, tokens and time, then each check with its
  * reason, any error and, for a failed case, the notes that help read it. A
  * Day Summary case shows the Summary written and each question's answer
- * instead of its checks. It links to the result's full trace and to the
- * case's history.
+ * instead of its checks; a Tagging case shows what was expected, kept and
+ * dropped; a Whole-pipeline case shows each Pattern that became ready or
+ * was shared and the true ones missed. It links to the result's full trace
+ * and to the case's history.
  *
  * @param props - `runId` is the run it belongs to; `result` is the Case
  *   Result; `tryLabel`, when given, says which try it is, e.g. "Try 2 of 3".
@@ -61,6 +65,10 @@ export function CaseResultCard({
       ) : null}
       {result.day_summary ? (
         <DaySummaryAnswers result={result.day_summary} />
+      ) : result.tagging ? (
+        <TaggingObservations result={result.tagging} />
+      ) : result.whole_pipeline ? (
+        <WholePipelinePatterns result={result.whole_pipeline} />
       ) : result.checks.length > 0 ? (
         <details open={result.outcome !== "pass"}>
           <summary className="cursor-pointer text-[13px] text-soft">
@@ -100,7 +108,8 @@ export function CaseResultCard({
       ) : null}
       {result.outcome === "fail" &&
       result.notes.length > 0 &&
-      !result.day_summary ? (
+      !result.day_summary &&
+      !result.tagging ? (
         <details>
           <summary className="cursor-pointer text-[13px] text-soft">
             What happened

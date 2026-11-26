@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AdminUsers } from "@/components/AdminUsers";
 import { ApiError, type AdminUser, type ApiClient } from "@/lib/api-client";
 import { renderWithQueries } from "@/test/render-with-queries";
+import { noPatterns } from "@/lib/users";
 
 const apiClient = {
   listAdminUsers: vi.fn<ApiClient["listAdminUsers"]>(),
@@ -30,7 +31,9 @@ const maya: AdminUser = {
   life_thread_count: 7,
   move_outcome_count: 3,
   has_portrait: true,
-  confirmed_pattern_count: 2,
+  pattern_counts: { ...noPatterns, noticed: 3, suspected: 1, confirmed: 2 },
+  kept_quote_count: 5,
+  familiarity: "knows_well",
 };
 
 const ren: AdminUser = {
@@ -45,7 +48,9 @@ const ren: AdminUser = {
   life_thread_count: 0,
   move_outcome_count: 0,
   has_portrait: false,
-  confirmed_pattern_count: 0,
+  pattern_counts: noPatterns,
+  kept_quote_count: 0,
+  familiarity: "new",
 };
 
 function rowFor(name: string): HTMLElement {
@@ -146,7 +151,18 @@ describe("AdminUsers", () => {
     expect(panel.getByText("Confirmed Patterns").nextSibling).toHaveTextContent(
       "2",
     );
+    expect(panel.getByText("Noticed Patterns").nextSibling).toHaveTextContent(
+      "3",
+    );
+    expect(panel.getByText("Suspected Patterns").nextSibling).toHaveTextContent(
+      "1",
+    );
+    expect(panel.queryByText("Closed Patterns")).toBeNull();
     expect(panel.getByText("Move outcomes").nextSibling).toHaveTextContent("3");
+    expect(panel.getByText("Familiarity").nextSibling).toHaveTextContent(
+      "Knows well",
+    );
+    expect(panel.getByText("Kept quotes").nextSibling).toHaveTextContent("5");
     expect(panel.getByText("Portrait").nextSibling).toHaveTextContent(
       "Written",
     );
@@ -167,6 +183,9 @@ describe("AdminUsers", () => {
     expect(panel.getByText("Portrait").nextSibling).toHaveTextContent(
       "Not written",
     );
+    expect(panel.queryByText("Noticed Patterns")).toBeNull();
+    expect(panel.queryByText("Kept quotes")).toBeNull();
+    expect(panel.getByText("Familiarity").nextSibling).toHaveTextContent("New");
   });
 
   it("makes a User an Admin", async () => {

@@ -8,13 +8,14 @@ from uuid import UUID, uuid4
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
+from companion.adapters.evals.logged_failures import logged_failures
 from companion.adapters.evals.stand_ins import (
     CannedWebSearch,
     CountingChatModel,
     CountingPhotoViewer,
     EvalAccounts,
-    IdleScheduler,
     InlineUserWorkQueue,
+    ManualScheduler,
     ManualTimer,
     RecordingChatChannel,
     RunningClock,
@@ -31,12 +32,24 @@ from companion.adapters.postgres.eval_repositories import (
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.adapters.pypdf.text_extractor import PypdfTextExtractor
 from companion.app import AppDependencies, create_app
+from companion.core.agenda import AgendaEntry, AgendaKeeper, AgendaReader
 from companion.core.evals.cases import EvalWebResult
 from companion.core.evals.models import EvalImage, ModelTokens, Replies
 from companion.core.evals.ports import EvalSetupError
 from companion.core.model_call_log import ModelCallLog, start_trace
-from companion.core.models import Feature, PhotoImage, TraceKind, UserSnapshot
+from companion.core.models import (
+    Feature,
+    LifeThread,
+    PatternMoveCause,
+    PhotoImage,
+    TraceKind,
+    UserSnapshot,
+)
 from companion.core.move_outcomes import MoveOutcomeKeeper
+from companion.core.observations import PatternTagger, PlannedObservations
+from companion.core.pattern_catalog import PatternCatalogService
+from companion.core.pattern_scoring import PatternScorer
+from companion.core.platform_settings import CONVERSATION_QUIET_GAP
 from companion.core.ports import ChatModel, Embedder, PhotoViewer, Repositories
 from companion.core.post_conversation import DayMemoryWriter
 from companion.core.usage import UsageLimiter, UsageRecordingChatModel
@@ -169,8 +182,9 @@ class InProcessCompanion:
     """The whole app built on the Eval database, driven through its own API.
 
     Messages go through the real Telegram webhook, with the recording chat
-    channel, no web search, no scheduler and a clock that runs with real
-    time. The Model Call Log keeps full content, as in every Eval run.
+    channel, no web search, a scheduler that ticks only when asked and a
+    clock that runs with real time. The Model Call Log keeps full content, as
+    in every Eval run.
     """
 
     def __init__(
@@ -204,6 +218,7 @@ class InProcessCompanion:
         self._web_search = CannedWebSearch()
         self._accounts = EvalAccounts()
         self._timer = ManualTimer()
+        self._scheduler = ManualScheduler()
         self._clock = RunningClock(datetime.now(UTC))
         self._repositories = build_postgres_repositories(engine)
         self._user_id: UUID | None = None
@@ -223,7 +238,7 @@ class InProcessCompanion:
             knowledge_vector_store=PgvectorKnowledgeVectorStore(engine),
             web_search=self._web_search,
             clock=self._clock,
-            scheduler=IdleScheduler(),
+            scheduler=self._scheduler,
             timer=self._timer,
             work_queue=InlineUserWorkQueue(),
             telegram_webhook_secret=WEBHOOK_SECRET,
@@ -628,6 +643,179 @@ class InProcessCompanion:
             self._repositories.conversations.list_messages(conversation_id),
         )
 
+    def turn_pattern_noticing_on(self) -> None:
+        """Turn Pattern noticing on for the made-up User, who has been told.
+
+        An Admin switches it on for them, and they press "Got it" on the
+        notice, so the tagging step runs for them.
+
+        Raises:
+            EvalSetupError: If no User is connected.
+        """
+        if self._user_id is None:
+            raise EvalSetupError("Connect the User before turning Pattern noticing on")
+        require_status(
+            self._client.put(
+                f"/api/admin/users/{self._user_id}/features/pattern_noticing",
+                json={"switch": "on"},
+                headers=self._admin_headers(),
+            ),
+            200,
+            "Turning Pattern noticing on",
+        )
+        require_status(
+            self._client.post(
+                "/api/me/pattern-noticing-told", headers=self._user_headers()
+            ),
+            200,
+            "Pressing Got it on the Pattern noticing notice",
+        )
+
+    def turn_pattern_exploring_on(self) -> None:
+        """Turn Pattern noticing and exploring on for the made-up User.
+
+        An Admin switches each on for them, and they press "Got it" on the
+        Pattern noticing notice. Pattern sharing stays off.
+
+        Raises:
+            EvalSetupError: If no User is connected.
+        """
+        self.turn_pattern_noticing_on()
+        self._switch_feature_on("pattern_exploring")
+
+    def turn_pattern_sharing_on(self) -> None:
+        """Turn Pattern noticing, exploring and sharing on for the made-up User.
+
+        An Admin switches each on for them, in the order they need each
+        other, and they press "Got it" on the Pattern noticing notice.
+
+        Raises:
+            EvalSetupError: If no User is connected.
+        """
+        self.turn_pattern_exploring_on()
+        self._switch_feature_on("pattern_sharing")
+
+    def score_patterns(self) -> None:
+        """Score the made-up User's Patterns from their Observations.
+
+        The scorer is built the way the app builds it for the quiet gap.
+
+        Raises:
+            EvalSetupError: If no User is connected, or User Memory doesn't
+                work for them.
+        """
+        snapshot = self._conversation_end_snapshot()
+        PatternScorer(self._repositories, self._pattern_catalog(), self._clock).score(
+            snapshot.user, snapshot.settings, PatternMoveCause.CONVERSATION_TAGGED
+        )
+
+    def keep_agenda(self, conversation_id: UUID) -> None:
+        """Keep the made-up User's Agenda as if a Conversation just ended.
+
+        The keeper is built the way the app builds it for the quiet gap.
+
+        Args:
+            conversation_id: The Conversation that just ended.
+
+        Raises:
+            EvalSetupError: If no User is connected, or User Memory doesn't
+                work for them.
+        """
+        AgendaKeeper(self._repositories, self._pattern_catalog(), self._clock).keep(
+            self._conversation_end_snapshot(), conversation_id
+        )
+
+    def read_agenda(self) -> list[AgendaEntry]:
+        """Read the made-up User's Agenda as the Reply Plan is given it.
+
+        Returns:
+            Their active Explorations with what each still needs to learn,
+            as for a User who isn't struggling.
+
+        Raises:
+            EvalSetupError: If no User is connected, or User Memory doesn't
+                work for them.
+        """
+        return AgendaReader(
+            self._repositories, self._pattern_catalog(), self._clock
+        ).read(self._conversation_end_snapshot(), struggling=False)
+
+    def end_conversation(self) -> list[str]:
+        """Let the made-up User's Conversation go quiet and run the scheduled work.
+
+        The clock moves on by the Conversation quiet gap, then the work the
+        scheduler runs on every tick runs once, as in the live app: the
+        Conversation ends and every Conversation-end step runs on it.
+
+        Returns:
+            Each failure the app logged during that work, such as a
+            Conversation-end step that failed and was skipped.
+
+        Raises:
+            EvalSetupError: If no User is connected, they have no
+                Conversation, or it wasn't ended and processed; it then
+                names the failures logged.
+        """
+        if self._user_id is None:
+            raise EvalSetupError("Connect the made-up User first")
+        conversations = self._repositories.conversations
+        settings = self._repositories.platform_settings.load()
+        self._clock.move(settings.get(CONVERSATION_QUIET_GAP))
+        with logged_failures() as failures:
+            self._scheduler.run_tick()
+        conversation = conversations.get_latest_for_user(self._user_id)
+        if conversation is None:
+            raise EvalSetupError("The made-up User has no Conversation")
+        if conversation.ended_at is None or any(
+            unprocessed.id == conversation.id
+            for unprocessed in conversations.list_ended_unprocessed()
+        ):
+            raise EvalSetupError(
+                "; ".join(["The Conversation-end steps didn't finish", *failures])
+            )
+        return failures
+
+    def tag_observations(
+        self, conversation_id: UUID, touched: Sequence[LifeThread]
+    ) -> PlannedObservations | None:
+        """Run the Conversation-end tagging step alone on a Conversation.
+
+        It is built the way the app builds it after Life Threads, with the
+        Model Call Log keeping full content, and runs in its own
+        Conversation-end trace.
+
+        Args:
+            conversation_id: The made-up User's ended Conversation.
+            touched: The Life Threads it touched, in the order shown.
+
+        Returns:
+            The Observations kept and those dropped; None when the step
+            didn't run or its answer couldn't be read.
+
+        Raises:
+            EvalSetupError: If no User is connected, or User Memory doesn't
+                work for them.
+        """
+        snapshot = self._conversation_end_snapshot()
+        tagger = PatternTagger(
+            self._repositories,
+            self._pattern_catalog(),
+            self._conversation_end_chat_model(),
+            ModelCallLog(
+                self._repositories,
+                self._clock,
+                content_for_everyone=True,
+                developer_logs=False,
+            ),
+            self._clock,
+        )
+        return tagger.tag_from(
+            snapshot,
+            conversation_id,
+            self._repositories.conversations.list_messages(conversation_id),
+            touched,
+        )
+
     def write_day_summary(self) -> None:
         """Run the Conversation-end Day Summary step alone, on the latest Conversation.
 
@@ -653,6 +841,30 @@ class InProcessCompanion:
         writer.write(
             snapshot, conversation, conversations.list_messages(conversation.id)
         )
+
+    def _switch_feature_on(self, feature: str) -> None:
+        """Switch a Feature on for the made-up User, as an Admin.
+
+        Args:
+            feature: The Feature's key, e.g. "pattern_exploring".
+        """
+        require_status(
+            self._client.put(
+                f"/api/admin/users/{self._user_id}/features/{feature}",
+                json={"switch": "on"},
+                headers=self._admin_headers(),
+            ),
+            200,
+            f"Turning {feature} on",
+        )
+
+    def _pattern_catalog(self) -> PatternCatalogService:
+        """Build the service that reads the Eval database's Pattern Catalog.
+
+        Returns:
+            The service.
+        """
+        return PatternCatalogService(self._repositories.pattern_catalog)
 
     def _conversation_end_snapshot(self) -> UserSnapshot:
         """Read the made-up User as a Conversation-end step reads them.

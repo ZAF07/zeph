@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from typing import Any, Protocol
 from uuid import UUID
 
+from companion.core.agenda import AgendaEntry
 from companion.core.evals.cases import EvalWebResult
 from companion.core.evals.models import (
     CaseHistoryRow,
@@ -20,7 +21,8 @@ from companion.core.evals.models import (
     StoredEvalCase,
     Variant,
 )
-from companion.core.models import ModelCall, Move, Need
+from companion.core.models import LifeThread, ModelCall, Move, Need
+from companion.core.observations import PlannedObservations
 from companion.core.ports import ChatModel, Embedder, Repositories
 
 
@@ -253,6 +255,122 @@ class EvalCompanion(Protocol):
 
         Args:
             conversation_id: The made-up User's finished Conversation.
+
+        Raises:
+            EvalSetupError: If no User is connected, or User Memory doesn't
+                work for them.
+        """
+        ...
+
+    def turn_pattern_noticing_on(self) -> None:
+        """Turn Pattern noticing on for the made-up User, who has been told.
+
+        An Admin switches it on for them, and they press "Got it" on the
+        notice, so the tagging step runs for them.
+
+        Raises:
+            EvalSetupError: If no User is connected.
+        """
+        ...
+
+    def turn_pattern_sharing_on(self) -> None:
+        """Turn Pattern noticing, exploring and sharing on for the made-up User.
+
+        An Admin switches each on for them, and they press "Got it" on the
+        Pattern noticing notice, so the whole Pattern pipeline runs for them.
+
+        Raises:
+            EvalSetupError: If no User is connected.
+        """
+        ...
+
+    def turn_pattern_exploring_on(self) -> None:
+        """Turn Pattern noticing and exploring on for the made-up User.
+
+        An Admin switches each on for them, and they press "Got it" on the
+        Pattern noticing notice. Pattern sharing stays off.
+
+        Raises:
+            EvalSetupError: If no User is connected.
+        """
+        ...
+
+    def score_patterns(self) -> None:
+        """Score the made-up User's Patterns from their Observations.
+
+        The real scoring step runs alone, as it does after tagging, with the
+        Eval database's Platform Settings.
+
+        Raises:
+            EvalSetupError: If no User is connected, or User Memory doesn't
+                work for them.
+        """
+        ...
+
+    def keep_agenda(self, conversation_id: UUID) -> None:
+        """Keep the made-up User's Agenda as if a Conversation just ended.
+
+        The real Agenda step runs alone, as it does after scoring: it gives
+        each suspected Pattern an Exploration and writes the aimed
+        Curiosities.
+
+        Args:
+            conversation_id: The Conversation that just ended.
+
+        Raises:
+            EvalSetupError: If no User is connected, or User Memory doesn't
+                work for them.
+        """
+        ...
+
+    def read_agenda(self) -> list[AgendaEntry]:
+        """Read the made-up User's Agenda as the Reply Plan is given it.
+
+        Returns:
+            Their active Explorations with what each still needs to learn,
+            as for a User who isn't struggling.
+
+        Raises:
+            EvalSetupError: If no User is connected, or User Memory doesn't
+                work for them.
+        """
+        ...
+
+    def end_conversation(self) -> list[str]:
+        """Let the made-up User's Conversation go quiet and run the scheduled work.
+
+        The clock moves on by the Conversation quiet gap, then the work the
+        scheduler runs on every tick runs once, as in the live app: the
+        Conversation ends and every Conversation-end step runs on it, with
+        the Eval database's Platform Settings.
+
+        Returns:
+            What failed and was skipped during that work, one line each,
+            such as a Conversation-end step: "Could not score Patterns:
+            ValueError('no settings')".
+
+        Raises:
+            EvalSetupError: If no User is connected, they have no
+                Conversation, or it wasn't ended and processed.
+        """
+        ...
+
+    def tag_observations(
+        self, conversation_id: UUID, touched: Sequence[LifeThread]
+    ) -> PlannedObservations | None:
+        """Run the Conversation-end tagging step alone on a Conversation.
+
+        It runs as it does after Life Threads, in its own Conversation-end
+        trace, with the Eval database's Platform Settings and the Pattern
+        Catalog loaded from its files. No other Conversation-end step runs.
+
+        Args:
+            conversation_id: The made-up User's ended Conversation.
+            touched: The Life Threads it touched, in the order shown.
+
+        Returns:
+            The Observations kept and those dropped; None when the step
+            didn't run or its answer couldn't be read.
 
         Raises:
             EvalSetupError: If no User is connected, or User Memory doesn't

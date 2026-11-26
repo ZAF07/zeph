@@ -23,3 +23,5 @@ web/*.tsbuildinfo
 
 # OS
 .DS_Store
+
+*.pdf

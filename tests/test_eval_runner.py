@@ -1,4 +1,5 @@
 import json
+from collections.abc import Sequence
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -6,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, create_engine, make_url, text
 
+from companion.adapters.eval_case_seed import read_eval_case_seed
 from companion.adapters.evals.environment import (
     PostgresEvalEnvironment,
     create_database_if_missing,
@@ -21,11 +23,20 @@ from companion.adapters.postgres.repositories import (
     PostgresNeedRepository,
     PostgresPlatformSettingsRepository,
 )
-from companion.core.evals.models import EvalCase, EvalName, EvalRunState
+from companion.core.evals.models import (
+    EvalCase,
+    EvalName,
+    EvalRunState,
+    evals_run_by_default,
+)
 from companion.core.evals.runner import EvalRunner
 from companion.core.models import Feature
-from companion.eval_terminal import build_eval_run_service, start_and_watch_run
-from companion.main import SEED_DIR
+from companion.eval_terminal import (
+    build_eval_run_service,
+    read_evals,
+    start_and_watch_run,
+)
+from companion.main import EVAL_CASES_DIR, EVAL_IMAGES_DIR, SEED_DIR
 from tests.conftest import shared_postgres_url
 from tests.eval_run_helpers import (
     CRISIS_CASE,
@@ -49,9 +60,13 @@ from tests.fakes import (
     understanding_answer,
 )
 from tests.telegram_helpers import owner_headers
+from tests.test_life_threads import thread_keeping_answer
 from tests.test_moves import stored_rule_outs
 from tests.test_moves_that_ask_a_question import tick_asks_a_question
+from tests.test_pattern_states import BELONG, MEI_STORY, WORK, WORK_STORY
+from tests.test_pattern_tagging import MEI, TEXT
 from tests.test_post_conversation import processing_answer
+from tests.test_ready_gate import JUN_STORY, LATER_TEXT, NOT_WITH_SAM
 from tests.test_understanding import seeded_needs
 
 PERSONA_CASE = EvalCase(
@@ -629,6 +644,33 @@ def test_a_photo_case_sends_the_image_uploaded_for_it(
     assert photo_viewer.calls[-1].photo.media_type == "image/png"
 
 
+def test_a_judge_on_a_model_that_always_thinks_is_never_told_thinking_is_off(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, PERSONA_CASE)
+    admin = owner_headers(client, auth_verifier)
+    saved_judge = PostgresJudgeSettingsRepository(engine).load()
+    judge = {**saved_judge, "model": "anthropic/claude-opus-5.5", "thinking": False}
+    client.put("/api/admin/eval-judge", json={"values": judge}, headers=admin)
+    start_run(client, admin, EvalName.PERSONA)
+    chat_model.script(
+        "Pretty good!",
+        '{"verdicts": [{"rule": "no_lists", "passed": true, "reason": "Fine."}]}',
+    )
+
+    runner.work_next_run()
+
+    _, judge_call = chat_model.calls
+    assert (judge_call.model, judge_call.thinking) == (
+        "anthropic/claude-opus-5.5",
+        True,
+    )
+
+
 def test_a_missing_judge_setting_makes_each_case_an_error_and_the_run_finishes(
     client: TestClient,
     engine: Engine,
@@ -851,7 +893,7 @@ def test_a_run_is_priced_per_model_and_a_model_without_a_price_is_named(
     assert priced["unpriced_models"] == []
     assert unpriced["state"] == "finished"
     assert unpriced["cost_sgd"] == 0
-    assert unpriced["unpriced_models"] == ["deepseek-flash"]
+    assert unpriced["unpriced_models"] == ["deepseek/deepseek-v4.1-flash-1017"]
 
 
 def test_the_estimate_uses_each_cases_tokens_from_its_last_run(
@@ -1042,8 +1084,10 @@ def test_the_terminal_runs_single_cases_and_prints_each_one(
     )
 
     assert passed is True
-    assert lines[0].startswith("Queued Eval Run ")
-    assert lines[0].endswith("(traffic)")
+    assert lines[0].startswith("Estimate: 1 case, about S$")
+    assert "never run" in lines[0]
+    assert lines[1].startswith("Queued Eval Run ")
+    assert lines[1].endswith("(traffic)")
     assert any("traffic" in line and line.startswith("PASS") for line in lines)
     assert not any("plan" in line for line in lines)
 
@@ -1183,6 +1227,81 @@ def test_a_need_override_reaches_only_its_variant_and_live_needs_stay(
     assert "pineapple" not in str(reply_plan_a)
     assert "Just chatting: Only when they say the word pineapple." in str(reply_plan_b)
     assert PostgresNeedRepository(engine).list_all() == live_needs
+
+
+def test_a_variant_can_override_how_a_need_treats_curiosities(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, UNDERSTANDING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    key = need_key(client, admin, "Just chatting")
+    live_needs = PostgresNeedRepository(engine).list_all()
+    [live] = [need for need in live_needs if need.name == "Just chatting"]
+    override = {
+        "name": live.name,
+        "when_it_fits": live.when_it_fits,
+        "how_to_reply": live.how_to_reply,
+        "curiosities": "never",
+    }
+    start_run(client, admin, EvalName.UNDERSTANDING, variants=[{}, {key: override}])
+    chat_model.script("Hi!", "Hi!")
+
+    runner.work_next_run()
+
+    reply_plan_a, reply_plan_b = chat_model.reply_plan_calls
+    assert "- Just chatting: test the water" in str(reply_plan_a)
+    assert "- Just chatting: never: ask none" in str(reply_plan_b)
+    assert PostgresNeedRepository(engine).list_all() == live_needs
+
+
+@pytest.mark.parametrize("choice", ["always", ["never"], 3])
+def test_a_need_override_with_an_unknown_curiosities_choice_is_refused(
+    client: TestClient, auth_verifier: FakeAuthVerifier, choice: object
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    key = need_key(client, admin, "Just chatting")
+    override = {
+        "name": "Just chatting",
+        "when_it_fits": "x",
+        "how_to_reply": "y",
+        "curiosities": choice,
+    }
+
+    response = client.post(
+        "/api/admin/eval-runs",
+        json={"evals": ["understanding"], "variants": [{key: override}], "repeats": 1},
+        headers=admin,
+    )
+
+    assert response.status_code == 422
+
+
+def test_a_variant_can_override_the_follow_up_cap(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, UNDERSTANDING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    start_run(
+        client,
+        admin,
+        EvalName.UNDERSTANDING,
+        variants=[{}, {"follow_ups_per_conversation": 0}],
+    )
+    chat_model.script("Hi!", "Hi!")
+
+    runner.work_next_run()
+
+    reply_plan_a, reply_plan_b = chat_model.reply_plan_calls
+    assert "- Get curious:" in reply_plan_a.history[0].text
+    assert "- Get curious:" not in reply_plan_b.history[0].text
 
 
 def test_reply_plan_prompt_and_outlook_overrides_reach_only_their_variant(
@@ -1746,7 +1865,7 @@ def test_move_outcome_keeping_overrides_reach_only_their_variant(
         connection.execute(
             text(
                 "UPDATE platform_settings SET value = "
-                '\'["deepseek-flash", "deepseek-pro"]\'::jsonb '
+                '\'["deepseek/deepseek-v4.1-flash-1017", "deepseek-pro"]\'::jsonb '
                 "WHERE key = 'available_models'"
             )
         )
@@ -1766,7 +1885,10 @@ def test_move_outcome_keeping_overrides_reach_only_their_variant(
     [variant_call] = [
         call for call in chat_model.calls if call.instructions == "Keep the lessons."
     ]
-    assert (live_call.model, live_call.thinking) == ("deepseek-flash", True)
+    assert (live_call.model, live_call.thinking) == (
+        "deepseek/deepseek-v4.1-flash-1017",
+        True,
+    )
     assert (variant_call.model, variant_call.thinking) == ("deepseek-pro", False)
     assert PostgresPlatformSettingsRepository(engine).load().values == live_before
 
@@ -1994,6 +2116,7 @@ def rule_out_live(
             "when_it_fits": need["when_it_fits"],
             "how_to_reply": need["how_to_reply"],
             "ruled_out_move_ids": [*need["ruled_out_move_ids"], move["id"]],
+            "curiosities": need["curiosities"],
         },
         headers=admin,
     )
@@ -2432,3 +2555,1250 @@ def test_a_memory_processing_override_reaches_only_its_variant(
     ]
     assert "I snapped at my sister again this morning." in variant_call.history[0].text
     assert PostgresPlatformSettingsRepository(engine).load().values == live_before
+
+
+MEI_TAGGING_CASE = EvalCase(
+    key="yes-to-mei",
+    eval=EvalName.TAGGING,
+    content={
+        "now": "2026-11-24T10:00:00",
+        "threads": [
+            {
+                "title": "Helping Mei move",
+                "story": "Their sister Mei keeps asking for help moving flats.",
+                "people": ["Mei"],
+            }
+        ],
+        "messages": [
+            {
+                "who": "person",
+                "text": "I said yes to Mei again, it's fine. Then I stewed all night",
+            },
+            {"who": "zeph", "text": "That sounds like a long night."},
+        ],
+        "observations": [
+            {
+                "pattern_type": "CONF.AVOID.BELONG",
+                "direction": "for",
+                "unclear": False,
+                "situational": False,
+            }
+        ],
+    },
+)
+
+
+def tagged_entry(**changes: Any) -> dict[str, Any]:
+    """One Observation as the tagging model writes it, with some fields changed."""
+    return {
+        "pattern_types": ["CONF.AVOID.BELONG"],
+        "sign": "I2",
+        "direction": "for",
+        "quote": "I said yes to Mei again",
+        "context": "Agreed to help Mei move again, then resented it.",
+        "about": "Mei, their sister",
+        "thread": 1,
+        "relationship": "family",
+        "power": "equal",
+        "setting": "home",
+        "stance": "neutral",
+        "evidence": "real_story",
+        **changes,
+    }
+
+
+def tagging_answer(*entries: dict[str, Any]) -> str:
+    """Build the JSON the tagging model answers with."""
+    return json.dumps({"observations": list(entries)})
+
+
+def test_a_tagging_case_runs_the_real_tagging_step_and_shows_kept_and_dropped(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, MEI_TAGGING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.TAGGING)
+    chat_model.script_pattern_tagging(
+        tagging_answer(
+            tagged_entry(),
+            tagged_entry(quote="I said no to Mei", sign="I5"),
+        )
+    )
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "pass", result
+    assert [
+        (check["group"], check["name"], check["passed"]) for check in result["checks"]
+    ] == [("CONF.AVOID.BELONG · for", "kept", True)]
+    tagging = result["tagging"]
+    assert tagging["answered"] is True
+    [kept] = tagging["kept"]
+    assert kept == {
+        "pattern_types": ["CONF.AVOID.BELONG"],
+        "sign": "I2",
+        "direction": "for",
+        "unclear": False,
+        "situational": False,
+        "quote": "I said yes to Mei again",
+        "context": "Agreed to help Mei move again, then resented it.",
+        "about": "Mei, their sister",
+        "thread": "Helping Mei move",
+        "conditions": {"audience": None, "stakes": None, "state_going_in": None},
+        "expected": True,
+    }
+    [dropped] = tagging["dropped"]
+    assert dropped["quote"] == "I said no to Mei"
+    assert dropped["reason"] == "quote not word for word in the User's own texts"
+    assert tagging["expected"] == [
+        {
+            "pattern_type": "CONF.AVOID.BELONG",
+            "direction": "for",
+            "unclear": False,
+            "situational": False,
+            "conditions": {},
+            "matched": True,
+        }
+    ]
+    [tagging_call] = chat_model.pattern_tagging_calls
+    shown = tagging_call.history[0].text
+    assert "[1] Helping Mei move" in shown
+    assert "CONF.AVOID.BELONG: Softening disagreement to protect belonging" in shown
+    assert "I said yes to Mei again, it's fine." in shown
+    trace = client.get(
+        f"/api/admin/eval-runs/{run['id']}/results/{result['id']}", headers=admin
+    ).json()
+    assert [call["step"] for call in trace["calls"]] == ["pattern_tagging"]
+    [saved] = PostgresEvalRunRepository(engine).list_results(UUID(run["id"]))
+    assert set(saved.result.facts["call"]) == {"duration_ms", "tokens_in", "tokens_out"}
+
+
+def test_a_tagging_case_fails_when_what_was_kept_differs_from_what_was_expected(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    unclear_case = EvalCase(
+        key="unclear-mei",
+        eval=EvalName.TAGGING,
+        content={
+            **MEI_TAGGING_CASE.content,
+            "observations": [
+                {
+                    "pattern_type": "ACH.WORTH.PERF",
+                    "direction": "for",
+                    "unclear": True,
+                    "situational": False,
+                }
+            ],
+        },
+    )
+    add_cases(engine, unclear_case)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.TAGGING)
+    chat_model.script_pattern_tagging(tagging_answer(tagged_entry()))
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "fail"
+    assert [
+        (check["group"], check["name"], check["passed"]) for check in result["checks"]
+    ] == [
+        ("ACH.WORTH.PERF · for · unclear", "kept", False),
+        ("Kept but not expected", "CONF.AVOID.BELONG · for", False),
+    ]
+    assert result["tagging"]["kept"][0]["expected"] is False
+    assert result["tagging"]["expected"][0]["matched"] is False
+
+
+def test_an_unclear_observation_matches_either_of_its_two_pattern_types(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    unclear_case = EvalCase(
+        key="unclear-mei",
+        eval=EvalName.TAGGING,
+        content={
+            **MEI_TAGGING_CASE.content,
+            "observations": [
+                {
+                    "pattern_type": "ACH.WORTH.PERF",
+                    "direction": "for",
+                    "unclear": True,
+                    "situational": False,
+                }
+            ],
+        },
+    )
+    add_cases(engine, unclear_case)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.TAGGING)
+    chat_model.script_pattern_tagging(
+        tagging_answer(
+            tagged_entry(pattern_types=["CONF.AVOID.BELONG", "ACH.WORTH.PERF"])
+        )
+    )
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "pass", result
+
+
+def test_a_nothing_to_tag_case_passes_only_when_nothing_is_kept(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    nothing_case = EvalCase(
+        key="nothing-here",
+        eval=EvalName.TAGGING,
+        content={**MEI_TAGGING_CASE.content, "observations": []},
+    )
+    situational_case = EvalCase(
+        key="stranger",
+        eval=EvalName.TAGGING,
+        content={
+            **MEI_TAGGING_CASE.content,
+            "observations": [
+                {
+                    "pattern_type": "CONF.AVOID.BELONG",
+                    "direction": "for",
+                    "unclear": False,
+                    "situational": True,
+                }
+            ],
+        },
+    )
+    add_cases(engine, nothing_case, situational_case)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.TAGGING)
+    chat_model.script_pattern_tagging(
+        tagging_answer(),
+        tagging_answer(tagged_entry(relationship="stranger")),
+    )
+
+    runner.work_next_run()
+
+    results = results_by_key(open_run(client, admin, run["id"]))
+    nothing = results["nothing-here"]
+    assert nothing["outcome"] == "pass", nothing
+    assert [(c["name"], c["passed"]) for c in nothing["checks"]] == [
+        ("nothing kept", True)
+    ]
+    assert nothing["tagging"]["kept"] == []
+    stranger = results["stranger"]
+    assert stranger["outcome"] == "pass", stranger
+    assert stranger["tagging"]["kept"][0]["situational"] is True
+
+
+def conditions_case(key: str, **conditions: str) -> EvalCase:
+    """A Tagging case about Mei that expects the given Conditions."""
+    return EvalCase(
+        key=key,
+        eval=EvalName.TAGGING,
+        content={
+            **MEI_TAGGING_CASE.content,
+            "observations": [
+                {
+                    "pattern_type": "CONF.AVOID.BELONG",
+                    "direction": "for",
+                    "unclear": False,
+                    "situational": False,
+                    **conditions,
+                }
+            ],
+        },
+    )
+
+
+def test_a_tagging_case_that_expects_conditions_passes_only_when_they_match(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(
+        engine,
+        conditions_case("said", audience="group", state_going_in="empty"),
+        conditions_case("wrong-value", audience="one-to-one"),
+        conditions_case("guessed", state_going_in="empty"),
+        conditions_case("not-stated"),
+    )
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.TAGGING)
+    chat_model.script_pattern_tagging(
+        tagging_answer(tagged_entry(audience="group", stakes="high")),
+        tagging_answer(tagged_entry(audience="group")),
+        tagging_answer(tagged_entry(state_going_in="low")),
+        tagging_answer(tagged_entry(audience="group", state_going_in="low")),
+    )
+
+    runner.work_next_run()
+
+    results = results_by_key(open_run(client, admin, run["id"]))
+    said = results["said"]
+    assert said["outcome"] == "pass", said
+    assert [(c["group"], c["name"], c["passed"]) for c in said["checks"]] == [
+        (
+            "CONF.AVOID.BELONG · for · audience: group · state going in: empty",
+            "kept",
+            True,
+        )
+    ]
+    assert said["tagging"]["expected"][0]["conditions"] == {
+        "audience": "group",
+        "state_going_in": "empty",
+    }
+    assert said["tagging"]["kept"][0]["conditions"] == {
+        "audience": "group",
+        "stakes": "high",
+        "state_going_in": None,
+    }
+    wrong = results["wrong-value"]
+    assert wrong["outcome"] == "fail"
+    assert [(c["group"], c["name"], c["passed"]) for c in wrong["checks"]] == [
+        ("CONF.AVOID.BELONG · for · audience: one-to-one", "kept", False),
+        ("Kept but not expected", "CONF.AVOID.BELONG · for", False),
+    ]
+    assert wrong["tagging"]["kept"][0]["conditions"]["audience"] == "group"
+    assert results["guessed"]["outcome"] == "fail"
+    not_stated = results["not-stated"]
+    assert not_stated["outcome"] == "pass", not_stated
+    assert not_stated["tagging"]["expected"][0]["conditions"] == {}
+
+
+def test_an_unreadable_tagging_answer_fails_the_case(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    nothing_case = EvalCase(
+        key="nothing-here",
+        eval=EvalName.TAGGING,
+        content={**MEI_TAGGING_CASE.content, "observations": []},
+    )
+    add_cases(engine, nothing_case)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.TAGGING)
+    chat_model.script_pattern_tagging("not json", "still not json")
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "fail"
+    assert [(c["name"], c["passed"]) for c in result["checks"]] == [
+        ("answer read", False)
+    ]
+    assert result["tagging"]["answered"] is False
+
+
+def test_tagging_overrides_reach_only_their_variant(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, MEI_TAGGING_CASE)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE platform_settings SET value = "
+                '\'["deepseek-flash", "deepseek-pro"]\'::jsonb '
+                "WHERE key = 'available_models'"
+            )
+        )
+    admin = owner_headers(client, auth_verifier)
+    live_before = PostgresPlatformSettingsRepository(engine).load().values
+    overrides = {
+        "pattern_tagging_prompt": "Tag carefully.",
+        "pattern_tagging_model": "deepseek-pro",
+        "pattern_tagging_thinking": False,
+    }
+    start_run(client, admin, EvalName.TAGGING, variants=[{}, overrides])
+    chat_model.script(tagging_answer())
+
+    runner.work_next_run()
+
+    [live_call] = chat_model.pattern_tagging_calls
+    [variant_call] = [
+        call for call in chat_model.calls if call.instructions == "Tag carefully."
+    ]
+    assert (live_call.model, live_call.thinking) == (
+        "deepseek/deepseek-v4.1-flash-1017",
+        True,
+    )
+    assert (variant_call.model, variant_call.thinking) == ("deepseek-pro", False)
+    assert PostgresPlatformSettingsRepository(engine).load().values == live_before
+
+
+def test_a_tagging_case_fails_when_a_kept_context_line_says_he_or_she(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, MEI_TAGGING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.TAGGING)
+    chat_model.script_pattern_tagging(
+        tagging_answer(
+            tagged_entry(context="She agreed to help her sister Mei move again.")
+        )
+    )
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "fail"
+    assert [
+        (check["group"], check["name"], check["passed"], check["detail"])
+        for check in result["checks"]
+    ] == [
+        ("CONF.AVOID.BELONG · for", "kept", True, 'kept 1: "I said yes to Mei again"'),
+        (
+            "Context lines",
+            "no he or she",
+            False,
+            '"She agreed to help her sister Mei move again." says she, her',
+        ),
+    ]
+
+
+BELONGING_CASE = EvalCase(
+    key="folds-with-mei",
+    eval=EvalName.WHOLE_PIPELINE,
+    content={
+        "now": "2026-11-02T19:30:00",
+        "true_pattern_types": [BELONG],
+        "conversations": [
+            {"days_later": 0, "messages": [TEXT]},
+            {"days_later": 3, "messages": [LATER_TEXT]},
+        ],
+    },
+)
+
+
+def script_two_conversations_that_make_belonging_ready(
+    chat_model: ScriptedChatModel,
+) -> None:
+    """Script a first Conversation with two stories, then a third and a counter-test."""
+    chat_model.script("That sounds like a long night.", "Different with Sam, then.")
+    chat_model.script_processing(
+        processing_answer(summary="Said yes to Mei again.", mood="sad"),
+        processing_answer(summary="Went along with Jun.", mood="neutral"),
+    )
+    chat_model.script_thread_keeping(thread_keeping_answer([MEI, WORK]))
+    chat_model.script_pattern_tagging(
+        tagging_answer(MEI_STORY, WORK_STORY), tagging_answer(JUN_STORY, NOT_WITH_SAM)
+    )
+
+
+def test_a_whole_pipeline_case_runs_every_conversation_and_lists_ready_patterns(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, BELONGING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.WHOLE_PIPELINE)
+    script_two_conversations_that_make_belonging_ready(chat_model)
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "pass", result
+    assert [
+        (check["name"], check["passed"], check["detail"]) for check in result["checks"]
+    ] == [
+        (BELONG, True, "ready, one of the true ones"),
+        ("true Patterns found", True, "1 of 1 became ready"),
+    ]
+    assert result["whole_pipeline"] == {
+        "patterns": [
+            {
+                "pattern_type": BELONG,
+                "name": "Softening disagreement to protect belonging",
+                "is_true": True,
+                "shared": False,
+                "state": "ready",
+            }
+        ],
+        "missed": [],
+        "true_count": 1,
+        "conversations": 2,
+    }
+    assert [call.history[-1].text for call in chat_model.calls[-2:]] == [
+        TEXT,
+        LATER_TEXT,
+    ]
+    assert len(chat_model.pattern_tagging_calls) == 2
+    assert len(chat_model.other_side_calls) == 1
+    trace = client.get(
+        f"/api/admin/eval-runs/{run['id']}/results/{result['id']}", headers=admin
+    ).json()
+    steps = [call["step"] for call in trace["calls"]]
+    assert steps.count("reply") == 2
+    assert steps.count("pattern_tagging") == 2
+    assert "pattern_other_side" in steps
+
+
+def test_a_whole_pipeline_case_fails_when_a_ready_pattern_is_not_a_true_one(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    wrong_truth = EvalCase(
+        key="moves-the-goal",
+        eval=EvalName.WHOLE_PIPELINE,
+        content={**BELONGING_CASE.content, "true_pattern_types": ["ACH.GOAL.MOVE"]},
+    )
+    add_cases(engine, wrong_truth)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.WHOLE_PIPELINE)
+    script_two_conversations_that_make_belonging_ready(chat_model)
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "fail"
+    assert [
+        (check["name"], check["passed"], check["detail"]) for check in result["checks"]
+    ] == [
+        (BELONG, False, "ready, not a true one"),
+        ("true Patterns found", False, "0 of 1 became ready"),
+    ]
+    assert result["whole_pipeline"]["patterns"][0]["is_true"] is False
+    assert result["whole_pipeline"]["missed"] == [
+        {
+            "pattern_type": "ACH.GOAL.MOVE",
+            "name": "Moving the goal as soon as they reach it",
+            "state": None,
+            "blocked_by": None,
+        }
+    ]
+    notes = result["notes"]
+    assert notes[:3] == [
+        "Why it failed:",
+        f"{BELONG}: ready, not a true one",
+        "true Patterns found: 0 of 1 became ready",
+    ]
+    assert "ACH.GOAL.MOVE: never noticed" in notes
+    assert "Conversation 1, 02 Nov 2026:" in notes
+    assert "Conversation 2, 05 Nov 2026:" in notes
+    assert f"Person: {LATER_TEXT}" in notes
+    assert "Zeph: Different with Sam, then." in notes
+
+
+def test_a_whole_pipeline_case_that_finds_none_of_its_true_patterns_fails(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, BELONGING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.WHOLE_PIPELINE)
+    chat_model.script("Mm.", "Mm.")
+    chat_model.script_processing(
+        processing_answer(summary="Said yes to Mei again.", mood="sad"),
+        processing_answer(summary="Went along with Jun.", mood="neutral"),
+    )
+    chat_model.script_thread_keeping(thread_keeping_answer([MEI, WORK]))
+    chat_model.script_pattern_tagging(tagging_answer(MEI_STORY, WORK_STORY))
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "fail", result
+    assert [
+        (check["name"], check["passed"], check["detail"]) for check in result["checks"]
+    ] == [("true Patterns found", False, "0 of 1 became ready")]
+    assert result["notes"][:4] == [
+        "Why it failed:",
+        "true Patterns found: 0 of 1 became ready",
+        "True Patterns missed:",
+        f"{BELONG}: suspected, stopped by situations",
+    ]
+    assert result["whole_pipeline"]["patterns"] == []
+    assert result["whole_pipeline"]["missed"] == [
+        {
+            "pattern_type": BELONG,
+            "name": "Softening disagreement to protect belonging",
+            "state": "suspected",
+            "blocked_by": "situations",
+        }
+    ]
+
+
+def test_a_whole_pipeline_case_with_no_true_pattern_and_nothing_ready_passes(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    none_true = EvalCase(
+        key="ordinary-days",
+        eval=EvalName.WHOLE_PIPELINE,
+        content={**BELONGING_CASE.content, "true_pattern_types": []},
+    )
+    add_cases(engine, none_true)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.WHOLE_PIPELINE)
+    chat_model.script("Mm.", "Mm.")
+    chat_model.script_processing(
+        processing_answer(summary="Cooked.", mood="neutral"),
+        processing_answer(summary="Ran.", mood="neutral"),
+    )
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "pass", result
+    assert [
+        (check["name"], check["passed"], check["detail"]) for check in result["checks"]
+    ] == [("nothing ready", True, "no Pattern became ready, and none is true")]
+
+
+def test_a_whole_pipeline_case_shows_a_conversation_end_step_that_failed(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, BELONGING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.WHOLE_PIPELINE)
+    script_two_conversations_that_make_belonging_ready(chat_model)
+    chat_model.script_portrait("", RuntimeError("the model is down"))
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    step = (
+        "after Conversation 2: Could not write the User Portrait: "
+        "RuntimeError('the model is down')"
+    )
+    assert result["outcome"] == "fail", result
+    assert [
+        (check["name"], check["passed"], check["detail"]) for check in result["checks"]
+    ] == [
+        (BELONG, True, "ready, one of the true ones"),
+        ("true Patterns found", True, "1 of 1 became ready"),
+        ("Conversation-end step failed", False, step),
+    ]
+    assert result["notes"][:4] == [
+        "Why it failed:",
+        f"Conversation-end step failed: {step}",
+        "",
+        "Conversation 1, 02 Nov 2026:",
+    ]
+
+
+def test_a_whole_pipeline_case_whose_conversation_end_fails_names_what_failed(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, BELONGING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.WHOLE_PIPELINE)
+    chat_model.script("Mm.")
+    chat_model.script_processing(RuntimeError("the model is down"))
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "error"
+    assert result["error"] == (
+        "The Conversation-end steps didn't finish; "
+        "Could not process an ended Conversation: "
+        "RuntimeError('the model is down')"
+    )
+
+
+def test_a_variant_s_override_changes_what_becomes_ready_in_a_whole_pipeline_case(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, BELONGING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(
+        client,
+        admin,
+        EvalName.WHOLE_PIPELINE,
+        variants=[{}, {"pattern_ready_situations": 9}],
+    )
+    script_two_conversations_that_make_belonging_ready(chat_model)
+    script_two_conversations_that_make_belonging_ready(chat_model)
+
+    runner.work_next_run()
+
+    results = {
+        result["variant"]: result["whole_pipeline"]
+        for result in open_run(client, admin, run["id"])["results"]
+    }
+    assert [pattern["pattern_type"] for pattern in results["A"]["patterns"]] == [BELONG]
+    assert results["B"]["patterns"] == []
+    assert results["B"]["missed"][0]["blocked_by"] == "situations"
+
+
+def test_a_whole_pipeline_case_naming_an_unknown_pattern_type_is_an_error(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    runner: EvalRunner,
+) -> None:
+    unknown = EvalCase(
+        key="unknown-truth",
+        eval=EvalName.WHOLE_PIPELINE,
+        content={**BELONGING_CASE.content, "true_pattern_types": ["NOT.A.TYPE"]},
+    )
+    add_cases(engine, unknown)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.WHOLE_PIPELINE)
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "error"
+    assert result["error"] == "Not in the Pattern Catalog: NOT.A.TYPE"
+    assert result["whole_pipeline"] is None
+
+
+def test_a_whole_pipeline_case_stops_between_conversations_once_over_the_limit(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, BELONGING_CASE)
+    set_token_limit(engine, 1)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.WHOLE_PIPELINE)
+    script_two_conversations_that_make_belonging_ready(chat_model)
+
+    runner.work_next_run()
+
+    stopped = open_run(client, admin, run["id"])
+    assert stopped["state"] == "stopped_over_limit"
+    [result] = stopped["results"]
+    assert result["outcome"] == "error"
+    assert result["error"] == (
+        "Stopped after 1 of 2 Conversations: the run went over its token limit."
+    )
+
+
+def test_the_terminal_runs_the_whole_pipeline_eval_only_when_it_is_named(
+    engine: Engine, chat_model: ScriptedChatModel, runner: EvalRunner, clock: FakeClock
+) -> None:
+    add_cases(engine, BELONGING_CASE)
+    service = build_eval_run_service(engine, clock)
+    script_two_conversations_that_make_belonging_ready(chat_model)
+    lines: list[str] = []
+
+    passed = start_and_watch_run(
+        service,
+        read_evals("whole_pipeline"),
+        [],
+        lines.append,
+        lambda _: runner.work_next_run(),
+    )
+
+    assert passed is True
+    assert lines[0].startswith("Estimate: 1 case, about S$")
+    assert any(line.startswith("PASS whole_pipeline/folds-with-mei") for line in lines)
+    assert (
+        "Whole pipeline: 1 of 1 ready Patterns true (100%, target 70%); "
+        "1 of 1 true Patterns found"
+    ) in lines
+    assert EvalName.WHOLE_PIPELINE not in read_evals("")
+    assert EvalName.WHOLE_PIPELINE not in evals_run_by_default()
+
+
+MEI_UNCLEAR = {
+    "quote": "I said yes to Mei again",
+    "sign": "I2",
+    "direction": "for",
+    "context": "Mei asked for help moving; they said yes though worn out.",
+    "about": "Mei, their sister",
+    "days_ago": 6,
+    "second_pattern_type": "ACH.WORTH.PERF",
+    "setting": "home",
+    "relationship": "family",
+}
+MANAGER_CLEAR = {
+    "quote": "I told my manager the plan was fine, then stewed on it all night",
+    "sign": "I2",
+    "direction": "for",
+    "context": "Agreed with a plan at work they thought was wrong.",
+    "about": "their manager",
+    "days_ago": 4,
+    "setting": "work",
+    "relationship": "colleague",
+}
+ASKS_THE_AIMED_CURIOSITY = {
+    "agenda_shown": True,
+    "aimed_raised": True,
+    "aimed_need": "unclear",
+    "aimed_approach": "story_follow_up",
+    "aimed_pattern_type": "CONF.AVOID.BELONG",
+}
+
+
+def agenda_case(
+    key: str,
+    expect: dict[str, Any],
+    tries: Sequence[dict[str, Any]] = (),
+    observations: Sequence[dict[str, Any]] = (MEI_UNCLEAR, MANAGER_CLEAR),
+    thought_experiments: Sequence[dict[str, Any]] = (),
+) -> EvalCase:
+    """An Understanding case whose made-up User has Softening disagreement suspected."""
+    return EvalCase(
+        key=key,
+        eval=EvalName.UNDERSTANDING,
+        content={
+            "now": "2026-11-13T18:30:00",
+            "memory": {
+                "patterns": [
+                    {
+                        "pattern_type": "CONF.AVOID.BELONG",
+                        "observations": list(observations),
+                        "tries": list(tries),
+                    }
+                ],
+                "thought_experiments": list(thought_experiments),
+            },
+            "messages": [{"text": "hey, quiet evening here", "expect": expect}],
+            "rules": [],
+        },
+    )
+
+
+def agenda_checks(result: dict[str, Any]) -> list[tuple[str, bool, str]]:
+    """List a result's Agenda checks as (name, passed, detail)."""
+    return [
+        (check["name"], check["passed"], check["detail"])
+        for check in result["checks"]
+        if "agenda" in check["name"] or "aimed" in check["name"]
+    ]
+
+
+def test_an_understanding_case_s_agenda_and_aimed_curiosity_are_written_by_real_code(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, agenda_case("asks-about-mei", ASKS_THE_AIMED_CURIOSITY))
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.UNDERSTANDING)
+    chat_model.script_reply_plan(
+        reply_plan_answer(
+            need="Think it through", bring_up=[{"curiosity": 1, "how": "weave"}]
+        )
+    )
+    chat_model.script("Nice. What happened after you said yes to helping Mei?")
+
+    runner.work_next_run()
+
+    result = results_by_key(open_run(client, admin, run["id"]))["asks-about-mei"]
+    assert result["outcome"] == "pass", result
+    assert agenda_checks(result) == [
+        ("Reply Plan · agenda shown", True, "was shown the Agenda"),
+        ("Reply Plan · aimed curiosity", True, "brought up the aimed Curiosity"),
+        ("Reply Plan · aimed need", True, "aimed at an unclear story"),
+        ("Reply Plan · aimed Approach", True, "asked by story follow-up"),
+        ("Reply Plan · aimed pattern type", True, "for CONF.AVOID.BELONG"),
+    ]
+    [reply_plan] = chat_model.reply_plan_calls
+    seen = reply_plan.history[0].text
+    assert "[1] Softening disagreement to protect belonging" in seen
+    assert "Still to learn: what drove what they told you about Mei" in seen
+    assert "[1] Go back to what they told you about Mei, their sister on 7 Nov" in seen
+    assert "Aim: something Zeph is exploring about them (the Agenda)" in seen
+
+
+def test_an_understanding_case_fails_on_the_reply_plan_when_the_aim_is_left(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, agenda_case("leaves-mei", ASKS_THE_AIMED_CURIOSITY))
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.UNDERSTANDING)
+    chat_model.script_reply_plan(reply_plan_answer(need="Think it through"))
+    chat_model.script("Sounds peaceful.")
+
+    runner.work_next_run()
+
+    result = results_by_key(open_run(client, admin, run["id"]))["leaves-mei"]
+    assert result["outcome"] == "fail"
+    assert agenda_checks(result) == [
+        ("Reply Plan · agenda shown", True, "was shown the Agenda"),
+        (
+            "Reply Plan · aimed curiosity",
+            False,
+            "brought up no aimed Curiosity, expected: brought up the aimed Curiosity",
+        ),
+        (
+            "Reply Plan · aimed need",
+            False,
+            "brought up no aimed Curiosity, expected aimed at an unclear story",
+        ),
+        (
+            "Reply Plan · aimed Approach",
+            False,
+            "brought up no aimed Curiosity, expected asked by story follow-up",
+        ),
+        (
+            "Reply Plan · aimed pattern type",
+            False,
+            "brought up no aimed Curiosity, expected for CONF.AVOID.BELONG",
+        ),
+    ]
+
+
+def test_a_try_already_made_lets_the_real_agenda_pick_a_thought_experiment(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    wording = "A friend asks you for a favour on your one free day. What do you do?"
+    add_cases(
+        engine,
+        agenda_case(
+            "what-if",
+            {"aimed_raised": True, "aimed_approach": "thought_experiment"},
+            tries=[
+                {
+                    "need": "unclear",
+                    "approach": "would_it_differ",
+                    "outcome": "vague",
+                    "days_ago": 5,
+                }
+            ],
+            thought_experiments=[
+                {
+                    "wording": wording,
+                    "pattern_type": "CONF.AVOID.BELONG",
+                    "other_pattern_type": "ACH.WORTH.PERF",
+                    "sensitivity": "low",
+                }
+            ],
+        ),
+    )
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.UNDERSTANDING)
+    chat_model.script_reply_plan(
+        reply_plan_answer(
+            need="Think it through", bring_up=[{"curiosity": 1, "how": "weave"}]
+        )
+    )
+    chat_model.script("Here's a what-if for you.")
+
+    runner.work_next_run()
+
+    result = results_by_key(open_run(client, admin, run["id"]))["what-if"]
+    assert result["outcome"] == "pass", result
+    seen = chat_model.reply_plan_calls[-1].history[0].text
+    assert wording in seen
+    assert "8 Nov 2026, would it have gone differently: Go back to" in seen
+    assert "(vague)" in seen
+
+
+@pytest.mark.parametrize(
+    ("outcome", "days_ago", "agenda_shown"),
+    [("brushed_off", 1, True), ("asked_to_drop", 3, False)],
+)
+def test_no_aimed_curiosity_waits_right_after_a_try_or_once_asked_to_drop(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+    outcome: str,
+    days_ago: int,
+    agenda_shown: bool,
+) -> None:
+    add_cases(
+        engine,
+        agenda_case(
+            "must-not-ask",
+            {"agenda_shown": agenda_shown, "aimed_raised": False},
+            tries=[
+                {
+                    "need": "unclear",
+                    "approach": "story_follow_up",
+                    "outcome": outcome,
+                    "days_ago": days_ago,
+                }
+            ],
+        ),
+    )
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.UNDERSTANDING)
+    chat_model.script_reply_plan(reply_plan_answer(need="Think it through"))
+    chat_model.script("Sounds peaceful.")
+
+    runner.work_next_run()
+
+    result = results_by_key(open_run(client, admin, run["id"]))["must-not-ask"]
+    assert result["outcome"] == "pass", result
+    seen = chat_model.reply_plan_calls[-1].history[0].text
+    assert "Aim: something Zeph is exploring" not in seen
+
+
+def test_a_pattern_not_suspected_from_its_observations_makes_the_case_an_error(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    runner: EvalRunner,
+) -> None:
+    add_cases(
+        engine,
+        agenda_case("too-little", {"agenda_shown": True}, observations=[MEI_UNCLEAR]),
+    )
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.UNDERSTANDING)
+
+    runner.work_next_run()
+
+    result = results_by_key(open_run(client, admin, run["id"]))["too-little"]
+    assert result["outcome"] == "error"
+    assert "CONF.AVOID.BELONG isn't suspected from its Observations" in result["error"]
+
+
+def unclear_tagging_case(key: str, **story: Any) -> EvalCase:
+    """A Tagging case whose made-up User already has the unclear Mei story."""
+    return EvalCase(
+        key=key,
+        eval=EvalName.TAGGING,
+        content={
+            "now": "2026-11-24T10:00:00",
+            "threads": [],
+            "unclear": [{"pattern_type": "CONF.AVOID.BELONG", **MEI_UNCLEAR, **story}],
+            "messages": [
+                {"who": "zeph", "text": "What were you hoping for with Mei?"},
+                {"who": "person", "text": "honestly I was scared she'd go quiet on me"},
+            ],
+            "observations": [],
+        },
+    )
+
+
+def test_a_tagging_case_shows_an_asked_unclear_story_and_passes_when_it_settles(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(
+        engine,
+        unclear_tagging_case("settles-mei", ends_clear_for="CONF.AVOID.BELONG"),
+    )
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.TAGGING)
+    chat_model.script_pattern_tagging(
+        json.dumps(
+            {
+                "observations": [],
+                "settled": [
+                    {"unclear": 1, "pattern_type": "CONF.AVOID.BELONG", "sign": "I4"}
+                ],
+            }
+        )
+    )
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "pass", result
+    assert [
+        (check["group"], check["name"], check["passed"], check["detail"])
+        for check in result["checks"]
+    ][-1] == (
+        "Unclear stories",
+        '"I said yes to Mei again"',
+        True,
+        "ended clear for CONF.AVOID.BELONG",
+    )
+    assert result["tagging"]["unclear"] == [
+        {
+            "quote": "I said yes to Mei again",
+            "pattern_types": ["CONF.AVOID.BELONG", "ACH.WORTH.PERF"],
+            "direction": "for",
+            "asked": True,
+            "ended_clear_for": "CONF.AVOID.BELONG",
+            "sign": "I4",
+            "expected_clear_for": "CONF.AVOID.BELONG",
+            "matched": True,
+        }
+    ]
+    shown = chat_model.pattern_tagging_calls[-1].history[0].text
+    assert (
+        'Unclear stories Zeph asked about in this Conversation:\n[1] "I said yes '
+        "to Mei again" in shown
+    )
+    assert "CONF.AVOID.BELONG or ACH.WORTH.PERF" in shown
+
+
+@pytest.mark.parametrize(
+    ("story", "settled", "outcome", "detail"),
+    [
+        (
+            {"ends_clear_for": "CONF.AVOID.BELONG"},
+            [],
+            "fail",
+            "ended unclear, expected clear for CONF.AVOID.BELONG",
+        ),
+        (
+            {},
+            [{"unclear": 1, "pattern_type": "ACH.WORTH.PERF", "sign": "I1"}],
+            "fail",
+            "ended clear for ACH.WORTH.PERF, expected unclear",
+        ),
+        ({}, [], "pass", "ended unclear"),
+        ({"asked": False}, [{"unclear": 1}], "pass", "ended unclear"),
+    ],
+)
+def test_a_tagging_case_passes_only_when_its_unclear_story_ends_as_expected(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+    story: dict[str, Any],
+    settled: list[dict[str, Any]],
+    outcome: str,
+    detail: str,
+) -> None:
+    add_cases(engine, unclear_tagging_case("mei-story", **story))
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.TAGGING)
+    chat_model.script_pattern_tagging(
+        json.dumps({"observations": [], "settled": settled})
+    )
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == outcome, result
+    assert result["checks"][-1]["detail"] == detail
+    shown = chat_model.pattern_tagging_calls[-1].history[0].text
+    stories_shown = shown.split("Thought Experiments")[0]
+    assert ('[1] "I said yes to Mei again' in stories_shown) == story.get("asked", True)
+
+
+def seeded_cases(eval_name: EvalName, prefix: str) -> list[EvalCase]:
+    """Read the seeded cases of an Eval whose key starts with a prefix."""
+    return [
+        case
+        for case in read_eval_case_seed(EVAL_CASES_DIR, EVAL_IMAGES_DIR)
+        if case.eval == eval_name and case.key.startswith(prefix)
+    ]
+
+
+@pytest.mark.parametrize(
+    "case", seeded_cases(EvalName.UNDERSTANDING, "agenda-"), ids=lambda case: case.key
+)
+def test_each_seeded_agenda_case_starts_with_the_agenda_it_expects(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+    case: EvalCase,
+) -> None:
+    """Which Exploration a picked Curiosity is for is left to the real model.
+
+    Two aimed Curiosities written at the same moment are offered in no fixed
+    order, so the scripted "pick number 1" can't choose between them.
+    """
+    [message] = case.content["messages"]
+    expect = {**message["expect"], "rules": [], "aimed_pattern_type": ""}
+    unjudged = {**case.content, "messages": [{**message, "expect": expect}]}
+    add_cases(engine, EvalCase(case.key, case.eval, unjudged))
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.UNDERSTANDING)
+    chat_model.script_understanding(
+        understanding_answer(struggling=expect["struggling"])
+    )
+    chat_model.script_reply_plan(
+        reply_plan_answer(
+            need="Think it through",
+            bring_up=(
+                [{"curiosity": 1, "how": "weave"}] if expect["aimed_raised"] else []
+            ),
+        )
+    )
+    chat_model.script("mm, tell me more")
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] != "error", result
+    assert [check for check in agenda_checks(result) if not check[1]] == []
+
+
+@pytest.mark.parametrize(
+    "case", seeded_cases(EvalName.TAGGING, "unclear-story-"), ids=lambda case: case.key
+)
+def test_each_seeded_unclear_story_case_shows_the_tagging_step_its_asked_story(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+    case: EvalCase,
+) -> None:
+    add_cases(engine, case)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.TAGGING)
+    chat_model.script_pattern_tagging(json.dumps({"observations": []}))
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] != "error", result
+    shown = chat_model.pattern_tagging_calls[-1].history[0].text
+    assert '[1] "Mei asked me to help her move again' in shown
+    assert "CONF.AVOID.BELONG or APPR.GIVE.NEEDED" in shown
+    assert "[2]" not in shown.split("Thought Experiments")[0].split("asked about")[1]

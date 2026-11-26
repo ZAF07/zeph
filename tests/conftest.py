@@ -12,6 +12,7 @@ from testcontainers.community.postgres import PostgresContainer
 
 from companion.adapters.pgvector.vector_store import PgvectorKnowledgeVectorStore
 from companion.adapters.postgres.database import (
+    load_pattern_catalog,
     migrate,
     seed_check_in_kinds,
     seed_copy,
@@ -20,6 +21,7 @@ from companion.adapters.postgres.database import (
     seed_moves,
     seed_needs,
     seed_platform_settings,
+    seed_thought_experiments,
 )
 from companion.adapters.postgres.eval_repositories import (
     PostgresEvalCaseRepository,
@@ -54,10 +56,12 @@ SEED_DIR = Path(__file__).parent.parent / "src/companion/seed"
 SEED_FILE = SEED_DIR / "platform_settings.yaml"
 HELPLINES_SEED_FILE = SEED_DIR / "helplines.yaml"
 COPY_SEED_FILE = SEED_DIR / "copy.yaml"
+PATTERN_CATALOG_DIR = SEED_DIR / "pattern_catalog"
 MEMORY_CATEGORIES_SEED_FILE = SEED_DIR / "memory_categories.yaml"
 CHECK_IN_KINDS_SEED_FILE = SEED_DIR / "check_in_kinds.yaml"
 NEEDS_SEED_FILE = SEED_DIR / "needs.yaml"
 MOVES_SEED_FILE = SEED_DIR / "moves.yaml"
+THOUGHT_EXPERIMENTS_SEED_FILE = SEED_DIR / "thought_experiments.yaml"
 JUDGE_SEED_FILE = SEED_DIR / "evals" / "judge.yaml"
 KNOWLEDGE_SEED_FILE = SEED_DIR / "knowledge" / "knowledge.yaml"
 
@@ -183,21 +187,25 @@ def engine(database_url: str) -> Iterator[Engine]:
             text(
                 "TRUNCATE users, telegram_connections, connection_tokens, "
                 "conversations, conversation_messages, platform_settings, copy_slots, "
+                "pattern_types, "
                 "helplines, safeguard_events, memory_categories, memory_items, "
                 "day_summaries, knowledge_documents, knowledge_chunks, "
                 "daily_usage, stickers, check_in_kinds, check_ins, "
                 "feature_switches, user_feature_switches, shared_photos, "
                 "personal_stickers, pending_auth_account_deletions, needs, moves, "
+                "thought_experiments, unmatched_entries, "
                 "eval_cases, eval_runs, eval_images, eval_judge_settings CASCADE"
             )
         )
     seed_platform_settings(engine, SEED_FILE)
     seed_copy(engine, COPY_SEED_FILE)
+    load_pattern_catalog(engine, PATTERN_CATALOG_DIR)
     seed_helplines(engine, HELPLINES_SEED_FILE)
     seed_memory_categories(engine, MEMORY_CATEGORIES_SEED_FILE)
     seed_check_in_kinds(engine, CHECK_IN_KINDS_SEED_FILE)
     seed_needs(engine, NEEDS_SEED_FILE)
     seed_moves(engine, MOVES_SEED_FILE, NEEDS_SEED_FILE)
+    seed_thought_experiments(engine, THOUGHT_EXPERIMENTS_SEED_FILE)
     PostgresJudgeSettingsRepository(engine).add_missing(
         yaml.safe_load(JUDGE_SEED_FILE.read_text()), datetime.now(UTC)
     )
@@ -276,6 +284,9 @@ def chat_model(seeded_settings: dict[str, Any]) -> ScriptedChatModel:
         curiosity_keeping_prompt=seeded_settings["curiosity_keeping_prompt"],
         move_outcome_keeping_prompt=seeded_settings["move_outcome_keeping_prompt"],
         pattern_keeping_prompt=seeded_settings["pattern_keeping_prompt"],
+        pattern_tagging_prompt=seeded_settings["pattern_tagging_prompt"],
+        pattern_matching_prompt=seeded_settings["pattern_matching_prompt"],
+        pattern_other_side_prompt=seeded_settings["pattern_other_side_prompt"],
     )
 
 

@@ -15,6 +15,7 @@ from companion.core.check_in_decision import (
     HoldBack,
     SkipForDailyLimit,
     decide_check_in,
+    kinds_with_pattern_settled,
     next_due_after_change,
     next_due_after_quiet_hours_move,
     retry_after_refusal,
@@ -49,9 +50,17 @@ from companion.core.models import (
     PauseLength,
     PlatformSettings,
     SharedPhoto,
+    ShareVia,
     TraceKind,
     User,
     UserSnapshot,
+)
+from companion.core.pattern_sharing import (
+    SHARES_COUNTED_OVER,
+    PatternSharing,
+    PatternToShare,
+    format_pattern_to_share_for_check_in,
+    within_weekly_limit,
 )
 from companion.core.platform_settings import (
     CHECK_IN_FEWER_MESSAGE,
@@ -63,8 +72,11 @@ from companion.core.platform_settings import (
     CHECK_IN_THINKING,
     CONVERSATION_QUIET_GAP,
     CURIOSITY_CHECK_INS_PER_WEEK,
+    PATTERN_SHARE_WAIT,
+    PATTERNS_SHARED_PER_WEEK,
     PERSONA,
     RECENT_CONVERSATION_SUMMARIES,
+    thinking_to_use,
 )
 from companion.core.ports import (
     ChatBlockedError,
@@ -73,6 +85,7 @@ from companion.core.ports import (
     MessageRefusedError,
     Repositories,
 )
+from companion.core.predictions import PredictionKeeper
 from companion.core.settings_changes import record_where_changed
 from companion.core.timing import users_today
 from companion.core.usage import UsageLimiter, UsageRecordingChatModel
@@ -398,6 +411,7 @@ def describe_check_in(
     memory: str,
     shared_photos: str = "",
     due_curiosities: str = "",
+    pattern_to_share: str = "",
 ) -> str:
     """Write what the Check-in model is told to decide on a Check-in.
 
@@ -411,16 +425,20 @@ def describe_check_in(
             offered.
         due_curiosities: The User's numbered due Curiosities; "" if none
             are offered.
+        pattern_to_share: The ready Pattern its message tells them; "" if
+            none is offered.
 
     Returns:
         The Kinds, what to call the User, their local time, recent
-        Check-ins, what is remembered about them, their Shared Photos and
-        their due Curiosities.
+        Check-ins, what is remembered about them, their Shared Photos,
+        their due Curiosities and the Pattern to tell them.
     """
     kind_lines = "\n".join(f"- {kind.name}: {kind.description}" for kind in kinds)
     remembered = memory or "Nothing remembered about them."
     extras = "".join(
-        f"\n\n{extra}" for extra in (shared_photos, due_curiosities) if extra
+        f"\n\n{extra}"
+        for extra in (shared_photos, due_curiosities, pattern_to_share)
+        if extra
     )
     return (
         f"Check-in Kinds you may choose from:\n{kind_lines}\n\n"
@@ -538,6 +556,8 @@ class CheckInService:
         usage_limiter: UsageLimiter,
         chat_channel: ChatChannel,
         clock: Clock,
+        pattern_sharing: PatternSharing,
+        prediction_keeper: PredictionKeeper,
     ) -> None:
         """Set up the service.
 
@@ -554,6 +574,10 @@ class CheckInService:
             chat_channel: Sends Check-ins, and any Shared Photo with them,
                 to Users.
             clock: Tells the current time.
+            pattern_sharing: Offers a ready Pattern that waited too long for
+                a moment in chat, and records when a Check-in shared it.
+            prediction_keeper: Keeps the new Prediction a Check-in gave a
+                shared Pattern.
         """
         self._repositories = repositories
         self._features = features
@@ -562,6 +586,8 @@ class CheckInService:
         self._usage_limiter = usage_limiter
         self._chat_channel = chat_channel
         self._clock = clock
+        self._pattern_sharing = pattern_sharing
+        self._prediction_keeper = prediction_keeper
 
     def change_settings(
         self,
@@ -772,15 +798,21 @@ class CheckInService:
 
         Returns:
             Their settings, whether Check-ins are available and paused right
-            now, their recent Check-ins, the Check-in Kinds, and which
-            settings an Admin changed.
+            now, their recent Check-ins, the Check-in Kinds (one that
+            shares a Pattern only while Pattern sharing works for them),
+            and which settings an Admin changed.
         """
+        shares_patterns = self._features.works_for(user.id, Feature.PATTERN_SHARING)
         return CheckInsPage(
             settings=user.check_ins,
             available=self._features.available_for(user.id, Feature.CHECK_INS),
             paused=self.is_paused(user),
             recent=self.list_recent(user),
-            kinds=self.list_kinds(),
+            kinds=[
+                kind
+                for kind in self.list_kinds()
+                if shares_patterns or not kind.shares_pattern
+            ],
             changed_by_admin=user.settings_changed_by_admin,
         )
 
@@ -895,6 +927,8 @@ class CheckInService:
                 CURIOSITY_CHECK_INS_PER_WEEK
             ),
             kinds=tuple(self.list_kinds()),
+            pattern_share_wait=platform_settings.get(PATTERN_SHARE_WAIT),
+            patterns_shared_per_week=platform_settings.get(PATTERNS_SHARED_PER_WEEK),
         )
 
     def _gather_facts(
@@ -931,8 +965,17 @@ class CheckInService:
             user_ids
         )
         waiting_curiosities = repositories.curiosities.list_waiting_for_users(user_ids)
+        now = self._clock.now()
         curiosity_check_ins = repositories.check_ins.count_curiosity_check_ins_since(
-            user_ids, self._clock.now() - CURIOSITY_CHECK_INS_COUNTED_OVER
+            user_ids, now - CURIOSITY_CHECK_INS_COUNTED_OVER
+        )
+        with_pattern_ready_long = (
+            repositories.patterns.list_users_with_pattern_ready_by(
+                user_ids, now - rules.pattern_share_wait
+            )
+        )
+        patterns_shared = repositories.patterns.count_shared_since(
+            user_ids, now - SHARES_COUNTED_OVER
         )
         all_facts = []
         for snapshot in snapshots:
@@ -957,12 +1000,18 @@ class CheckInService:
                     ),
                     has_shared_photos=user_id in with_shared_photos,
                     has_due_curiosity=bool(
-                        due_curiosities(
-                            waiting_curiosities.get(user_id, []), snapshot.today
-                        )
+                        due_curiosities(waiting_curiosities.get(user_id, []), snapshot)
                     ),
                     curiosity_check_ins_this_week=curiosity_check_ins.get(user_id, 0),
                     last_sent_at=sent[0].decided_at if sent else None,
+                    pattern_waiting=(
+                        snapshot.works(Feature.PATTERN_SHARING)
+                        and user_id in with_pattern_ready_long
+                        and within_weekly_limit(
+                            patterns_shared.get(user_id, 0),
+                            rules.patterns_shared_per_week,
+                        )
+                    ),
                 )
             )
         return all_facts
@@ -999,7 +1048,11 @@ class CheckInService:
 
         Kinds that send a Shared Photo come with the User's Shared Photos,
         and Kinds that ask a Curiosity with their due Curiosities. A
-        Curiosity is marked raised once its message counts as sent. The next
+        Curiosity is marked raised once its message counts as sent. When a
+        ready Pattern has waited long enough and still passes its checks,
+        only the Kinds that share one are offered, with the Pattern; once
+        the message counts as sent, a small check says whether it told them,
+        and only then is the Pattern shared. The next
         Due Time is the one for a send or a skip, unless the chat channel
         refuses the message. Nothing is saved or sent if the User's Due Time
         changed since the tick read it.
@@ -1014,7 +1067,17 @@ class CheckInService:
             InvalidCheckInAnswerError: If the model's answer can't be used.
         """
         user = snapshot.user
-        kinds = list(plan.kinds)
+        pattern_to_share = (
+            self._pattern_sharing.pattern_to_offer_in_check_in(snapshot)
+            if any(kind.shares_pattern for kind in plan.kinds)
+            else None
+        )
+        kinds = list(
+            kinds_with_pattern_settled(plan.kinds, pattern_to_share is not None)
+        )
+        if not kinds:
+            logger.warning("No Check-in Kind is left to send to this User")
+            return
         shared_photos = (
             self._repositories.user_memory.list_shared_photos(user.id)
             if any(kind.sends_shared_photo for kind in kinds)
@@ -1022,7 +1085,7 @@ class CheckInService:
         )
         curiosities_to_ask = (
             due_curiosities(
-                self._repositories.curiosities.list_waiting(user.id), snapshot.today
+                self._repositories.curiosities.list_waiting(user.id), snapshot
             )
             if any(kind.raises_curiosity for kind in kinds)
             else []
@@ -1030,7 +1093,9 @@ class CheckInService:
         requested_by = (
             plan.check_in_now.requested_by if plan.check_in_now is not None else None
         )
-        decision = self._decide(snapshot, kinds, shared_photos, curiosities_to_ask)
+        decision = self._decide(
+            snapshot, kinds, shared_photos, curiosities_to_ask, pattern_to_share
+        )
         if decision.kind is None:
             skipped = CheckIn(
                 id=uuid4(),
@@ -1072,6 +1137,13 @@ class CheckInService:
         )
         if was_sent and curiosity is not None:
             self._repositories.curiosities.mark_raised([curiosity.id], None, now)
+            self._prediction_keeper.record_given(
+                snapshot, [curiosity.id], [decision.message or ""]
+            )
+        if was_sent and pattern_to_share is not None and decision.message:
+            self._pattern_sharing.record_if_shared(
+                snapshot, pattern_to_share, [decision.message], ShareVia.CHECK_IN, None
+            )
         if (
             was_sent
             and shared_photo is not None
@@ -1297,6 +1369,7 @@ class CheckInService:
         kinds: list[CheckInKind],
         shared_photos: list[SharedPhoto],
         due_curiosities: list[Curiosity],
+        pattern_to_share: PatternToShare | None,
     ) -> CheckInDecision:
         """Ask the Check-in model to choose a Kind and write the message, or skip.
 
@@ -1306,6 +1379,8 @@ class CheckInService:
             kinds: The Check-in Kinds it may choose from.
             shared_photos: The User's Shared Photos it may send.
             due_curiosities: The User's due Curiosities it may ask.
+            pattern_to_share: The ready Pattern its message tells them;
+                None for none.
 
         Returns:
             The decision.
@@ -1325,12 +1400,19 @@ class CheckInService:
             self._memory(user, settings),
             describe_shared_photos(kinds, shared_photos, user.time_zone),
             describe_due_curiosities_for_check_in(kinds, due_curiosities),
+            (
+                format_pattern_to_share_for_check_in(
+                    pattern_to_share, [kind.name for kind in kinds]
+                )
+                if pattern_to_share is not None
+                else ""
+            ),
         )
         answer = self._chat_model.generate(
             snapshot=snapshot,
             step=ModelStep.CHECK_IN,
             model=settings.get(CHECK_IN_MODEL),
-            thinking=settings.get(CHECK_IN_THINKING),
+            thinking=thinking_to_use(settings, CHECK_IN_MODEL, CHECK_IN_THINKING),
             instructions=f"{settings.get(PERSONA)}\n\n{settings.get(CHECK_IN_PROMPT)}",
             history=[ChatLine(role=ChatRole.USER, text=description)],
         )

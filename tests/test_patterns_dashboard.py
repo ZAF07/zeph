@@ -1,9 +1,11 @@
 import importlib
+import json
 from datetime import date, datetime, timedelta
 from types import ModuleType
 from typing import Any
 from uuid import UUID, uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
@@ -12,9 +14,9 @@ from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.core.models import (
     Pattern,
     PatternEvidence,
-    PatternReaction,
     PatternState,
     PatternToSave,
+    PredictionOutcome,
 )
 from tests.fakes import (
     FakeAuthVerifier,
@@ -27,16 +29,28 @@ from tests.telegram_helpers import auth_headers, connect_telegram
 from tests.test_features import maya_id
 from tests.test_life_threads import end_conversation
 from tests.test_moves_migration import downgrade_to
+from tests.test_pattern_sharing import (
+    APPROVED_WORDING,
+    PREDICTION,
+    end_with,
+    predictions_of,
+    ready_to_share,
+    share,
+)
+from tests.test_pattern_states import BELONG
+from tests.test_pattern_states import patterns_of as catalog_patterns_of
+from tests.test_pattern_tagging import (
+    deleted_quote_count,
+    observation_entry,
+    observations_of,
+)
 from tests.test_patterns import (
     GOES_QUIET,
     MUM,
     PROJECT,
-    end_with_pattern_answer,
-    evidence,
-    pattern_keeping_answer,
     patterns_of,
-    start_goes_quiet_pattern,
 )
+from tests.test_ready_gate import belonging
 from tests.test_user_portrait import REWRITTEN, end_conversation_with_portrait
 
 EARNS_REST = (
@@ -45,6 +59,7 @@ EARNS_REST = (
 WORST_FIRST = "Names the worst version of a plan first, before anyone else can."
 HIDDEN = "Keeps busy so they never have to sit with a hard feeling."
 CLOSED = "Only feels calm when the house is spotless."
+UNCLEAR_QUOTE = "I've been thinking about why I do that"
 
 
 def patterns_shown(client: TestClient, headers: dict[str, str]) -> list[Any]:
@@ -118,7 +133,7 @@ def keep_threads(
     )
 
 
-def test_a_user_sees_only_confirmed_patterns_newest_agreed_first_with_evidence(
+def told_belonging(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -126,70 +141,36 @@ def test_a_user_sees_only_confirmed_patterns_newest_agreed_first_with_evidence(
     clock: FakeClock,
     scheduler: FakeScheduler,
     seeded_settings: dict[str, Any],
-) -> None:
-    connect_telegram(client, auth_verifier, chat_channel)
-    user_id = maya_id(client, auth_verifier)
-    keep_threads(client, chat_model, clock, scheduler, seeded_settings)
-    threads = threads_by_title(client.engine, user_id)
-    project, mum = threads["Side project"], threads["Mum's visit"]
-    keep_pattern(
-        client.engine,
-        user_id,
-        WORST_FIRST,
-        PatternState.CONFIRMED,
-        [
-            (date(2026, 10, 28), project, "Listed what could go wrong first."),
-            (date(2026, 11, 9), mum, "Called the trip reckless before mum could."),
-        ],
-        confirmed_at=datetime(2026, 11, 9, 20, 0),
+) -> str:
+    """Have Zeph tell Maya her Pattern of CONF.AVOID.BELONG; return her User ID."""
+    user_id = ready_to_share(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
     )
-    keep_pattern(
-        client.engine,
-        user_id,
-        EARNS_REST,
-        PatternState.CONFIRMED,
-        [
-            (date(2026, 11, 2), mum, "Felt guilty taking an afternoon off."),
-            (date(2026, 11, 12), project, "Worked through the weekend."),
-        ],
-        confirmed_at=datetime(2026, 11, 12, 20, 0),
-    )
-    hidden_patterns = [
-        (HIDDEN, PatternState.SUSPECTED),
-        (CLOSED, PatternState.CLOSED),
-    ]
-    for pattern_text, state in hidden_patterns:
-        keep_pattern(
-            client.engine,
-            user_id,
-            pattern_text,
-            state,
-            [
-                (date(2026, 11, 3), project, "Cleaned at midnight."),
-                (date(2026, 11, 4), mum, "Tidied while mum talked."),
-            ],
+    share(client, chat_model, clock)
+    return user_id
+
+
+def never_again(engine: Engine, user_id: str) -> frozenset[str]:
+    """List the Pattern Types never to be noted for a User again."""
+    return build_postgres_repositories(engine).patterns.list_never_again(UUID(user_id))
+
+
+def set_state(engine: Engine, pattern_id: UUID, state: PatternState) -> None:
+    """Put a Pattern in a state straight in the database."""
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE patterns SET state = :state WHERE id = :id"),
+            {"state": state.value, "id": pattern_id},
         )
 
-    shown = patterns_shown(client, maya_headers(auth_verifier))
 
-    assert [pattern["pattern"] for pattern in shown] == [EARNS_REST, WORST_FIRST]
-    assert set(shown[0]) == {"id", "pattern", "agreed_at", "evidence"}
-    assert shown[0]["agreed_at"].startswith("2026-11-12T20:00:00")
-    assert shown[0]["evidence"] == [
-        {
-            "day": "2026-11-12",
-            "thread": "Side project",
-            "line": "Worked through the weekend.",
-        },
-        {
-            "day": "2026-11-02",
-            "thread": "Mum's visit",
-            "line": "Felt guilty taking an afternoon off.",
-        },
-    ]
-
-
-def test_agreeing_with_a_pattern_records_the_day_and_a_later_reaction_keeps_it(
+def test_a_user_sees_a_pattern_zeph_told_them_with_quotes_by_thread_and_prediction(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -198,107 +179,198 @@ def test_agreeing_with_a_pattern_records_the_day_and_a_later_reaction_keeps_it(
     scheduler: FakeScheduler,
     seeded_settings: dict[str, Any],
 ) -> None:
-    connect_telegram(client, auth_verifier, chat_channel)
-    user_id = maya_id(client, auth_verifier)
-    start_goes_quiet_pattern(client, chat_model, clock, scheduler, seeded_settings)
-    have_pattern_answer = (client, chat_model, clock, scheduler, seeded_settings)
-    [suspected] = patterns_of(client.engine, user_id)
-    assert suspected.confirmed_at is None
-
-    end_with_pattern_answer(
-        *have_pattern_answer, {"pattern": 1, "reaction": "agreed", "state": "confirmed"}
+    user_id = told_belonging(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
     )
-    agreed_at = clock.now()
-    end_with_pattern_answer(
-        *have_pattern_answer, {"pattern": 1, "reaction": "brushed_off"}
-    )
+    told_at = clock.now()
+    days = {
+        observation.quote: observation.day.isoformat()
+        for observation in observations_of(client.engine, user_id)
+    }
 
-    [pattern] = patterns_of(client.engine, user_id)
-    assert pattern.state == PatternState.CONFIRMED
-    assert pattern.last_reaction == PatternReaction.BRUSHED_OFF
-    assert pattern.confirmed_at == agreed_at
     [shown] = patterns_shown(client, maya_headers(auth_verifier))
-    assert datetime.fromisoformat(shown["agreed_at"]) == agreed_at
 
-
-def test_a_new_pattern_agreed_with_at_once_is_dated_and_agreeing_again_keeps_the_day(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    chat_model: ScriptedChatModel,
-    clock: FakeClock,
-    scheduler: FakeScheduler,
-    seeded_settings: dict[str, Any],
-) -> None:
-    connect_telegram(client, auth_verifier, chat_channel)
-    user_id = maya_id(client, auth_verifier)
-    chat_model.script_pattern_keeping(
-        pattern_keeping_answer(
-            [
-                {
-                    "pattern": GOES_QUIET,
-                    "evidence": [
-                        evidence(1, "Skipped meals for days while on the app."),
-                        evidence(2, "Snapped at mum because the app had them."),
-                    ],
-                    "reaction": "agreed",
-                    "state": "confirmed",
-                }
-            ]
-        )
-    )
-    keep_threads(client, chat_model, clock, scheduler, seeded_settings)
-    [started_confirmed] = patterns_of(client.engine, user_id)
-    agreed_at = started_confirmed.confirmed_at
-
-    end_with_pattern_answer(
-        client,
-        chat_model,
-        clock,
-        scheduler,
-        seeded_settings,
-        {"pattern": 1, "reaction": "agreed", "state": "confirmed"},
-    )
-
-    assert agreed_at is not None
-    [pattern] = patterns_of(client.engine, user_id)
-    assert pattern.last_offered_at == clock.now()
-    assert pattern.confirmed_at == agreed_at < clock.now()
-
-
-def test_deleting_a_pattern_removes_it_and_rewrites_the_portrait_without_it(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    chat_model: ScriptedChatModel,
-    clock: FakeClock,
-    scheduler: FakeScheduler,
-    seeded_settings: dict[str, Any],
-) -> None:
-    connect_telegram(client, auth_verifier, chat_channel)
-    user_id = maya_id(client, auth_verifier)
-    headers = maya_headers(auth_verifier)
-    end_conversation_with_portrait(
-        client,
-        chat_model,
-        clock,
-        scheduler,
-        seeded_settings,
-        threads=[PROJECT, MUM],
-    )
-    threads = threads_by_title(client.engine, user_id)
-    keep_pattern(
-        client.engine,
-        user_id,
-        GOES_QUIET,
-        PatternState.CONFIRMED,
-        [
-            (date(2026, 11, 2), threads["Side project"], "Skipped meals."),
-            (date(2026, 11, 3), threads["Mum's visit"], "Snapped at mum."),
+    assert shown == {
+        "id": str(belonging(client.engine, user_id).id),
+        "state": "shared",
+        "pattern": (
+            "You seem to protect closeness by keeping disagreements small, even "
+            "when they matter to you."
+        ),
+        "where_it_shows": [
+            {
+                "condition": "relationship",
+                "shows_with": ["family", "friend"],
+                "not_with": ["partner"],
+            }
         ],
-        confirmed_at=datetime(2026, 11, 3, 20, 0),
+        "told_at": shown["told_at"],
+        "quote_groups": [
+            {
+                "life_thread": "Falling-out with Mei",
+                "quotes": [
+                    {
+                        "quote": "I said yes to Mei again",
+                        "day": days["I said yes to Mei again"],
+                    }
+                ],
+            },
+            {
+                "life_thread": "New manager at work",
+                "quotes": [
+                    {
+                        "quote": "Then I stewed on it all night",
+                        "day": days["Then I stewed on it all night"],
+                    }
+                ],
+            },
+            {
+                "life_thread": None,
+                "quotes": [
+                    {
+                        "quote": "I just went along with it",
+                        "day": days["I just went along with it"],
+                    }
+                ],
+            },
+        ],
+        "predictions": [
+            {"wording": PREDICTION, "made_at": shown["told_at"], "outcome": None}
+        ],
+    }
+    assert datetime.fromisoformat(shown["told_at"]) == told_at
+
+
+def test_a_prediction_shows_how_it_went_once_it_is_known(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    told_belonging(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+    )
+    headers = maya_headers(auth_verifier)
+
+    outcomes_shown = []
+    for outcome in PredictionOutcome:
+        with client.engine.begin() as connection:
+            connection.execute(
+                text("UPDATE predictions SET outcome = :outcome, outcome_at = now()"),
+                {"outcome": outcome.value},
+            )
+        [shown] = patterns_shown(client, headers)
+        outcomes_shown.append(shown["predictions"][0]["outcome"])
+
+    assert outcomes_shown == ["came_true", "did_not", "not_come_up", "not_followed_up"]
+
+
+def test_each_pattern_zeph_told_them_shows_and_no_other_is_returned(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    user_id = told_belonging(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+    )
+    headers = maya_headers(auth_verifier)
+    pattern_id = belonging(client.engine, user_id).id
+    keep_pattern(client.engine, user_id, HIDDEN, PatternState.UNMATCHED, [])
+
+    states_shown = {}
+    for state in PatternState:
+        set_state(client.engine, pattern_id, state)
+        states_shown[state.value] = [
+            pattern["state"] for pattern in patterns_shown(client, headers)
+        ]
+
+    assert states_shown == {
+        "noticed": [],
+        "suspected": [],
+        "ready": [],
+        "shared": ["shared"],
+        "confirmed": ["confirmed"],
+        "contested": ["contested"],
+        "closed": ["closed"],
+        "unmatched": [],
+    }
+
+    with client.engine.begin() as connection:
+        connection.execute(text("UPDATE patterns SET shared_at = NULL"))
+    set_state(client.engine, pattern_id, PatternState.CLOSED)
+
+    assert patterns_shown(client, headers) == []
+
+
+def test_deleting_a_pattern_removes_it_with_its_own_quotes_and_rewrites_the_portrait(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    user_id = told_belonging(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+    )
+    headers = maya_headers(auth_verifier)
+    end_with(
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+        observations=[
+            observation_entry(
+                pattern_types=["ACH.WORTH.PERF", BELONG],
+                sign="I1",
+                quote=UNCLEAR_QUOTE,
+                thread=None,
+            )
+        ],
+    )
+    set_state(
+        client.engine, belonging(client.engine, user_id).id, PatternState.CONFIRMED
+    )
+    end_conversation_with_portrait(
+        client, chat_model, clock, scheduler, seeded_settings
     )
     [shown] = patterns_shown(client, headers)
+    portraits_before = len(chat_model.portrait_calls)
+    quotes_before = len(observations_of(client.engine, user_id))
+    assert shown["state"] == "confirmed"
+    assert APPROVED_WORDING in chat_model.portrait_calls[-1].history[0].text
 
     deleted = client.delete(f"/api/patterns/{shown['id']}", headers=headers)
     deleted_again = client.delete(f"/api/patterns/{shown['id']}", headers=headers)
@@ -309,12 +381,69 @@ def test_deleting_a_pattern_removes_it_and_rewrites_the_portrait_without_it(
     assert deleted_again.status_code == 404
     assert patterns_shown(client, headers) == []
     assert patterns_of(client.engine, user_id) == []
-    assert GOES_QUIET not in chat_model.portrait_calls[-1].history[0].text
+    assert [
+        (observation.pattern_type_id, observation.second_pattern_type_id)
+        for observation in observations_of(client.engine, user_id)
+    ] == [("ACH.WORTH.PERF", BELONG)]
+    assert predictions_of(client.engine, user_id) == []
+    kept = client.get("/api/kept-quotes", headers=headers).json()["quotes"]
+    assert [quote["quote"] for quote in kept] == [UNCLEAR_QUOTE]
+    assert deleted_quote_count(client.engine, user_id) == quotes_before - 1
+    assert never_again(client.engine, user_id) == frozenset()
+    assert len(chat_model.portrait_calls) == portraits_before + 1
+    assert APPROVED_WORDING not in chat_model.portrait_calls[-1].history[0].text
     portrait = client.get("/api/user-portrait", headers=headers).json()["portrait"]
     assert portrait["text"] == REWRITTEN
 
 
-def test_a_user_cannot_delete_a_suspected_or_another_users_pattern(
+@pytest.mark.parametrize("state", [PatternState.CONTESTED, PatternState.CLOSED])
+def test_a_deleted_pattern_they_disagreed_with_or_that_did_not_hold_up_never_returns(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+    state: PatternState,
+) -> None:
+    user_id = told_belonging(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+    )
+    headers = maya_headers(auth_verifier)
+    set_state(client.engine, belonging(client.engine, user_id).id, state)
+    [shown] = patterns_shown(client, headers)
+
+    deleted = client.delete(f"/api/patterns/{shown['id']}", headers=headers)
+    end_with(
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+        observations=[
+            observation_entry(quote=UNCLEAR_QUOTE, thread=None),
+            observation_entry(
+                pattern_types=["ACH.WORTH.PERF", BELONG],
+                sign="I1",
+                quote=UNCLEAR_QUOTE,
+                thread=None,
+            ),
+        ],
+    )
+
+    assert deleted.status_code == 204
+    assert never_again(client.engine, user_id) == frozenset({BELONG})
+    assert observations_of(client.engine, user_id) == []
+    assert catalog_patterns_of(client.engine, user_id) == []
+
+
+def test_a_pattern_shows_the_wording_it_was_told_in_even_after_its_type_is_gone(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -323,36 +452,117 @@ def test_a_user_cannot_delete_a_suspected_or_another_users_pattern(
     scheduler: FakeScheduler,
     seeded_settings: dict[str, Any],
 ) -> None:
-    connect_telegram(client, auth_verifier, chat_channel)
-    user_id = maya_id(client, auth_verifier)
-    keep_threads(client, chat_model, clock, scheduler, seeded_settings)
-    threads = threads_by_title(client.engine, user_id)
-    shared_evidence = [
-        (date(2026, 11, 2), threads["Side project"], "Skipped meals."),
-        (date(2026, 11, 3), threads["Mum's visit"], "Snapped at mum."),
-    ]
-    suspected_id = keep_pattern(
-        client.engine, user_id, HIDDEN, PatternState.SUSPECTED, shared_evidence
+    user_id = told_belonging(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
     )
-    confirmed_id = keep_pattern(
-        client.engine,
-        user_id,
-        GOES_QUIET,
-        PatternState.CONFIRMED,
-        shared_evidence,
-        confirmed_at=datetime(2026, 11, 3, 20, 0),
+    headers = maya_headers(auth_verifier)
+    told = belonging(client.engine, user_id)
+    assert told.shared_wording is not None
+    assert told.shared_wording.startswith(APPROVED_WORDING)
+    with client.engine.begin() as connection:
+        connection.execute(
+            text("UPDATE patterns SET shared_wording = 'The words Zeph used then.'")
+        )
+    [as_told] = patterns_shown(client, headers)
+    with client.engine.begin() as connection:
+        for table in ("patterns", "observations"):
+            connection.execute(
+                text(
+                    f"UPDATE {table} SET pattern_type_id = 'GONE.FROM.CATALOG' "  # noqa: S608
+                    "WHERE pattern_type_id = :belong"
+                ),
+                {"belong": BELONG},
+            )
+
+    [type_gone] = patterns_shown(client, headers)
+    deleted = client.delete(f"/api/patterns/{type_gone['id']}", headers=headers)
+
+    assert as_told["pattern"] == "The words Zeph used then."
+    assert type_gone["pattern"] == "The words Zeph used then."
+    assert type_gone["quote_groups"] == as_told["quote_groups"]
+    assert deleted.status_code == 204
+    assert patterns_shown(client, headers) == []
+
+
+def stored_ruled_out_topics(engine: Engine) -> list[str] | None:
+    """Read the stored ruled-out topics; None while they reload from the seed."""
+    with engine.connect() as connection:
+        topics: list[str] | None = connection.execute(
+            text(
+                "SELECT value FROM platform_settings "
+                "WHERE key = 'pattern_ruled_out_topics'"
+            )
+        ).scalar_one_or_none()
+    return topics
+
+
+@pytest.mark.parametrize(
+    ("stored", "after"),
+    [
+        (
+            ["abuse", "sexual trauma", "self-harm or suicide", "eating and body image"],
+            None,
+        ),
+        (["abuse", "money"], ["abuse", "money"]),
+    ],
+)
+def test_the_migration_reloads_the_ruled_out_topics_unless_an_admin_changed_them(
+    engine: Engine, database_url: str, stored: list[str], after: list[str] | None
+) -> None:
+    downgrade_to(database_url, "0106")
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "UPDATE platform_settings SET value = CAST(:topics AS jsonb) "
+                    "WHERE key = 'pattern_ruled_out_topics'"
+                ),
+                {"topics": json.dumps(stored)},
+            )
+    finally:
+        migrate(database_url)
+
+    assert stored_ruled_out_topics(engine) == after
+
+
+def test_a_user_cannot_delete_a_pattern_never_told_or_another_users_pattern(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    user_id = ready_to_share(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
     )
+    pattern_id = belonging(client.engine, user_id).id
     stranger = auth_headers(auth_verifier, "user_stranger")
 
-    as_maya = client.delete(
-        f"/api/patterns/{suspected_id}", headers=maya_headers(auth_verifier)
+    while_ready = client.delete(
+        f"/api/patterns/{pattern_id}", headers=maya_headers(auth_verifier)
     )
-    as_stranger = client.delete(f"/api/patterns/{confirmed_id}", headers=stranger)
+    share(client, chat_model, clock)
+    as_stranger = client.delete(f"/api/patterns/{pattern_id}", headers=stranger)
 
-    assert as_maya.status_code == 404
+    assert while_ready.status_code == 404
     assert as_stranger.status_code == 404
     assert patterns_shown(client, stranger) == []
-    assert len(patterns_of(client.engine, user_id)) == 2
+    assert belonging(client.engine, user_id).state == PatternState.SHARED
+    assert len(observations_of(client.engine, user_id)) == 4
 
 
 def test_with_user_memory_off_a_user_still_sees_and_deletes_patterns(
@@ -364,22 +574,16 @@ def test_with_user_memory_off_a_user_still_sees_and_deletes_patterns(
     scheduler: FakeScheduler,
     seeded_settings: dict[str, Any],
 ) -> None:
-    connect_telegram(client, auth_verifier, chat_channel)
-    user_id = maya_id(client, auth_verifier)
-    headers = maya_headers(auth_verifier)
-    keep_threads(client, chat_model, clock, scheduler, seeded_settings)
-    threads = threads_by_title(client.engine, user_id)
-    keep_pattern(
-        client.engine,
-        user_id,
-        GOES_QUIET,
-        PatternState.CONFIRMED,
-        [
-            (date(2026, 11, 2), threads["Side project"], "Skipped meals."),
-            (date(2026, 11, 3), threads["Mum's visit"], "Snapped at mum."),
-        ],
-        confirmed_at=datetime(2026, 11, 3, 20, 0),
+    told_belonging(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
     )
+    headers = maya_headers(auth_verifier)
     client.patch("/api/me", json={"user_memory_enabled": False}, headers=headers)
 
     [shown] = patterns_shown(client, headers)
@@ -389,7 +593,7 @@ def test_with_user_memory_off_a_user_still_sees_and_deletes_patterns(
     assert patterns_shown(client, headers) == []
 
 
-def test_the_portrait_is_written_from_confirmed_patterns_only(
+def test_a_pattern_with_no_pattern_type_never_reaches_the_portrait(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -415,7 +619,7 @@ def test_the_portrait_is_written_from_confirmed_patterns_only(
         confirmed_at=datetime(2026, 11, 3, 20, 0),
     )
     keep_pattern(
-        client.engine, user_id, HIDDEN, PatternState.SUSPECTED, shared_evidence
+        client.engine, user_id, HIDDEN, PatternState.UNMATCHED, shared_evidence
     )
     keep_pattern(client.engine, user_id, CLOSED, PatternState.CLOSED, shared_evidence)
     clock.advance(timedelta(days=1))
@@ -425,7 +629,8 @@ def test_the_portrait_is_written_from_confirmed_patterns_only(
     )
 
     given = chat_model.portrait_calls[-1].history[0].text
-    assert f"Patterns they agreed with:\n- {GOES_QUIET}" in given
+    assert "Patterns they agreed with:\nNone yet." in given
+    assert GOES_QUIET not in given
     assert HIDDEN not in given
     assert CLOSED not in given
     assert "patterns they agreed with" in seeded_settings["portrait_prompt"].lower()
@@ -494,32 +699,3 @@ def test_the_migration_keeps_a_portrait_prompt_and_hero_line_an_admin_edited(
         migrate(database_url)
 
     assert stored_texts(engine) == ("Admin's own Portrait prompt.", "Admin's own line.")
-
-
-def test_the_migration_dates_confirmed_patterns_to_when_they_were_last_offered(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    chat_model: ScriptedChatModel,
-    clock: FakeClock,
-    scheduler: FakeScheduler,
-    seeded_settings: dict[str, Any],
-    database_url: str,
-) -> None:
-    connect_telegram(client, auth_verifier, chat_channel)
-    user_id = maya_id(client, auth_verifier)
-    start_goes_quiet_pattern(client, chat_model, clock, scheduler, seeded_settings)
-    end_with_pattern_answer(
-        client,
-        chat_model,
-        clock,
-        scheduler,
-        seeded_settings,
-        {"pattern": 1, "reaction": "agreed", "state": "confirmed"},
-    )
-
-    downgrade_to(database_url, "0068")
-    migrate(database_url)
-
-    [pattern] = patterns_of(client.engine, user_id)
-    assert pattern.confirmed_at == pattern.last_offered_at

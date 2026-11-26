@@ -1,8 +1,14 @@
 import { codeTextArea, fieldLabel, inputField } from "@/components/form-styles";
 import type { NeedOverride } from "@/lib/api-client";
+import {
+  curiosityTreatmentOptions,
+  defaultCuriosityTreatment,
+  toCuriosityTreatment,
+} from "@/lib/curiosity-treatment";
 
 /**
- * The three fields of a Need override.
+ * The fields of a Need override: its three texts and how Curiosities are
+ * treated.
  *
  * @param props - `label` names the Need; `value` is the override, or null
  *   if it is malformed; `onChange` gets the new details.
@@ -54,6 +60,26 @@ export function NeedOverrideFields({
             onChange({ ...details, how_to_reply: event.target.value })
           }
         />
+      </label>
+      <label className={fieldLabel}>
+        Curiosities
+        <select
+          aria-label={`${label} Curiosities`}
+          className={inputField}
+          value={details.curiosities ?? defaultCuriosityTreatment}
+          onChange={(event) =>
+            onChange({
+              ...details,
+              curiosities: toCuriosityTreatment(event.target.value),
+            })
+          }
+        >
+          {curiosityTreatmentOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
       </label>
     </div>
   );

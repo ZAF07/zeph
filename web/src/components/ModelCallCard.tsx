@@ -10,13 +10,15 @@ import {
   formatTokens,
   modelStepLabel,
   replyPlanShapeFacts,
+  taggingShapeFacts,
   understandingShapeFacts,
 } from "@/lib/model-calls";
 
 /**
  * One model call in a trace: its step, model, tokens, time taken, the tools
- * it called, its error and the shape of its Understanding, Reply Plan or
- * brought-up check on a Woven-in Check-in, then its content when it was kept.
+ * it called, its error and the shape of its Understanding, Reply Plan,
+ * brought-up check on a Woven-in Check-in or Pattern tagging, then its
+ * content when it was kept.
  *
  * @param props - `call` is the model call.
  * @returns The call's card.
@@ -43,6 +45,7 @@ export function ModelCallCard({ call }: { call: ModelCall }) {
       ? replyPlanShapeFacts(call.reply_plan_shape)
       : []),
     ...(call.check_in_shape ? checkInShapeFacts(call.check_in_shape) : []),
+    ...(call.tagging_shape ? taggingShapeFacts(call.tagging_shape) : []),
   ];
   return (
     <article

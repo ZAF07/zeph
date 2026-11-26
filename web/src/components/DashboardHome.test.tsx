@@ -6,10 +6,13 @@ import { DashboardHome } from "@/components/DashboardHome";
 import type { ApiClient, Home, HomeCheckIns } from "@/lib/api-client";
 import type { Copy } from "@/lib/copy";
 import { markedCopy, seedCopy, wordsNotFromCopy } from "@/test/copy";
+import { userWithRole } from "@/test/fixtures";
 import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   getHome: vi.fn<ApiClient["getHome"]>(),
+  getMe: vi.fn<ApiClient["getMe"]>(),
+  markPatternNoticingTold: vi.fn<ApiClient["markPatternNoticingTold"]>(),
 };
 
 vi.mock("@/lib/use-api-client", () => ({
@@ -112,6 +115,9 @@ describe("DashboardHome", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-11-11T12:00:00Z"));
     apiClient.getHome.mockReset();
+    apiClient.getMe.mockReset();
+    apiClient.getMe.mockResolvedValue(userWithRole("user"));
+    apiClient.markPatternNoticingTold.mockReset();
   });
 
   afterEach(() => {
@@ -332,6 +338,32 @@ describe("DashboardHome", () => {
         "Sister Jo is moving abroad",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("tells the User Zeph now keeps some of their words until they press Got it", async () => {
+    vi.useRealTimers();
+    apiClient.getHome.mockResolvedValue(homeWith());
+    apiClient.getMe.mockResolvedValue({
+      ...userWithRole("user"),
+      show_pattern_noticing_notice: true,
+    });
+    apiClient.markPatternNoticingTold.mockResolvedValue(userWithRole("user"));
+    const user = userEvent.setup();
+
+    renderWithQueries(<DashboardHome copy={seedCopy()} />);
+
+    expect(
+      await screen.findByText("Zeph now keeps some of your words."),
+    ).toBeVisible();
+    expect(
+      screen.getByText(/See them on your Memories page under Things you said/),
+    ).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Got it" }));
+
+    expect(apiClient.markPatternNoticingTold).toHaveBeenCalled();
+    expect(
+      screen.queryByText("Zeph now keeps some of your words."),
+    ).not.toBeInTheDocument();
   });
 
   it("says Memory is on while it is", async () => {
