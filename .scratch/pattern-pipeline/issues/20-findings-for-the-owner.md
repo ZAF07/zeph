@@ -772,6 +772,7 @@ Settles from the sections above: 02 "Curiosity Check-ins ignore pace and backing
 - **What:** migration 0109 keeps an Admin-edited `reply_plan_prompt`, and production's is edited. The new fields `asked_for_patterns` and `named_pattern` are only in the new seed text.
 - **Impact:** on production a User who asks for their patterns still gets what they got before, and replies never name a told Pattern, until the new text is merged in.
 - **Suggested fix:** after the deploy, merge the two new field descriptions and the two JSON lines into the stored prompt on Prompts & models (`docs/PROMPT_EDITS_AND_DEPLOYS_GUIDE.md`). Do it before Pattern sharing is switched on for anyone.
+- **Corrected 26 Nov 2026:** not needed for the next deploy. Prod goes from migration 0078 to 0112 in one go, the old migrations wipe this prompt first, so the new seed text loads whole and no "Kept the stored" line is logged. See "Open now" in `docs/PROMPT_EDITS_AND_DEPLOYS_GUIDE.md`.
 
 ### Stronger models read something into the ask itself
 
@@ -838,6 +839,7 @@ Settles from the sections above: 02 "Curiosity Check-ins ignore pace and backing
 - **What:** migration 0110 reloads `pattern_tagging_prompt` only where no Admin edited it. Code gives the model the three new lists either way, so an edited prompt fills them without being told to leave an unsaid one empty.
 - **Impact:** guessed Conditions on real Observations, which issues 42 to 44 will narrow and ask on.
 - **Suggested fix:** after the next deploy, check the backend log for "Kept the stored pattern_tagging_prompt"; if it is there, merge the new seed text in by hand before Pattern noticing is on. Minutes.
+- **Corrected 26 Nov 2026:** not needed for the next deploy. Prod goes from migration 0078 to 0112 in one go, the old migrations wipe this prompt first, so the new seed text loads whole and no "Kept the stored" line is logged. See "Open now" in `docs/PROMPT_EDITS_AND_DEPLOYS_GUIDE.md`.
 
 ### The model guessed audience and stakes until the prompt said not to
 
@@ -889,6 +891,7 @@ Settles from the sections above: 02 "Curiosity Check-ins ignore pace and backing
 - **What:** stakes high makes an ACH.WORTH.PERF or CTRL.UNCERT.PLAN Observation weightless. If the tagging prompt on production was edited and so lacks the "never guess" rule (see issue 41's finding above), guessed stakes now cost real evidence.
 - **Impact:** those two Patterns could stay unnoticed for a User whose stories the model calls high stakes unsaid.
 - **Suggested fix:** the same check as issue 41's finding, before Pattern noticing is on: after the deploy, look for "Kept the stored pattern_tagging_prompt" in the backend log and merge the seed text in by hand.
+- **Corrected 26 Nov 2026:** not needed for the next deploy. Prod goes from migration 0078 to 0112 in one go, the old migrations wipe this prompt first, so the new seed text loads whole and no "Kept the stored" line is logged. See "Open now" in `docs/PROMPT_EDITS_AND_DEPLOYS_GUIDE.md`.
 
 ### Scoring and the ready gate can differ on a story kept under 0.3.0
 
@@ -963,6 +966,7 @@ Settles from the sections above: 02 "Curiosity Check-ins ignore pace and backing
 - **What:** migration 0111 reloads `reply_plan_prompt` unless edited. Production's is edited, so it stays and the log says "Kept the stored reply_plan_prompt". The new seed text says "Approach" and "When it says to ask openly how they were doing, never offer a mood or state yourself".
 - **Impact:** small: the instruction code writes already says to name no state. The line is a second guard.
 - **Suggested fix:** merge the two sentences in by hand after the deploy, with the other pending merges (`named_pattern`, `asked_for_patterns`).
+- **Corrected 26 Nov 2026:** not needed for the next deploy. Prod goes from migration 0078 to 0112 in one go, the old migrations wipe this prompt first, so the new seed text loads whole and no "Kept the stored" line is logged. See "Open now" in `docs/PROMPT_EDITS_AND_DEPLOYS_GUIDE.md`.
 - [ ] Owner merged the new Reply Plan prompt lines on production
 
 ## 40 — The directness setting also sets how Zeph asks (2026-11-26)
@@ -1010,6 +1014,7 @@ Settles from the sections above: 02 "Curiosity Check-ins ignore pace and backing
 - **What:** migration 0112 reloads `reply_settings_instructions` unless an Admin edited it. If it is kept, the log says "Kept the stored reply_settings_instructions". The new text adds "and with the questions you ask them" and two examples ("you can just ask me straight", "you ask a lot, ease up").
 - **Impact:** small if kept: the tool's own description already says it covers asking.
 - **Suggested fix:** after the deploy, check the log; if kept, add the words by hand on Prompts & models.
+- **Corrected 26 Nov 2026:** not needed for the next deploy. Prod goes from migration 0078 to 0112 in one go, the old migrations wipe this prompt first, so the new seed text loads whole and no "Kept the stored" line is logged. See "Open now" in `docs/PROMPT_EDITS_AND_DEPLOYS_GUIDE.md`.
 
 ## Comments
 
