@@ -32,6 +32,7 @@ from companion.core.models import (
     ThreadReaction,
     UserSnapshot,
 )
+from companion.core.narrowing_words import describe_where_it_shows
 from companion.core.pattern_catalog import PatternCatalogService
 from companion.core.pattern_scoring import (
     PatternScore,
@@ -45,7 +46,6 @@ from companion.core.pattern_scoring import (
 )
 from companion.core.pattern_sharing import (
     FIRST_PREDICTION_WORDING,
-    describe_where_it_shows,
 )
 from companion.core.platform_settings import (
     CHECK_IN_MODEL,
@@ -339,7 +339,7 @@ def shared_pattern_facts(
         from the Conversation it was shared in counts as new.
     """
     numbers, today = weighing.numbers, weighing.today
-    counted = without_narrowing(counted_once(observations, predictions))
+    counted = without_narrowing(counted_once(observations, predictions), numbers)
     scored = score_observations(counted, weighing.sign_strengths, numbers, today)
     said_after_sharing = [
         observation

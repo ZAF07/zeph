@@ -496,8 +496,22 @@ export type MoveOutcome = {
   made_at: string;
 };
 
-/** Who a Pattern shows with and who it was shown not to happen with. */
+/** A Condition an Observation can hold, as the backend names it. */
+export type PatternCondition =
+  | "relationship"
+  | "power"
+  | "stance"
+  | "setting"
+  | "audience"
+  | "stakes"
+  | "state_going_in";
+
+/**
+ * Where a Pattern shows and where it was shown not to happen: the Condition
+ * and its values as stored. Copy puts each value in words.
+ */
 export type WhereItShows = {
+  condition: PatternCondition;
   shows_with: string[];
   not_with: string[];
 };

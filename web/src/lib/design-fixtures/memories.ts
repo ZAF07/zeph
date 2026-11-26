@@ -138,7 +138,11 @@ const patterns: Pattern[] = [
     pattern:
       "You seem to name the worst version of a plan first, before anyone else can.",
     where_it_shows: [
-      { shows_with: ["family", "friend"], not_with: ["colleague"] },
+      {
+        condition: "relationship",
+        shows_with: ["family", "friend"],
+        not_with: ["colleague"],
+      },
     ],
     told_at: "2026-11-01T20:00:00+08:00",
     quote_groups: [

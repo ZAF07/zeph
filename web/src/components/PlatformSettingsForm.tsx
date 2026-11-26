@@ -239,6 +239,16 @@ const fieldSections: {
         unit: "people",
       },
       {
+        key: "narrowing_stories_needed",
+        label: "Stories before a Condition narrows a Pattern",
+        unit: "stories",
+      },
+      {
+        key: "narrowings_per_pattern",
+        label: "Most narrowings per Pattern",
+        unit: "Conditions",
+      },
+      {
         key: "pattern_suspected_situations",
         label: "Situations to be suspected",
         unit: "situations",

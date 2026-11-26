@@ -5,32 +5,34 @@ from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 from uuid import UUID, uuid4
 
-from companion.core.agenda import observations_of
+from companion.core.agenda import missing_condition_need, observations_of
+from companion.core.condition_coverage import condition_value
 from companion.core.memory_retrieval import format_calendar_day
 from companion.core.models import (
     CatalogPattern,
     ChatLine,
     ChatRole,
+    Condition,
     EvidenceKind,
+    ExplorationTry,
     Feature,
     ModelStep,
-    NarrowingTag,
     Observation,
     ObservationDirection,
     PatternMoveCause,
-    PatternNarrowing,
     PatternReaction,
     PatternState,
     PatternType,
-    Power,
     Prediction,
     ShareVia,
     UserSnapshot,
 )
+from companion.core.narrowing_words import describe_where_it_shows, where_words
 from companion.core.observations import is_situational
 from companion.core.pattern_catalog import PatternCatalogService
 from companion.core.pattern_scoring import (
     PatternScore,
+    ScoringNumbers,
     logged_move,
     reaction_points,
     score_observations,
@@ -41,6 +43,7 @@ from companion.core.pattern_scoring import (
 )
 from companion.core.platform_settings import (
     CHECK_IN_MODEL,
+    CONDITION_ONE_SIDED_STORIES,
     PATTERN_SHARE_WAIT,
     PATTERNS_SHARED_PER_WEEK,
     thinking_for_model,
@@ -66,11 +69,6 @@ EVIDENCE_KINDS_FROM_THEIR_LIFE = (
     EvidenceKind.REPORTED_HABIT,
     EvidenceKind.OWN_OPINION,
 )
-POWER_WORDS = {
-    Power.ABOVE.value: "people above them",
-    Power.EQUAL.value: "their equals",
-    Power.BELOW.value: "people below them",
-}
 CAUSE_OF_SHARING = {
     ShareVia.CHAT: PatternMoveCause.SHARED_IN_CHAT,
     ShareVia.CHECK_IN: PatternMoveCause.SHARED_IN_CHECK_IN,
@@ -88,6 +86,21 @@ SHARED_CHECK_PROMPT = (
 
 
 @dataclass(frozen=True)
+class NotSeenYet:
+    """One thing the Companion hasn't seen about a Pattern it shares.
+
+    Attributes:
+        condition: The Condition the Pattern's stories are one-sided on.
+        seen: The one value every clear story for the Pattern shares.
+        not_seen: A value of it no clear story says, for or against.
+    """
+
+    condition: Condition
+    seen: str
+    not_seen: str
+
+
+@dataclass(frozen=True)
 class PatternToShare:
     """A ready Pattern code offers to be shared, with what it is shared with.
 
@@ -97,12 +110,15 @@ class PatternToShare:
         quotes: Two or three of the User's Observations to quote, each from
             a different situation.
         scored: Its score as scoring counts it, for the log.
+        not_seen: One thing the Companion hasn't seen about it, to say as
+            not known; None when its stories aren't one-sided.
     """
 
     pattern: CatalogPattern
     pattern_type: PatternType
     quotes: tuple[Observation, ...]
     scored: PatternScore
+    not_seen: NotSeenYet | None = None
 
 
 @dataclass(frozen=True)
@@ -257,6 +273,7 @@ def told_patterns_in_mind(
     pattern_types: Mapping[str, PatternType],
     observations: Sequence[Observation],
     thread_titles: Mapping[UUID, str],
+    numbers: ScoringNumbers,
 ) -> list[ToldPatternInMind]:
     """Number the Patterns the Companion told the User that a reply may build on.
 
@@ -266,6 +283,7 @@ def told_patterns_in_mind(
         observations: The User's Observations, as tagged when their
             Conversations ended.
         thread_titles: The User's Life Thread titles by ID.
+        numbers: The Admin-set numbers, for what narrows a Pattern.
 
     Returns:
         Those being tested (shared) and those confirmed that have words to
@@ -282,7 +300,7 @@ def told_patterns_in_mind(
         if pattern.state not in STATES_A_REPLY_MAY_NAME or wording is None:
             continue
         its_observations = without_narrowing(
-            observations_of(pattern.pattern_type_id, observations)
+            observations_of(pattern.pattern_type_id, observations), numbers
         )
         told.append(
             ToldPatternInMind(
@@ -487,25 +505,60 @@ def within_weekly_limit(shared_this_week: int, per_week: int) -> bool:
     return shared_this_week < per_week
 
 
-def describe_where_it_shows(narrowings: Sequence[PatternNarrowing]) -> str:
-    """Write where a Pattern shows and where it doesn't, in plain words.
+def not_seen_yet(
+    observations: Sequence[Observation],
+    tries: Sequence[ExplorationTry],
+    one_sided_stories: int,
+) -> NotSeenYet | None:
+    """Pick the one thing the Companion hasn't seen about a Pattern it shares.
+
+    It is the Agenda's open missing-Condition need, read from the same
+    coverage table, so sharing and asking never disagree. The state going
+    in is never handed over: the Companion never names a state first.
 
     Args:
-        narrowings: Where counter-tests showed it doesn't happen.
+        observations: The Observations of the Pattern.
+        tries: The tries of its Exploration.
+        one_sided_stories: The Admin-set number of stories to be one-sided.
 
     Returns:
-        E.g. " It shows with family, friend; not with partner."; "" when
-        it isn't narrowed.
+        The Condition with the value its stories share and one not seen;
+        None when no Condition is one-sided, or the one that is most
+        one-sided is the state going in.
     """
-    parts = []
-    for narrowing in narrowings:
-        words = POWER_WORDS if narrowing.tag == NarrowingTag.POWER else {}
-        holds_with = ", ".join(
-            words.get(value, value) for value in narrowing.holds_with
-        )
-        not_with = ", ".join(words.get(value, value) for value in narrowing.not_with)
-        parts.append(f" It shows with {holds_with}; not with {not_with}.")
-    return "".join(parts)
+    need = missing_condition_need(observations, tries, one_sided_stories)
+    if need is None or need.condition is None or need.value is None:
+        return None
+    if need.condition == Condition.STATE_GOING_IN or need.observation is None:
+        return None
+    seen = condition_value(need.observation, need.condition)
+    if seen is None:
+        return None
+    return NotSeenYet(condition=need.condition, seen=seen, not_seen=need.value)
+
+
+def describe_not_seen(not_seen: NotSeenYet | None) -> str:
+    """Write the one thing the Companion hasn't seen, for the reply that shares.
+
+    Args:
+        not_seen: What it hasn't seen; None for nothing.
+
+    Returns:
+        The line telling the reply to say it as something not known, never
+        as a claim, and to ask nothing about it; "" for nothing.
+    """
+    if not_seen is None:
+        return ""
+    seen = where_words(not_seen.condition, not_seen.seen)
+    unseen = where_words(not_seen.condition, not_seen.not_seen)
+    return (
+        "One thing you don't know, to say right after the Pattern: every "
+        f"story they told you about this was {seen}, and you haven't heard "
+        f"how it goes {unseen}. Say that in a sentence as something you "
+        "don't know (like “I've only heard about this in meetings. I don't "
+        "know if it's the same when it's just the two of you”), never as a "
+        "claim about them, and don't ask about it.\n"
+    )
 
 
 def describe_quotes(quotes: Sequence[Observation]) -> str:
@@ -558,8 +611,9 @@ def describe_three_parts(to_share: PatternToShare) -> str:
         to_share: The Pattern to share.
 
     Returns:
-        The rules of wording, the Pattern, the quotes and the Prediction,
-        ending with asking what would prove it wrong.
+        The rules of wording, the Pattern with where it shows, one thing
+        not seen when there is one, the quotes and the Prediction, ending
+        with asking what would prove it wrong.
     """
     pattern_type = to_share.pattern_type
     return (
@@ -569,6 +623,7 @@ def describe_three_parts(to_share: PatternToShare) -> str:
         "1. The Pattern, in your own warm words, fitted to the people in "
         f"their life: {pattern_type.approved_wording}"
         f"{describe_where_it_shows(to_share.pattern.narrowings)}\n"
+        f"{describe_not_seen(to_share.not_seen)}"
         "2. Their own words: quote two or three of these word for word, "
         "saying what each was about:\n"
         f"{describe_quotes(to_share.quotes)}\n"
@@ -847,6 +902,7 @@ class PatternSharing:
                 thread.id: thread.title
                 for thread in self._repositories.life_threads.list_for_user(user_id)
             },
+            scoring_numbers(snapshot.settings),
         )
 
     def record_if_shared(
@@ -943,7 +999,8 @@ class PatternSharing:
             for pattern in rejected:
                 scored = score_observations(
                     without_narrowing(
-                        observations_of(pattern.pattern_type_id, observations)
+                        observations_of(pattern.pattern_type_id, observations),
+                        numbers,
                     ),
                     sign_strengths,
                     numbers,
@@ -1022,6 +1079,11 @@ class PatternSharing:
                     pattern_type=judged.pattern_type,
                     quotes=quotes,
                     scored=judged.scored,
+                    not_seen=not_seen_yet(
+                        judged.observations,
+                        judged.tries,
+                        settings.get(CONDITION_ONE_SIDED_STORIES),
+                    ),
                 )
         return None
 

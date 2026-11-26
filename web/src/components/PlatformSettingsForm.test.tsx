@@ -103,6 +103,8 @@ const settings: AdminSettings = {
     "After this many days an Observation counts half.",
   ),
   pattern_people_per_situation: seeded(3),
+  narrowing_stories_needed: seeded(2),
+  narrowings_per_pattern: seeded(2),
   pattern_suspected_situations: seeded(2),
   pattern_suspected_points: seeded(100),
   pattern_closed_under_points: seeded(-150),
@@ -525,6 +527,10 @@ describe("PlatformSettingsForm", () => {
     expect(screen.getByLabelText("Points for a strong sign")).toHaveValue(140);
     expect(screen.getByLabelText("Unclear counts")).toHaveValue(25);
     expect(screen.getByLabelText("Situations to be suspected")).toHaveValue(2);
+    expect(
+      screen.getByLabelText("Stories before a Condition narrows a Pattern"),
+    ).toHaveValue(2);
+    expect(screen.getByLabelText("Most narrowings per Pattern")).toHaveValue(2);
     expect(
       screen.getByText("After this many days an Observation counts half."),
     ).toBeInTheDocument();

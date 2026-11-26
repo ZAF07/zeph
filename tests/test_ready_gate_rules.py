@@ -6,11 +6,11 @@ import pytest
 
 from companion.adapters.pattern_catalog_seed import read_pattern_catalog_seed
 from companion.core.models import (
+    Condition,
     EvidenceKind,
     ExplorationApproach,
     ExplorationNeed,
     ExplorationTry,
-    NarrowingTag,
     Observation,
     ObservationDirection,
     PatternMoveCause,
@@ -80,6 +80,8 @@ WEIGHING = Weighing(
         unclear_percent=25,
         half_life_days=75,
         people_per_situation=3,
+        narrowing_stories_needed=2,
+        narrowings_per_pattern=2,
     ),
     today=TODAY,
 )
@@ -307,7 +309,7 @@ def test_too_much_evidence_against_with_the_same_kind_of_person_blocks() -> None
     more = story(about="Lin, their aunt", conversation=SECOND_CONVERSATION)
     facts = facts_of([*stories, more, against], tries=[])
 
-    assert narrowings_of([*stories, more, against]) == ()
+    assert narrowings_of([*stories, more, against], WEIGHING.numbers) == ()
     assert facts.points_against == 140
     assert ready_check(facts, BARS) == ReadyCheck.COUNTER_TEST
 
@@ -326,9 +328,9 @@ def test_a_counter_test_showing_it_does_not_happen_with_friends_narrows_it() -> 
     observations = [*with_seniors, not_with_friends]
     facts = facts_of(observations, tries=[])
 
-    assert narrowings_of(observations) == (
+    assert narrowings_of(observations, WEIGHING.numbers) == (
         PatternNarrowing(
-            tag=NarrowingTag.RELATIONSHIP, holds_with=("family",), not_with=("friend",)
+            tag=Condition.RELATIONSHIP, holds_with=("family",), not_with=("friend",)
         ),
     )
     assert facts.counter_tested
@@ -340,6 +342,7 @@ def test_a_counter_test_showing_it_does_not_happen_with_friends_narrows_it() -> 
 def test_a_pattern_is_narrowed_by_where_the_other_person_stands_too() -> None:
     observations = [
         story(about="Mei", power=Power.EQUAL),
+        story(about="Jun", power=Power.EQUAL),
         story(
             about="an intern",
             direction=ObservationDirection.AGAINST,
@@ -348,9 +351,9 @@ def test_a_pattern_is_narrowed_by_where_the_other_person_stands_too() -> None:
         ),
     ]
 
-    assert narrowings_of(observations) == (
+    assert narrowings_of(observations, WEIGHING.numbers) == (
         PatternNarrowing(
-            tag=NarrowingTag.POWER, holds_with=("equal",), not_with=("below",)
+            tag=Condition.POWER, holds_with=("equal",), not_with=("below",)
         ),
     )
 
@@ -366,7 +369,7 @@ def test_evidence_against_with_no_kind_of_person_tagged_never_narrows() -> None:
         ),
     ]
 
-    assert narrowings_of(observations) == ()
+    assert narrowings_of(observations, WEIGHING.numbers) == ()
 
 
 def test_evidence_against_with_nobody_named_does_not_switch_narrowing_off() -> None:
@@ -384,11 +387,11 @@ def test_evidence_against_with_nobody_named_does_not_switch_narrowing_off() -> N
     )
     observations = [*with_family, not_with_partner, summing_up]
 
-    counted = without_narrowing(observations)
+    counted = without_narrowing(observations, WEIGHING.numbers)
 
-    assert narrowings_of(observations) == (
+    assert narrowings_of(observations, WEIGHING.numbers) == (
         PatternNarrowing(
-            tag=NarrowingTag.RELATIONSHIP,
+            tag=Condition.RELATIONSHIP,
             holds_with=("colleague", "family", "friend"),
             not_with=("partner",),
         ),
@@ -532,6 +535,7 @@ def test_observations_that_carry_no_weight_never_shape_a_narrowing() -> None:
     during_grief = replace(story(about="Wei, their cousin"), excluded=True)
     observations = [
         story(about="Jun", relationship=Relationship.FRIEND),
+        story(about="Kai", relationship=Relationship.FRIEND),
         during_grief,
         story(
             about="Sam",
@@ -540,9 +544,9 @@ def test_observations_that_carry_no_weight_never_shape_a_narrowing() -> None:
         ),
     ]
 
-    assert narrowings_of(observations) == (
+    assert narrowings_of(observations, WEIGHING.numbers) == (
         PatternNarrowing(
-            tag=NarrowingTag.RELATIONSHIP, holds_with=("friend",), not_with=("partner",)
+            tag=Condition.RELATIONSHIP, holds_with=("friend",), not_with=("partner",)
         ),
     )
 

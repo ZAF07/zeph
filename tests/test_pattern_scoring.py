@@ -47,6 +47,8 @@ NUMBERS = ScoringNumbers(
     unclear_percent=25,
     half_life_days=75,
     people_per_situation=3,
+    narrowing_stories_needed=2,
+    narrowings_per_pattern=2,
 )
 BARS = StateBars(suspected_situations=2, suspected_points=100, closed_under_points=-150)
 SIGN_STRENGTHS = {

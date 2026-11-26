@@ -1,8 +1,14 @@
 import { MemoryCard } from "@/components/MemoryCard";
-import type { Pattern, PredictionOutcome } from "@/lib/api-client";
+import type {
+  Pattern,
+  PatternCondition,
+  PredictionOutcome,
+  WhereItShows,
+} from "@/lib/api-client";
 import { type Copy, fillCopy, readCopy } from "@/lib/copy";
 import { formatShortCalendarDay, formatShortDay } from "@/lib/dates";
 
+const conditionsAboutPeople: PatternCondition[] = ["relationship", "power"];
 const blockLabel =
   "pb-2 text-[11px] font-medium tracking-[2px] text-soft uppercase";
 const row = "flex flex-wrap gap-x-4 gap-y-0.5 border-t border-line py-2.5";
@@ -18,6 +24,36 @@ const rowLines =
  */
 function outcomeSlot(outcome: PredictionOutcome | null): string {
   return `memories.patterns.outcome.${outcome ?? "waiting"}`;
+}
+
+/**
+ * Puts where a Pattern shows and where it doesn't in words, from Copy. Who
+ * the other person is reads "with …"; every other Condition reads as when.
+ *
+ * @param copy - The Memories page's Copy.
+ * @param where - One narrowing: the Condition and its values as stored.
+ * @returns The line, e.g. "It shows in a group; not one-to-one."
+ */
+function whereItShowsLine(copy: Copy, where: WhereItShows): string {
+  const words = (values: string[]) =>
+    values
+      .map((value) =>
+        readCopy(
+          copy,
+          `memories.patterns.condition.${where.condition}.${value.replace(/[^a-z]+/g, "_")}`,
+        ),
+      )
+      .join(", ");
+  if (conditionsAboutPeople.includes(where.condition)) {
+    return fillCopy(copy, "memories.patterns.where_it_shows", {
+      shows_with: words(where.shows_with),
+      not_with: words(where.not_with),
+    });
+  }
+  return fillCopy(copy, "memories.patterns.shows_when", {
+    shows_when: words(where.shows_with),
+    not_when: words(where.not_with),
+  });
 }
 
 /**
@@ -110,10 +146,7 @@ export function PatternCard({
         </p>
         {pattern.where_it_shows.map((where, index) => (
           <p key={index} className="mt-1.5 mb-0 text-[14px] text-soft">
-            {fillCopy(copy, "memories.patterns.where_it_shows", {
-              shows_with: where.shows_with.join(", "),
-              not_with: where.not_with.join(", "),
-            })}
+            {whereItShowsLine(copy, where)}
           </p>
         ))}
         <div className="mt-1.5">

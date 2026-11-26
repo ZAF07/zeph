@@ -331,6 +331,8 @@ PATTERN_HALF_LIFE_DAYS = Setting("pattern_half_life_days", read_whole_number)
 PATTERN_PEOPLE_PER_SITUATION = Setting(
     "pattern_people_per_situation", read_whole_number
 )
+NARROWING_STORIES_NEEDED = Setting("narrowing_stories_needed", read_whole_number)
+NARROWINGS_PER_PATTERN = Setting("narrowings_per_pattern", read_whole_number)
 PATTERN_SUSPECTED_SITUATIONS = Setting(
     "pattern_suspected_situations", read_whole_number
 )
@@ -1492,6 +1494,30 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
             "Within one Life Thread only the strongest Observation per person "
             "counts, for and against apart; this many people at most add "
             "weight."
+        ),
+    ),
+    EditableSetting(
+        NARROWING_STORIES_NEEDED.key,
+        "Stories before a Condition narrows a Pattern",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=50,
+        hint=(
+            "A Condition (who was there, the stakes, the setting…) narrows a "
+            "Pattern only when this many clear stories for it say that "
+            "Condition, and what counts against it happened under other values."
+        ),
+    ),
+    EditableSetting(
+        NARROWINGS_PER_PATTERN.key,
+        "Most narrowings per Pattern",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=7,
+        hint=(
+            "At most this many Conditions narrow one Pattern: those with the "
+            "most stories. Evidence against that they don't explain counts "
+            "against the Pattern in full."
         ),
     ),
     EditableSetting(

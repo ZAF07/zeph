@@ -1275,7 +1275,10 @@ def pattern_scores(
     numbers = scoring_numbers(settings)
     return {
         pattern_type_id: score_observations(
-            without_narrowing(its_observations), sign_strengths, numbers, today
+            without_narrowing(its_observations, numbers),
+            sign_strengths,
+            numbers,
+            today,
         )
         for pattern_type_id, its_observations in observations_by_pattern_type(
             observations

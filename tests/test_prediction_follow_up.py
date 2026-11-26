@@ -335,7 +335,7 @@ def test_predictions_that_came_true_confirm_a_pattern_and_it_joins_the_portrait(
     assert waiting(client.engine, user_id) == []
     assert portrait_patterns(chat_model).splitlines()[1:] == [
         f"- {APPROVED_WORDING}, even when they matter to you."
-        " It shows with family, friend; not with partner."
+        " It shows with family, with friends; not with a partner."
     ]
 
 

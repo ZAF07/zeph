@@ -16,6 +16,7 @@ from companion.core.models import (
     CheckInOutcome,
     CheckInSettings,
     CheckInStatus,
+    Condition,
     ConnectionToken,
     ConnectionTokenStatus,
     DaySummary,
@@ -304,8 +305,12 @@ class MoveOutcomesResponse(BaseModel):
 
 
 class WhereItShowsResponse(BaseModel):
-    """Who a Pattern shows with and who it was shown not to happen with."""
+    """Where a Pattern shows and where it was shown not to happen.
 
+    `condition` names the Condition; the two lists hold its values as stored.
+    """
+
+    condition: Condition
     shows_with: list[str]
     not_with: list[str]
 
@@ -487,7 +492,9 @@ def to_pattern_response(told: ToldPattern) -> PatternResponse:
         pattern=told.wording,
         where_it_shows=[
             WhereItShowsResponse(
-                shows_with=list(where.shows_with), not_with=list(where.not_with)
+                condition=where.condition,
+                shows_with=list(where.shows_with),
+                not_with=list(where.not_with),
             )
             for where in told.where_it_shows
         ],

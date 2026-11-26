@@ -3,10 +3,14 @@ from dataclasses import dataclass, replace
 from datetime import date, datetime
 from uuid import UUID, uuid4
 
+from companion.core.condition_coverage import (
+    CONDITION_ORDER,
+    condition_value,
+    coverage_of,
+)
 from companion.core.models import (
     CatalogPattern,
     EvidenceKind,
-    NarrowingTag,
     Observation,
     ObservationDirection,
     PatternMove,
@@ -26,6 +30,8 @@ from companion.core.models import (
 )
 from companion.core.pattern_catalog import PatternCatalogService
 from companion.core.platform_settings import (
+    NARROWING_STORIES_NEEDED,
+    NARROWINGS_PER_PATTERN,
     PATTERN_CLOSED_UNDER_POINTS,
     PATTERN_HALF_LIFE_DAYS,
     PATTERN_MODERATE_SIGN_POINTS,
@@ -50,7 +56,7 @@ STATES_MOVED_BY_SCORE = frozenset(
 
 @dataclass(frozen=True)
 class ScoringNumbers:
-    """The Admin-set numbers an Observation's weight is worked out with.
+    """The Admin-set numbers a Pattern's Observations are counted with.
 
     Attributes:
         sign_points: The points each strength of sign is worth.
@@ -60,6 +66,9 @@ class ScoringNumbers:
         half_life_days: After how many days an Observation counts half.
         people_per_situation: The most people whose Observations count in
             one situation.
+        narrowing_stories_needed: The fewest clear stories for a Pattern
+            that must say a Condition before it can narrow the Pattern.
+        narrowings_per_pattern: The most Conditions that narrow one Pattern.
     """
 
     sign_points: Mapping[SignStrength, int]
@@ -67,6 +76,8 @@ class ScoringNumbers:
     unclear_percent: int
     half_life_days: int
     people_per_situation: int
+    narrowing_stories_needed: int
+    narrowings_per_pattern: int
 
 
 @dataclass(frozen=True)
@@ -367,73 +378,59 @@ def score_observations(
     )
 
 
-def tag_value(observation: Observation, tag: NarrowingTag) -> str | None:
-    """Read one of an Observation's situation tags.
-
-    Args:
-        observation: The Observation.
-        tag: Which tag.
-
-    Returns:
-        Its value; None when the tag is empty.
-    """
-    value = (
-        observation.tags.relationship
-        if tag == NarrowingTag.RELATIONSHIP
-        else observation.tags.power
-    )
-    return value.value if value else None
-
-
-def narrowings_of(observations: Sequence[Observation]) -> tuple[PatternNarrowing, ...]:
+def narrowings_of(
+    observations: Sequence[Observation], numbers: ScoringNumbers
+) -> tuple[PatternNarrowing, ...]:
     """Work out where a Pattern holds and where it was shown not to happen.
 
-    A Pattern is narrowed by a tag (who the other person is, or where they
-    stand) when its clear evidence against is all with other kinds of
-    people than any of its clear evidence for: "with seniors, not with
-    friends". Observations that carry no weight are left out, and so is
-    evidence against with nobody of that kind named: it neither narrows
-    the Pattern nor stops it being narrowed.
+    Each Condition is looked at alone, from the Pattern's coverage table.
+    One narrows the Pattern when enough clear stories for it say that
+    Condition, and its clear evidence against is all under other values
+    than any clear story for: "in a group, not one-to-one". Only the
+    Conditions with the most stories for behind them are kept, up to the
+    Admin-set number, ties going by `CONDITION_ORDER`. Observations that
+    carry no weight are left out, and so is evidence against that doesn't
+    say the Condition: it neither narrows the Pattern nor stops it being
+    narrowed.
 
     Args:
         observations: The Observations of the Pattern.
+        numbers: The Admin-set numbers, for the stories needed and the
+            most narrowings.
 
     Returns:
-        One narrowing per tag that tells the two apart; none when the
-        evidence against is with the same kinds of people, or there is none.
+        The kept narrowings, the one with the most stories first; none
+        when no Condition tells the evidence for and against apart.
     """
-    clear = [
-        observation
-        for observation in observations
-        if not observation.unclear
-        and not observation.situational
-        and not observation.excluded
-    ]
-    narrowings = []
-    for tag in NarrowingTag:
+    table = coverage_of(observations)
+    found: list[tuple[int, PatternNarrowing]] = []
+    for condition in CONDITION_ORDER:
         holds_with = {
-            tag_value(observation, tag)
-            for observation in clear
-            if observation.direction == ObservationDirection.FOR
-        } - {None}
-        against = [
-            tag_value(observation, tag)
-            for observation in clear
-            if observation.direction == ObservationDirection.AGAINST
-        ]
-        not_with = set(against) - {None}
-        if not holds_with or not not_with:
+            value for value, seen in table[condition].items() if seen.stories_for
+        }
+        not_with = {
+            value for value, seen in table[condition].items() if seen.stories_against
+        }
+        stories = sum(seen.stories_for for seen in table[condition].values())
+        if stories < numbers.narrowing_stories_needed or not not_with:
             continue
         if holds_with & not_with:
             continue
-        narrowings.append(
-            PatternNarrowing(
-                tag=tag,
-                holds_with=tuple(sorted(value for value in holds_with if value)),
-                not_with=tuple(sorted(value for value in not_with if value)),
+        found.append(
+            (
+                stories,
+                PatternNarrowing(
+                    tag=condition,
+                    holds_with=tuple(sorted(holds_with)),
+                    not_with=tuple(sorted(not_with)),
+                ),
             )
         )
-    return tuple(narrowings)
+    most_stories_first = sorted(found, key=lambda kept: kept[0], reverse=True)
+    return tuple(
+        narrowing
+        for _, narrowing in most_stories_first[: numbers.narrowings_per_pattern]
+    )
 
 
 def narrows(observation: Observation, narrowings: Sequence[PatternNarrowing]) -> bool:
@@ -441,32 +438,37 @@ def narrows(observation: Observation, narrowings: Sequence[PatternNarrowing]) ->
 
     Args:
         observation: The Observation.
-        narrowings: The Pattern's narrowings.
+        narrowings: The Pattern's kept narrowings.
 
     Returns:
         True when it is evidence against from a kind of situation the
         Pattern is narrowed away from.
     """
     return observation.direction == ObservationDirection.AGAINST and any(
-        tag_value(observation, narrowing.tag) in narrowing.not_with
+        condition_value(observation, narrowing.tag) in narrowing.not_with
         for narrowing in narrowings
     )
 
 
-def without_narrowing(observations: Sequence[Observation]) -> list[Observation]:
+def without_narrowing(
+    observations: Sequence[Observation], numbers: ScoringNumbers
+) -> list[Observation]:
     """Leave out the evidence against that only narrows a Pattern.
 
     Scoring and the ready gate both count a Pattern's Observations this
     way, so "not with my partner" marks where the Pattern stops and never
-    counts against it.
+    counts against it. Evidence against that no kept narrowing explains
+    stays, and counts against the Pattern in full.
 
     Args:
         observations: The Observations of the Pattern.
+        numbers: The Admin-set numbers, for the stories needed and the
+            most narrowings.
 
     Returns:
         The Observations that count toward its score, in the order given.
     """
-    narrowings = narrowings_of(observations)
+    narrowings = narrowings_of(observations, numbers)
     return [
         observation
         for observation in observations
@@ -670,7 +672,10 @@ def plan_pattern_moves(
     )
     for pattern_type_id, its_observations in by_type.items():
         score = score_observations(
-            without_narrowing(its_observations), sign_strengths, numbers, today
+            without_narrowing(its_observations, numbers),
+            sign_strengths,
+            numbers,
+            today,
         )
         pattern = existing.get(pattern_type_id)
         if pattern is None and pattern_type_id in never_again:
@@ -708,7 +713,7 @@ def scoring_numbers(settings: PlatformSettings) -> ScoringNumbers:
         settings: The platform settings.
 
     Returns:
-        The numbers an Observation's weight is worked out with.
+        The numbers a Pattern's Observations are counted with.
     """
     return ScoringNumbers(
         sign_points={
@@ -725,6 +730,8 @@ def scoring_numbers(settings: PlatformSettings) -> ScoringNumbers:
         unclear_percent=settings.get(PATTERN_UNCLEAR_PERCENT),
         half_life_days=settings.get(PATTERN_HALF_LIFE_DAYS),
         people_per_situation=settings.get(PATTERN_PEOPLE_PER_SITUATION),
+        narrowing_stories_needed=settings.get(NARROWING_STORIES_NEEDED),
+        narrowings_per_pattern=settings.get(NARROWINGS_PER_PATTERN),
     )
 
 
