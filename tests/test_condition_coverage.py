@@ -79,10 +79,10 @@ def test_stories_only_against_never_make_a_condition_one_sided() -> None:
         ]
     )
 
-    assert missing_condition(table, one_sided_stories=2) is None
+    assert missing_condition(table, 2, closed=set()) is None
 
 
-def test_the_missing_condition_says_what_was_seen_and_what_to_learn() -> None:
+def test_the_missing_condition_says_what_to_learn_unless_a_try_closed_it() -> None:
     table = coverage_of(
         [
             observation(stakes=Stakes.HIGH, setting=None, relationship=None)
@@ -90,12 +90,11 @@ def test_the_missing_condition_says_what_was_seen_and_what_to_learn() -> None:
         ]
     )
 
-    missing = missing_condition(table, one_sided_stories=2)
+    missing = missing_condition(table, 2, closed=set())
 
     assert missing is not None
-    assert (missing.condition, missing.seen_value, missing.value, missing.stories) == (
+    assert (missing.condition, missing.value, missing.stories) == (
         Condition.STAKES,
-        "high",
         "low",
         2,
     )

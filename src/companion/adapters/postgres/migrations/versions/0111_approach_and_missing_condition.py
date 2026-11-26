@@ -57,7 +57,11 @@ RENAMED_VALUES = {
 
 
 def renamed(content: Any) -> Any:
-    """Rename "way" to "approach" all through a stored Eval Case.
+    """Bring a stored Eval Case's field names and values up to date.
+
+    "way" and "aimed_way" become "approach" and "aimed_approach", the
+    Approach "other_person" becomes "would_it_differ" and the need
+    "missing_part" becomes "missing_condition".
 
     Args:
         content: The case's content, or any part of it.
@@ -114,7 +118,12 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Bring the old column names and values back; cases and prompt stay."""
+    """Bring the old column names and values back.
+
+    A try at a Condition other than the setting can't be stored the old
+    way, so it is deleted with its Curiosity. Stored Eval Cases and the
+    prompt stay as they are.
+    """
     op.execute(
         "UPDATE exploration_tries SET need = 'missing_part' "
         "WHERE need = 'missing_condition' AND condition = 'setting'"

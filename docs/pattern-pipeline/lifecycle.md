@@ -158,7 +158,7 @@ Each suspected Pattern on the Agenda has an **Exploration**. Code works out what
    - another value of it has no clear story, for or against,
    - it is the Condition with the most such stories. Ties go in this order: audience, stakes, relationship, power, stance, setting, state going in.
 
-   A useful answer closes that value for good.
+   A useful answer closes that value for good. For the state going in it closes every value, since the question is the same open one.
 
 How it asks is its **Approach**, least pushy first: a story follow-up, "would it have gone differently if…", a Thought Experiment (unclear stories only), "this week, notice…". After a try with nothing, the next try waits 3 days and uses the next Approach; after 4 in a row the Exploration rests.
 

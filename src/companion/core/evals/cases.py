@@ -356,7 +356,7 @@ class EvalObservation:
         second_pattern_type: The look-alike Pattern Type it couldn't be told
             apart from, which makes it unclear; None when it is clear.
         thread: The title of the Life Thread it belongs to; None for none.
-        setting: The part of life it happened in; None if not known.
+        setting: Where it happened; None if not known.
         relationship: Who the other person is to them; None if not known.
         audience: Who else was there; None if not known.
         stakes: Whether something that matters to them could be lost; None

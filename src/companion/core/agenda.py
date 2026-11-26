@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 from uuid import UUID, uuid4
 
 from companion.core.condition_coverage import (
+    VALUES_TO_LEARN,
     condition_value,
     coverage_of,
     is_clear,
@@ -325,16 +326,26 @@ def closed_condition_values(
 
     Returns:
         Each Condition and value a missing-Condition try came back useful
-        for. Such a value is never asked about again.
+        for. Such a value is never asked about again. The state going in
+        is asked about with one open question whatever the value, so a
+        useful try closes every value of it.
     """
-    return {
-        (attempt.condition, attempt.condition_value)
-        for attempt in tries
-        if attempt.need == ExplorationNeed.MISSING_CONDITION
-        and attempt.outcome == TryOutcome.USEFUL
-        and attempt.condition is not None
-        and attempt.condition_value is not None
-    }
+    closed: set[tuple[Condition, str]] = set()
+    for attempt in tries:
+        if (
+            attempt.need != ExplorationNeed.MISSING_CONDITION
+            or attempt.outcome != TryOutcome.USEFUL
+            or attempt.condition is None
+            or attempt.condition_value is None
+        ):
+            continue
+        if attempt.condition == Condition.STATE_GOING_IN:
+            closed.update(
+                (attempt.condition, value)
+                for value in VALUES_TO_LEARN[attempt.condition]
+            )
+        closed.add((attempt.condition, attempt.condition_value))
+    return closed
 
 
 def missing_condition_need(

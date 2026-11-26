@@ -79,13 +79,11 @@ class MissingCondition:
     Attributes:
         condition: The Condition whose stories so far all share one value.
         value: The value not seen yet, which is what to learn.
-        seen_value: The one value the stories for the Pattern share.
         stories: How many clear stories for the Pattern share it.
     """
 
     condition: Condition
     value: str
-    seen_value: str
     stories: int
 
 
@@ -151,7 +149,7 @@ def coverage_of(observations: Sequence[Observation]) -> CoverageTable:
 def missing_condition(
     table: CoverageTable,
     one_sided_stories: int,
-    closed: Set[tuple[Condition, str]] = frozenset(),
+    closed: Set[tuple[Condition, str]],
 ) -> MissingCondition | None:
     """Pick the one Condition value worth asking about, if any.
 
@@ -180,12 +178,12 @@ def missing_condition(
         }
         if len(seen_for) != 1:
             continue
-        [(seen_value, stories)] = seen_for.items()
+        [stories] = seen_for.values()
         to_learn = [
             value
             for value in VALUES_TO_LEARN[condition]
             if value not in table[condition] and (condition, value) not in closed
         ]
         if stories >= one_sided_stories and to_learn:
-            found.append(MissingCondition(condition, to_learn[0], seen_value, stories))
+            found.append(MissingCondition(condition, to_learn[0], stories))
     return max(found, key=lambda missing: missing.stories, default=None)

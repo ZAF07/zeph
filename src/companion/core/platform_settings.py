@@ -1744,7 +1744,7 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         CONDITION_ONE_SIDED_STORIES.key,
         "Stories that make a Condition one-sided",
         SettingKind.WHOLE_NUMBER,
-        minimum=1,
+        minimum=2,
         maximum=50,
         hint=(
             "Zeph asks about a Condition (who was there, the stakes, the "

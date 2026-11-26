@@ -432,6 +432,24 @@ def test_a_useful_try_closes_that_value_for_good_and_the_next_one_opens() -> Non
     ]
 
 
+def test_a_useful_try_at_the_state_going_in_closes_every_state() -> None:
+    its = exploration(pattern())
+    worn_out = [
+        group_story(1, audience=None, state_going_in=StateGoingIn.WORN_OUT),
+        group_story(2, audience=None, state_going_in=StateGoingIn.WORN_OUT),
+    ]
+    _, useful = asked(
+        its,
+        need=ExplorationNeed.MISSING_CONDITION,
+        condition=Condition.STATE_GOING_IN,
+        condition_value="steady",
+        outcome=TryOutcome.USEFUL,
+    )
+
+    assert missing(needs_of(worn_out)) == [(Condition.STATE_GOING_IN, "steady")]
+    assert missing(needs_of(worn_out, [useful])) == []
+
+
 def test_a_state_need_starts_from_no_story() -> None:
     worn_out = [
         group_story(1, audience=None, state_going_in=StateGoingIn.WORN_OUT),
