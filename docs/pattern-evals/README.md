@@ -316,6 +316,39 @@ Safeguard as a crisis, so that case was rewritten (it then passed). One run
 proves little: use Repeats. The findings are in
 `.scratch/pattern-pipeline/issues/20-findings-for-the-owner.md`, section 25.
 
+## First missing-Condition results (26 Nov 2026, issue 43)
+
+The three new Agenda cases were run on four models (Understanding, Reply
+Plan and Reply on the model named; the Judge on the live one).
+
+| Run | Model | Passed | Cost |
+|---|---|---|---|
+| `fa78a26a` | deepseek-v4.1-flash (live), cases as first drafted | 0 of 3 | S$0.02 |
+| `fda65a7a` | deepseek-v4.1-flash (live) | 2 of 3 | S$0.02 |
+| `8a0bf7b9` A | claude-haiku-5.5 | 1 of 3 | S$0.01 |
+| `8a0bf7b9` B | claude-opus-5.5 | 2 of 3 | S$0.32 |
+| `8a0bf7b9` C | deepseek-v4-pro | 1 of 3 | S$0.09 |
+
+In every run code wrote the right aimed Curiosity (one-to-one, none, the
+open state question), and no reply named a state. What failed was the
+Reply Plan's choice of moment and the Judge:
+
+- **The one-sided case.** On "kind of bored, talk to me" only flash brought
+  the aimed Curiosity up. Haiku, Opus and deepseek-pro asked about the
+  evening instead. On the first draft's opener ("finally friday…") flash
+  didn't either.
+- **The not-one-sided case** passed on all four after the first run, where
+  the Judge read a light question about their evening as naming a pattern.
+- **The state case.** Flash (first run), Haiku and Opus asked openly how
+  they were going into it; Opus passed. Haiku failed only on "that happens
+  a lot" (the Judge's never-names-a-pattern rule). Deepseek-pro asked about
+  the flatmate instead, and flash's second run didn't bring it up.
+
+After the first run the one-sided case got an opener that leaves room for
+a question, and the state rule now judges only that no state is named.
+One run each proves little: use Repeats. Findings are in
+`.scratch/pattern-pipeline/issues/20-findings-for-the-owner.md`, section 43.
+
 ## How to run the Whole-pipeline Eval
 
 It costs far more than the other Evals: every text is a full reply (the
