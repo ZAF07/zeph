@@ -18,7 +18,44 @@ Don't log notes about how your own work went.
 
 ## When you finish an issue of this PRD
 
-Before archiving, ask: did I find a bug, failure, risk or potential failure, in my task or outside it, that my diff doesn't fix? Add one section for your issue above `## Comments`, in issue order, with one entry per finding:
+Before archiving, ask: did I find a bug, failure, risk or potential failure, in my task or outside it, that my diff doesn't fix? Add one section for your issue above `## 44 — Narrowing and sharing use every Condition (2026-11-26)
+
+### The Patterns tab has new Copy that no reference file draws
+
+- **Kind:** risk
+- **What:** a narrowing by audience, stakes, stance, setting or state is shown with a new line (`memories.patterns.shows_when`, "It shows in a group; not one-to-one.") and 25 value words (`memories.patterns.condition.*`). `web/design/reference/Memories--tab-patterns.html` draws only the relationship line, so the pixel test passes without seeing the new words. Relationship words are seeded as drawn ("friend", "colleague"), next to "your partner" and "strangers".
+- **Impact:** the design rule "the reference changes first" wasn't met for these words, and a User can read "It shows with friend, colleague; not with your partner."
+- **Suggested fix:** the owner rewords the slots on Admin → Copy and adds a non-people narrowing to the reference file, then rebuilds the baseline. Half an hour.
+
+### A state gap on top hides every other gap when sharing
+
+- **Kind:** risk
+- **What:** `not_seen_yet` (`core/pattern_sharing.py`) takes the Agenda's one open missing-Condition need. When that is the state going in, the sharing reply is handed nothing, even if another Condition is one-sided too.
+- **Impact:** a User whose stories all say they were worn out hears no "one thing I haven't seen".
+- **Suggested fix:** let `missing_condition` skip state when asked for the sharing reply. A small change, plus a test.
+
+### The unseen value is often a third value of the Condition that already narrows
+
+- **Kind:** risk
+- **What:** in the running-app check the Pattern was narrowed "in a group; not one-to-one", and the unseen value handed over was "with other people watching". The first reply turned this into "No idea how it goes when it's just you and one other person watching".
+- **Impact:** the one thing Zeph says it hasn't seen can be the least useful one, and can read oddly next to the narrowing.
+- **Suggested fix:** when sharing, pass over a Condition that already narrows the Pattern and take the next one-sided one. A small change to `not_seen_yet`, to be agreed since it bends "no second version of the rule".
+
+### A told Pattern keeps its old narrowings
+
+- **Kind:** risk
+- **What:** narrowings are saved only when the ready gate judges a Pattern (`ReadyKeeper._look`). A shared, confirmed or contested Pattern keeps the ones it had, while its score is counted with today's rule and settings.
+- **Impact:** the Patterns tab can show "It shows with …; not with …" for a narrowing the score no longer uses, for example one kept with one story before this issue.
+- **Suggested fix:** save the narrowings again in `settle_shared` at each Conversation end. Small.
+
+### Whether the reply said the unseen value is not checked or kept
+
+- **Kind:** potential failure
+- **What:** the unseen value is an instruction to the Reply. The small check after the reply reads only "shared" and the Prediction, and nothing is stored, so the Patterns tab and the trace page don't show it.
+- **Impact:** a reply can skip it or say it as a claim and nothing notices; no Eval case covers it either.
+- **Suggested fix:** add `not_seen_handed` to the Reply Plan's shape, and one Understanding Eval case with a Judge rule ("says one thing it doesn't know, as not known"). About S$0.02 a run.
+
+## Comments`, in issue order, with one entry per finding:
 
 ```markdown
 ## NN — <issue title> (<YYYY-MM-DD>)

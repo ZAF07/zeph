@@ -1,6 +1,6 @@
 # 23 — Situations vary on more than people: event, setting, place, time, mood
 
-Status: ready-for-human (the record of decisions; no code is built from this file. Archive it once issues 41 to 44 are archived)
+Status: completed (the record of decisions; no code was built from this file. Built through issues 41 to 44, all archived)
 Track: A
 Blocked by: 41, 42, 43, 44
 
@@ -170,6 +170,15 @@ Zeph is not there to prove Patterns correct. It is there to help people become m
 
 ## Acceptance criteria
 
-- [ ] Issues 41, 42, 43 and 44 are done and archived.
+- [x] Issues 41, 42, 43 and 44 are done and archived.
 
 ## Comments
+
+### 26 Nov 2026 — closed
+
+Issues 41, 42, 43 and 44 are built, checked in the running app and archived in `archive/` beside this file. Issue 40 (directness also sets how Zeph asks) is its own issue and still open. The parked parts above stay parked.
+
+## Completion
+
+- Completed: 2026-11-26
+- Commit: <merge commit, filled in after the merge>
