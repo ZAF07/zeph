@@ -130,4 +130,4 @@ Also decided:
 ## Completion
 
 - Completed: 2026-11-26
-- Commit: <merge commit, recorded after the merge>
+- Commit: 60faae7f ("Merge pattern-40-directness-sets-how-zeph-asks: the directness setting also sets how Zeph asks", the merge of pattern-40-directness-sets-how-zeph-asks into main; work commits 1a2ca07d, 74a19a9e, 2d7d9f7d, 28cd45dc)
