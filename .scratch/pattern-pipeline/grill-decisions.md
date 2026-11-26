@@ -18,7 +18,7 @@ Zeph must be proactive and opinionated, not passive: it digs, asks and forms Pat
 4. **Where things live.** Pattern Types (with Thought Experiments and per-type numbers) in git as YAML, loaded on deploy, read-only for Admins: an exception to ADR-0004, needs its own ADR. Global numbers are Platform Settings with hints, overridable in Eval Variants. Prompts stay Admin-editable and hold no numbers.
 5. **User reactions.** The model reads the reaction; code decides what it means. Agreement is supporting evidence that adds up; code confirms. Rejection: Zeph stops offering it (unless the User raises it) and keeps gathering silently; the User has a switch for the silent gathering, on by default.
 6. **The Read stays free** (a view of this situation). **Sharing a Pattern is gated by code**: the Reply Plan is offered only ready Patterns; others are in mind but marked not to be said. A check after the reply says whether one was shared.
-7. **Directness setting** for Users (gentle / balanced / direct): how and how soon Zeph says its Read. Never touches the Pattern gate; ignored while struggling. Its own issue.
+7. **Directness setting** for Users (gentle / balanced / direct): how and how soon Zeph says its Read. Never touches the Pattern gate; ignored while struggling. Its own issue. *Changed 25 and 26 Nov 2026 (issue 40, ADR-0033): it also sets how Zeph asks: the order of Approaches, the wait after a try with nothing, the tries before an Exploration rests and the fewest replies between two Curiosities. Still never the gate, and the backing-off rules stay the same for everyone.*
 8. **Observations keep the exact quote past Message Retention**, as User Memory: visible, deletable (re-scores the Pattern), removed by Delete My Data. Each has the quote (checked by code), a context line by the model (shown apart as Zeph's note), day, Life Thread, situation tags.
 9. **Independent situation = Life Thread** (fallback with no Thread: same person and setting). Within a Thread, different people add weight: strongest Observation per person, capped (Admin-set, start 3). The gate still needs 3 Threads.
 10. **Situation tags**, closed lists: relationship (partner, family, friend, acquaintance, colleague, stranger) and power (above, equal, below), plus the doc's setting and stance. Store all; compare on coarse ones first.
@@ -88,7 +88,7 @@ Discussed 24 Nov 2026, deliberately left out of this work as too big.
 
 `issues/archive/23-situations-vary-on-more-than-people.md` and ADR-0031 extend these decisions; the reasons are there.
 
-- Decision 7 (directness): it will also set where an Exploration starts and how long it waits (issue 40). It still never touches the gate.
+- Decision 7 (directness): it also sets where an Exploration starts and how long it waits, and, by the owner's choice on 26 Nov 2026, the tries before it rests and the fewest replies between Curiosities (issue 40, built 26 Nov 2026). It still never touches the gate.
 - Decisions 9 and 10 (situations and tags): tags are now called Conditions and gain audience, stakes and state going in. A situation is still one Life Thread; Conditions never add situations or points.
 - Decision 14 (Explorations): "way" is renamed Approach. "Missing part of life" becomes a "missing Condition" need, worked out by code from a coverage table, and the counter-test moves ahead of it.
 - Decision 16 (ready): narrowing uses any Condition, needs 2 clear stories on the side that holds, and at most 2 narrow one Pattern.

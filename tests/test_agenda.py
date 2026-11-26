@@ -10,6 +10,7 @@ from companion.core.agenda import (
     AgendaInput,
     AgendaNumbers,
     OpenNeed,
+    agenda_numbers,
     aimed_question,
     approaches_for,
     describe_need,
@@ -30,6 +31,7 @@ from companion.core.models import (
     CuriosityAim,
     CuriositySensitivity,
     CuriosityState,
+    Directness,
     EvidenceKind,
     Exploration,
     ExplorationApproach,
@@ -39,6 +41,7 @@ from companion.core.models import (
     Observation,
     ObservationDirection,
     PatternState,
+    PlatformSettings,
     Relationship,
     SituationSetting,
     SituationTags,
@@ -237,6 +240,7 @@ def keep(
     scores: dict[str, PatternScore] | None = None,
     numbers: AgendaNumbers = NUMBERS,
     thought_experiments: list[ThoughtExperiment] | None = None,
+    directness: Directness = Directness.BALANCED,
 ) -> AgendaChanges:
     """Keep the Agenda at the end of the Conversation ENDED."""
     tried = tried or []
@@ -254,6 +258,7 @@ def keep(
             now=NOW,
             time_zone="Asia/Singapore",
             thought_experiments=thought_experiments or [],
+            directness=directness,
         ),
         numbers,
     )
@@ -490,6 +495,7 @@ def test_each_try_at_a_need_moves_to_a_different_approach_least_pushy_first() ->
             need,
             [attempt for _, attempt in tried],
             {c.id: c.raised_at for c, _ in tried if c.raised_at},
+            Directness.BALANCED,
         )
 
     assert approach_after() == ExplorationApproach.STORY_FOLLOW_UP
@@ -509,7 +515,10 @@ def test_after_a_useful_try_the_same_approach_is_used_again() -> None:
     )
 
     approach = next_approach(
-        OpenNeed(ExplorationNeed.COUNTER_TEST), [useful], {curiosity.id: NOW}
+        OpenNeed(ExplorationNeed.COUNTER_TEST),
+        [useful],
+        {curiosity.id: NOW},
+        Directness.BALANCED,
     )
 
     assert approach == ExplorationApproach.WOULD_IT_DIFFER
@@ -529,6 +538,7 @@ def test_a_try_at_another_need_does_not_move_this_ones_approach() -> None:
         OpenNeed(ExplorationNeed.UNCLEAR, observation=story),
         [at_work],
         {curiosity.id: NOW},
+        Directness.BALANCED,
     )
 
     assert approach == ExplorationApproach.STORY_FOLLOW_UP
@@ -870,7 +880,7 @@ def test_every_aimed_question_is_written_by_code_without_the_pattern(
 ) -> None:
     belong = PATTERN_TYPES[BELONG]
 
-    for approach in approaches_for(open_need):
+    for approach in approaches_for(open_need, Directness.BALANCED):
         if approach == ExplorationApproach.THOUGHT_EXPERIMENT:
             continue
         question, why = aimed_question(open_need, approach, belong)
@@ -912,6 +922,7 @@ def test_a_condition_is_asked_by_three_approaches_and_never_a_thought_experiment
             need,
             [attempt for _, attempt in tried[:count]],
             {c.id: c.raised_at for c, _ in tried[:count] if c.raised_at},
+            Directness.BALANCED,
         )
 
     assert [after(count) for count in range(4)] == [
@@ -951,11 +962,12 @@ def test_a_state_gap_is_asked_openly_never_by_would_it_differ_and_names_no_state
         word for state in StateGoingIn for word in (state.value, "tired", "stress")
     ]
 
-    assert approaches_for(need) == (
-        ExplorationApproach.STORY_FOLLOW_UP,
-        ExplorationApproach.NOTICE_THIS_WEEK,
-    )
-    for approach in approaches_for(need):
+    for directness in Directness:
+        assert approaches_for(need, directness) == (
+            ExplorationApproach.STORY_FOLLOW_UP,
+            ExplorationApproach.NOTICE_THIS_WEEK,
+        )
+    for approach in approaches_for(need, Directness.BALANCED):
         question, why = aimed_question(need, approach, PATTERN_TYPES[BELONG])
         written = (question + why + describe_need(need)).lower()
         assert "how they were doing going into it" in question
@@ -1210,3 +1222,298 @@ def test_a_waiting_thought_experiment_switched_off_or_archived_is_closed() -> No
     assert planned.closed_curiosity_ids == [waiting[0].id]
     [attempt] = planned.new_tries
     assert attempt.thought_experiment_id is None
+
+
+STORY = ExplorationApproach.STORY_FOLLOW_UP
+WOULD = ExplorationApproach.WOULD_IT_DIFFER
+EXPERIMENT = ExplorationApproach.THOUGHT_EXPERIMENT
+NOTICE = ExplorationApproach.NOTICE_THIS_WEEK
+A_CONDITION_NEED = OpenNeed(
+    ExplorationNeed.MISSING_CONDITION,
+    observation=observation(),
+    condition=Condition.AUDIENCE,
+    value="one_to_one",
+)
+
+
+@pytest.mark.parametrize(
+    ("directness", "open_need", "approaches"),
+    [
+        (
+            Directness.GENTLE,
+            OpenNeed(ExplorationNeed.UNCLEAR),
+            (STORY, EXPERIMENT, NOTICE),
+        ),
+        (
+            Directness.BALANCED,
+            OpenNeed(ExplorationNeed.UNCLEAR),
+            (STORY, WOULD, EXPERIMENT, NOTICE),
+        ),
+        (
+            Directness.DIRECT,
+            OpenNeed(ExplorationNeed.UNCLEAR),
+            (WOULD, STORY, EXPERIMENT, NOTICE),
+        ),
+        (
+            Directness.GENTLE,
+            OpenNeed(ExplorationNeed.COUNTER_TEST),
+            (STORY, EXPERIMENT, NOTICE),
+        ),
+        (
+            Directness.DIRECT,
+            OpenNeed(ExplorationNeed.COUNTER_TEST),
+            (WOULD, STORY, EXPERIMENT, NOTICE),
+        ),
+        (Directness.GENTLE, A_CONDITION_NEED, (STORY, NOTICE)),
+        (Directness.BALANCED, A_CONDITION_NEED, (STORY, WOULD, NOTICE)),
+        (Directness.DIRECT, A_CONDITION_NEED, (WOULD, STORY, NOTICE)),
+    ],
+)
+def test_directness_sets_the_order_of_approaches_for_every_need(
+    directness: Directness,
+    open_need: OpenNeed,
+    approaches: tuple[ExplorationApproach, ...],
+) -> None:
+    assert approaches_for(open_need, directness) == approaches
+
+
+@pytest.mark.parametrize(
+    ("directness", "first"),
+    [
+        (Directness.GENTLE, STORY),
+        (Directness.BALANCED, STORY),
+        (Directness.DIRECT, WOULD),
+    ],
+)
+def test_directness_sets_the_first_approach_of_an_exploration(
+    directness: Directness, first: ExplorationApproach
+) -> None:
+    suspected = pattern()
+
+    planned = keep([suspected], [observation()], directness=directness)
+
+    [attempt] = planned.new_tries
+    assert (attempt.need, attempt.approach) == (ExplorationNeed.COUNTER_TEST, first)
+
+
+def test_a_gentle_user_is_never_asked_would_it_differ() -> None:
+    its = exploration(pattern())
+    need = OpenNeed(ExplorationNeed.COUNTER_TEST)
+    tried = [
+        asked(its, approach=approach, days_ago=days_ago)
+        for approach, days_ago in [(STORY, 9), (EXPERIMENT, 6), (NOTICE, 3)]
+    ]
+
+    def after(count: int) -> ExplorationApproach:
+        return next_approach(
+            need,
+            [attempt for _, attempt in tried[:count]],
+            {c.id: c.raised_at for c, _ in tried[:count] if c.raised_at},
+            Directness.GENTLE,
+        )
+
+    assert [after(count) for count in range(4)] == [STORY, EXPERIMENT, NOTICE, STORY]
+
+
+def test_a_gentle_users_unclear_story_gets_a_thought_experiment_second() -> None:
+    suspected = pattern()
+    story = observation(second=WORTH, days_ago=6)
+    its = exploration(suspected)
+    followed_up = asked(
+        its, need=ExplorationNeed.UNCLEAR, aimed_at=story, approach=STORY, days_ago=4
+    )
+    experiment = thought_experiment()
+
+    planned = keep(
+        [suspected],
+        [story],
+        [its],
+        [followed_up],
+        thought_experiments=[experiment],
+        directness=Directness.GENTLE,
+    )
+
+    [attempt] = planned.new_tries
+    assert (attempt.approach, attempt.thought_experiment_id) == (
+        EXPERIMENT,
+        experiment.id,
+    )
+
+
+@pytest.mark.parametrize("outcome", [TryOutcome.USEFUL, TryOutcome.VAGUE])
+def test_a_would_it_differ_try_from_before_they_chose_gentle_is_not_repeated(
+    outcome: TryOutcome,
+) -> None:
+    its = exploration(pattern())
+    curiosity, earlier = asked(its, approach=WOULD, outcome=outcome)
+
+    chosen = next_approach(
+        OpenNeed(ExplorationNeed.COUNTER_TEST),
+        [earlier],
+        {curiosity.id: NOW},
+        Directness.GENTLE,
+    )
+
+    assert chosen == EXPERIMENT
+
+
+def test_a_waiting_aimed_curiosity_stays_when_the_user_changes_directness() -> None:
+    suspected = pattern()
+    its = exploration(suspected)
+    waiting = asked(its, approach=STORY, state=CuriosityState.WAITING)
+
+    planned = keep(
+        [suspected], [observation()], [its], [waiting], directness=Directness.DIRECT
+    )
+
+    assert planned.closed_curiosity_ids == []
+    assert planned.new_curiosities == []
+
+
+def settings_with_directness_numbers() -> PlatformSettings:
+    """Platform Settings holding the Agenda's numbers, each per directness."""
+    return PlatformSettings(
+        {
+            "agenda_size": 3,
+            "exploration_wait_days_gentle": 5,
+            "exploration_wait_days": 3,
+            "exploration_wait_days_direct": 2,
+            "exploration_rest_after_tries_gentle": 3,
+            "exploration_rest_after_tries": 4,
+            "exploration_rest_after_tries_direct": 5,
+            "thought_experiments_per_pattern_per_week": 1,
+            "condition_one_sided_stories": 2,
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    ("directness", "wait_days", "rest_after_tries"),
+    [
+        (Directness.GENTLE, 5, 3),
+        (Directness.BALANCED, 3, 4),
+        (Directness.DIRECT, 2, 5),
+    ],
+)
+def test_directness_sets_the_wait_and_the_tries_before_resting(
+    directness: Directness, wait_days: int, rest_after_tries: int
+) -> None:
+    numbers = agenda_numbers(settings_with_directness_numbers(), directness)
+
+    assert numbers.wait == timedelta(days=wait_days)
+    assert numbers.rest_after_tries == rest_after_tries
+
+
+@pytest.mark.parametrize(
+    ("directness", "not_before"),
+    [
+        (Directness.GENTLE, date(2026, 11, 28)),
+        (Directness.BALANCED, date(2026, 11, 26)),
+        (Directness.DIRECT, date(2026, 11, 25)),
+    ],
+)
+def test_the_next_try_waits_as_long_as_their_directness_says(
+    directness: Directness, not_before: date
+) -> None:
+    numbers = agenda_numbers(settings_with_directness_numbers(), directness)
+    suspected = pattern()
+    its = exploration(suspected)
+
+    planned = keep(
+        [suspected],
+        [observation()],
+        [its],
+        [asked(its, days_ago=1)],
+        numbers=numbers,
+        directness=directness,
+    )
+
+    assert [curiosity.not_before for curiosity in planned.new_curiosities] == [
+        not_before
+    ]
+
+
+@pytest.mark.parametrize(
+    ("directness", "tries_before_resting"),
+    [(Directness.GENTLE, 3), (Directness.BALANCED, 4), (Directness.DIRECT, 5)],
+)
+def test_it_rests_after_as_many_tries_with_nothing_as_their_directness_says(
+    directness: Directness, tries_before_resting: int
+) -> None:
+    numbers = agenda_numbers(settings_with_directness_numbers(), directness)
+    suspected = pattern()
+    its = exploration(suspected)
+    tries = [
+        asked(its, days_ago=days_ago) for days_ago in range(tries_before_resting, 0, -1)
+    ]
+
+    def states_after(tried: list[tuple[Curiosity, ExplorationTry]]) -> list[str]:
+        planned = keep(
+            [suspected],
+            [observation()],
+            [its],
+            tried,
+            numbers=numbers,
+            directness=directness,
+        )
+        return [changed.state for changed in planned.changed]
+
+    assert states_after(tries[1:]) == []
+    assert states_after(tries) == [ExplorationState.RESTING]
+
+
+@pytest.mark.parametrize("directness", list(Directness))
+def test_no_directness_is_asked_two_conversations_in_a_row(
+    directness: Directness,
+) -> None:
+    suspected = pattern()
+    its = exploration(suspected)
+    just_asked = asked(its, conversation_id=ENDED, days_ago=0, outcome=None)
+
+    planned = keep(
+        [suspected], [observation()], [its], [just_asked], directness=directness
+    )
+
+    assert planned.new_curiosities == []
+
+
+def test_after_they_turn_direct_the_next_try_steps_on_in_the_direct_order() -> None:
+    suspected = pattern()
+    its = exploration(suspected)
+    as_balanced = asked(its, approach=STORY, days_ago=4)
+
+    planned = keep(
+        [suspected],
+        [observation()],
+        [its],
+        [as_balanced],
+        thought_experiments=[thought_experiment()],
+        directness=Directness.DIRECT,
+    )
+
+    [attempt] = planned.new_tries
+    assert attempt.approach == NOTICE
+
+
+def test_asked_to_drop_rests_it_at_once_whatever_the_directness() -> None:
+    numbers = agenda_numbers(settings_with_directness_numbers(), Directness.DIRECT)
+    suspected = pattern()
+    its = exploration(suspected)
+    dropped = asked(
+        its,
+        conversation_id=ENDED,
+        days_ago=0,
+        reaction=ThreadReaction.ASKED_TO_DROP,
+        outcome=None,
+    )
+
+    planned = keep(
+        [suspected],
+        [observation()],
+        [its],
+        [dropped],
+        numbers=numbers,
+        directness=Directness.DIRECT,
+    )
+
+    assert [changed.state for changed in planned.changed] == [ExplorationState.RESTING]

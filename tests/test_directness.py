@@ -3,8 +3,12 @@ from typing import Any
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
-from companion.adapters.postgres.database import migrate, seed_platform_settings
-from tests.conftest import SEED_FILE
+from companion.adapters.postgres.database import (
+    migrate,
+    seed_copy,
+    seed_platform_settings,
+)
+from tests.conftest import COPY_SEED_FILE, SEED_FILE
 from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
@@ -23,6 +27,45 @@ from tests.test_settings_via_chat import me, reply_call
 from tests.test_understanding_migrations import downgrade_to
 
 DIRECTNESS_LINE = "How direct they want you to be with your Read: "
+HELP_SLOT = "account.directness.help"
+HELP_BEFORE_ASKING = (
+    "How soon and how plainly Zeph tells you what it thinks is really going on. "
+    "Whatever you pick, Zeph gives its view when you ask, and takes extra care "
+    "when things are hard."
+)
+INSTRUCTIONS_WITH_ASKING = (
+    "how direct you are with your view of what is going on for them and with "
+    "the questions you ask them, whether"
+)
+INSTRUCTIONS_BEFORE_ASKING = (
+    "how direct you are with your view of what is going on for them, whether"
+)
+EXAMPLES_WITH_ASKING = (
+    'think", "you can just ask me straight", "you ask a lot, ease up", "stop'
+)
+EXAMPLES_BEFORE_ASKING = 'think", "stop'
+
+
+def set_before_asking(engine: Engine, help_text: str, instructions: str) -> None:
+    """Store the help text and the settings instructions as given."""
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE copy_slots SET text = :text WHERE key = :key"),
+            {"text": help_text, "key": HELP_SLOT},
+        )
+        connection.execute(
+            text(
+                "UPDATE platform_settings SET value = to_jsonb(CAST(:value AS TEXT)) "
+                "WHERE key = 'reply_settings_instructions'"
+            ),
+            {"value": instructions},
+        )
+
+
+def help_text_of(client: TestClient) -> str:
+    """The Account page's help text for how direct Zeph is, as stored."""
+    help_text: str = client.get("/api/copy").json()["texts"][HELP_SLOT]
+    return help_text
 
 
 def reply_plan_input(chat_model: ScriptedChatModel) -> str:
@@ -199,3 +242,78 @@ def test_an_existing_install_puts_users_on_balanced_and_reloads_the_prompts(
     assert me(client, maya)["directness"] == "balanced"
     for key in ("reply_plan_prompt", "reply_settings_instructions"):
         assert stored_setting(engine, key) == seeded_settings[key]
+
+
+def test_the_account_page_says_directness_also_changes_how_zeph_asks(
+    client: TestClient,
+) -> None:
+    help_text = help_text_of(client)
+
+    assert "how it asks you things" in help_text
+    assert "Gentle asks less often" in help_text
+    assert "direct asks sooner" in help_text
+    assert "backs off when you’d rather not answer" in help_text
+
+
+def test_the_chat_tool_says_directness_also_changes_how_zeph_asks(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    seeded_settings: dict[str, Any],
+) -> None:
+    set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+
+    call = reply_call(
+        client,
+        chat_model,
+        "you ask a lot of questions, ease up",
+        ToolCall("change_directness", {"directness": "gentle"}),
+        "Sure, I'll ease up.",
+    )
+
+    descriptions = {tool.name: tool.description for tool in call.tools}
+    assert "the questions you ask" in descriptions["change_directness"]
+    assert "ask your own questions less often" in call.tool_results[0]
+    assert INSTRUCTIONS_WITH_ASKING in seeded_settings["reply_settings_instructions"]
+    assert EXAMPLES_WITH_ASKING in seeded_settings["reply_settings_instructions"]
+
+
+def test_an_existing_install_gets_the_words_on_how_zeph_asks(
+    engine: Engine,
+    database_url: str,
+    client: TestClient,
+    seeded_settings: dict[str, Any],
+) -> None:
+    new_help_text = help_text_of(client)
+    new_instructions = seeded_settings["reply_settings_instructions"]
+    instructions_before = new_instructions.replace(
+        INSTRUCTIONS_WITH_ASKING, INSTRUCTIONS_BEFORE_ASKING
+    ).replace(EXAMPLES_WITH_ASKING, EXAMPLES_BEFORE_ASKING)
+    downgrade_to(database_url, "0111")
+    try:
+        set_before_asking(engine, HELP_BEFORE_ASKING, instructions_before)
+    finally:
+        migrate(database_url)
+    seed_platform_settings(engine, SEED_FILE)
+    seed_copy(engine, COPY_SEED_FILE)
+
+    assert help_text_of(client) == new_help_text
+    assert stored_setting(engine, "reply_settings_instructions") == new_instructions
+
+
+def test_an_admins_own_words_on_directness_are_kept_by_the_migration(
+    engine: Engine, database_url: str, client: TestClient
+) -> None:
+    downgrade_to(database_url, "0111")
+    try:
+        set_before_asking(engine, "Our own help text.", "Our own instructions.")
+    finally:
+        migrate(database_url)
+    seed_platform_settings(engine, SEED_FILE)
+    seed_copy(engine, COPY_SEED_FILE)
+
+    assert help_text_of(client) == "Our own help text."
+    assert stored_setting(engine, "reply_settings_instructions") == (
+        "Our own instructions."
+    )

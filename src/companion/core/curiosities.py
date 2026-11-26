@@ -1,7 +1,7 @@
 import json
 import logging
 import re
-from collections.abc import Sequence, Set
+from collections.abc import Mapping, Sequence, Set
 from dataclasses import dataclass, replace
 from datetime import date, datetime
 from typing import Any
@@ -33,6 +33,7 @@ from companion.core.models import (
     CuriosityState,
     CuriosityToRaise,
     CuriosityTreatment,
+    Directness,
     Feature,
     HowSure,
     LifeThread,
@@ -40,6 +41,7 @@ from companion.core.models import (
     ModelStep,
     Need,
     ReplyPlan,
+    Setting,
     ThreadReaction,
     UserSnapshot,
 )
@@ -54,6 +56,8 @@ from companion.core.platform_settings import (
     CURIOSITY_KEEPING_PROMPT,
     CURIOSITY_KEEPING_THINKING,
     CURIOSITY_REPLIES_BETWEEN,
+    CURIOSITY_REPLIES_BETWEEN_DIRECT,
+    CURIOSITY_REPLIES_BETWEEN_GENTLE,
     STARTER_THOUGHT_EXPERIMENT_DAYS,
     thinking_for_model,
     thinking_to_use,
@@ -67,6 +71,11 @@ logger = logging.getLogger(__name__)
 
 RECENTLY_RAISED_TO_SHOW = 10
 RAISED_FOR_PACE = 20
+CURIOSITY_REPLIES_BETWEEN_BY_DIRECTNESS: Mapping[Directness, Setting[int]] = {
+    Directness.GENTLE: CURIOSITY_REPLIES_BETWEEN_GENTLE,
+    Directness.BALANCED: CURIOSITY_REPLIES_BETWEEN,
+    Directness.DIRECT: CURIOSITY_REPLIES_BETWEEN_DIRECT,
+}
 HOW_TO_RAISE_WORDS = {
     BringUpWay.LEAD: "Open with it.",
     BringUpWay.WEAVE: (
@@ -590,7 +599,9 @@ class CuriosityRaiser:
             replies_since_last,
             self._clock.now(),
             CuriosityPace(
-                replies_between=settings.get(CURIOSITY_REPLIES_BETWEEN),
+                replies_between=settings.get(
+                    CURIOSITY_REPLIES_BETWEEN_BY_DIRECTNESS[snapshot.user.directness]
+                ),
                 brush_offs_to_back_off=settings.get(CURIOSITY_BRUSH_OFFS_TO_BACK_OFF),
                 back_off_for=settings.get(CURIOSITY_BACK_OFF),
             ),

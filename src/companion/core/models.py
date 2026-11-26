@@ -247,7 +247,8 @@ class User:
             AI notice, if they have.
         user_memory_enabled: Whether the Companion may keep User Memory.
         photo_viewing_enabled: Whether the Companion may look at their photos.
-        directness: How direct they want the Companion to be with its Read.
+        directness: How direct they want the Companion to be, with its Read
+            and with how it asks.
         onboarding_completed_at: When they finished onboarding, if they have.
         role: Whether they are a plain User or an Admin.
         check_ins: Their Check-in settings.
@@ -461,7 +462,8 @@ class PreferenceChanges:
         name: What the Companion should call them.
         user_memory_enabled: Whether the Companion may keep User Memory.
         photo_viewing_enabled: Whether the Companion may look at their photos.
-        directness: How direct they want the Companion to be with its Read.
+        directness: How direct they want the Companion to be, with its Read
+            and with how it asks.
         contested_gathering_enabled: Whether the Companion may keep noting
             evidence for a Pattern they disagreed with.
         country: Two-letter country code.
@@ -3684,7 +3686,11 @@ class ExplorationNeed(StrEnum):
 
 
 class ExplorationApproach(StrEnum):
-    """An Approach: how an aimed Curiosity asks, least pushy first."""
+    """An Approach: how an aimed Curiosity asks.
+
+    Listed least pushy first; the order they are tried in follows the
+    User's directness.
+    """
 
     STORY_FOLLOW_UP = "story_follow_up"
     WOULD_IT_DIFFER = "would_it_differ"

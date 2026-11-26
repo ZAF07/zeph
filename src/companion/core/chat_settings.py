@@ -131,10 +131,14 @@ FORGET_PARAMETERS: dict[str, Any] = {
 }
 DIRECTNESS_WORDS = {
     Directness.GENTLE: (
-        "gentle: you wait for a good moment to give your view and put it softly"
+        "gentle: you wait for a good moment to give your view and put it "
+        "softly, and you ask your own questions less often"
     ),
     Directness.BALANCED: "balanced: you give your view when there is room for it",
-    Directness.DIRECT: "direct: you give your view sooner and in plain words",
+    Directness.DIRECT: (
+        "direct: you give your view sooner and in plain words, and you ask "
+        "your own questions sooner and more often"
+    ),
 }
 DIRECTNESS_PARAMETERS: dict[str, Any] = {
     "type": "object",
@@ -344,10 +348,12 @@ class ReplySettingsTools:
                 name="change_directness",
                 description=(
                     "Change how direct you are with your view of what is "
-                    "really going on for the person. Use direct when they ask "
-                    "you to be blunter, straighter or more honest; gentle when "
-                    "they ask you to go easier, be softer or hold back; "
-                    "balanced when they want it back to normal."
+                    "really going on for the person, and with the questions "
+                    "you ask to understand them. Use direct when they ask "
+                    "you to be blunter, straighter or more honest, or to just "
+                    "ask them things; gentle when they ask you to go easier, "
+                    "be softer, hold back or ask less; balanced when they "
+                    "want it back to normal."
                 ),
                 parameters=DIRECTNESS_PARAMETERS,
                 run=self._change_directness,
@@ -579,7 +585,7 @@ class ReplySettingsTools:
         )
 
     def _change_directness(self, arguments: dict[str, Any]) -> str:
-        """Change how direct the Companion is with its Read.
+        """Change how direct the Companion is with its Read and its questions.
 
         Args:
             arguments: The model's arguments, with "directness".

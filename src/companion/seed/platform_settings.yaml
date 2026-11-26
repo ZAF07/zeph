@@ -943,6 +943,16 @@ agenda_size: 3
 exploration_wait_days: 3
 exploration_rest_after_tries: 4
 
+# The same two numbers for a User who set how direct Zeph is to gentle or to
+# direct (the two above are for balanced). Gentle waits longer and rests
+# sooner; direct waits less and keeps trying longer. Directness also sets the
+# order of Approaches, in code: gentle never gets "would it have gone
+# differently if…", direct gets it first.
+exploration_wait_days_gentle: 5
+exploration_wait_days_direct: 2
+exploration_rest_after_tries_gentle: 3
+exploration_rest_after_tries_direct: 5
+
 # A Condition (audience, stakes, relationship, power, stance, setting, state
 # going in) is one-sided for a suspected Pattern once this many clear stories
 # for it share one value. Zeph then asks about one value it hasn't seen.
@@ -1007,6 +1017,11 @@ curiosities_waiting_limit: 10
 # The fewest replies, counted across Conversations, between two Curiosities
 # raised in replies.
 curiosity_replies_between: 3
+
+# The same number for a User who set how direct Zeph is to gentle or to direct
+# (the one above is for balanced). It doubles while Zeph backs off, as below.
+curiosity_replies_between_gentle: 4
+curiosity_replies_between_direct: 2
 
 # How many replies in one Conversation may make a Move that asks a question
 # (Get curious): follow-ups on what the User is telling now. They don't use
@@ -1130,13 +1145,15 @@ reply_settings_instructions: >-
   clearly ask: pause or resume Check-ins, how often you check in, quiet hours,
   turning your memory of them on or off, turning on or off whether you look
   at their photos, how direct you are with your view of what is going on
-  for them, whether you keep quietly noting what fits something you noticed
+  for them and with the questions you ask them, whether you keep quietly
+  noting what fits something you noticed
   about them and they disagreed with (only when you have that tool),
   forgetting one thing you remember, their time zone, and
   deleting their data. When they ask for one of these, even casually ("once a
   week is plenty", "stop remembering things about me", "stop looking at my
   photos", "just tell me straight", "go easier on me when you say what you
-  think", "stop looking for that, it isn't me"), call the tool straight
+  think", "you can just ask me straight", "you ask a lot, ease up", "stop
+  looking for that, it isn't me"), call the tool straight
   away; don't ask whether to go ahead first.
   Deleting their data has its own confirmation step after the tool. Only
   change what they asked for. If it isn't clear what they want changed or to

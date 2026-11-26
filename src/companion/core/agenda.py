@@ -21,6 +21,7 @@ from companion.core.models import (
     CuriosityAim,
     CuriositySensitivity,
     CuriosityState,
+    Directness,
     Exploration,
     ExplorationApproach,
     ExplorationNeed,
@@ -34,6 +35,7 @@ from companion.core.models import (
     PlatformSettings,
     Power,
     Relationship,
+    Setting,
     SituationSetting,
     Stakes,
     Stance,
@@ -55,7 +57,11 @@ from companion.core.platform_settings import (
     AGENDA_SIZE,
     CONDITION_ONE_SIDED_STORIES,
     EXPLORATION_REST_AFTER_TRIES,
+    EXPLORATION_REST_AFTER_TRIES_DIRECT,
+    EXPLORATION_REST_AFTER_TRIES_GENTLE,
     EXPLORATION_WAIT,
+    EXPLORATION_WAIT_DIRECT,
+    EXPLORATION_WAIT_GENTLE,
     THOUGHT_EXPERIMENTS_PER_PATTERN_PER_WEEK,
 )
 from companion.core.ports import Clock, Repositories
@@ -83,6 +89,30 @@ STATE_APPROACHES = (
     ExplorationApproach.STORY_FOLLOW_UP,
     ExplorationApproach.NOTICE_THIS_WEEK,
 )
+APPROACH_ORDER_BY_DIRECTNESS: Mapping[Directness, tuple[ExplorationApproach, ...]] = {
+    Directness.GENTLE: (
+        ExplorationApproach.STORY_FOLLOW_UP,
+        ExplorationApproach.THOUGHT_EXPERIMENT,
+        ExplorationApproach.NOTICE_THIS_WEEK,
+    ),
+    Directness.BALANCED: APPROACHES,
+    Directness.DIRECT: (
+        ExplorationApproach.WOULD_IT_DIFFER,
+        ExplorationApproach.STORY_FOLLOW_UP,
+        ExplorationApproach.THOUGHT_EXPERIMENT,
+        ExplorationApproach.NOTICE_THIS_WEEK,
+    ),
+}
+EXPLORATION_WAIT_BY_DIRECTNESS: Mapping[Directness, Setting[timedelta]] = {
+    Directness.GENTLE: EXPLORATION_WAIT_GENTLE,
+    Directness.BALANCED: EXPLORATION_WAIT,
+    Directness.DIRECT: EXPLORATION_WAIT_DIRECT,
+}
+EXPLORATION_REST_AFTER_TRIES_BY_DIRECTNESS: Mapping[Directness, Setting[int]] = {
+    Directness.GENTLE: EXPLORATION_REST_AFTER_TRIES_GENTLE,
+    Directness.BALANCED: EXPLORATION_REST_AFTER_TRIES,
+    Directness.DIRECT: EXPLORATION_REST_AFTER_TRIES_DIRECT,
+}
 NOTHING_USEFUL = frozenset({TryOutcome.VAGUE, TryOutcome.BRUSHED_OFF})
 CONDITION_WORDS: Mapping[tuple[Condition, str], tuple[str, str]] = {
     (Condition.AUDIENCE, Audience.ONE_TO_ONE.value): (
@@ -237,6 +267,8 @@ class AgendaInput:
         conversation_id: The Conversation that just ended.
         now: When the Agenda is kept.
         time_zone: The User's IANA time zone.
+        directness: How direct they want the Companion to be, which sets
+            the order of Approaches.
         thought_experiments: Every Thought Experiment, archived ones too.
         starters_put: The Thought Experiments already put to them as
             starters, or waiting to be.
@@ -253,6 +285,7 @@ class AgendaInput:
     conversation_id: UUID
     now: datetime
     time_zone: str | None
+    directness: Directness
     thought_experiments: Sequence[ThoughtExperiment] = ()
     starters_put: Set[UUID] = frozenset()
 
@@ -490,38 +523,56 @@ def asked_in_order(
     )
 
 
-def approaches_for(need: OpenNeed) -> tuple[ExplorationApproach, ...]:
-    """Name the Approaches a need may be asked by, least pushy first.
+def approaches_for(
+    need: OpenNeed, directness: Directness
+) -> tuple[ExplorationApproach, ...]:
+    """Name the Approaches a need may be asked by, in the order to try them.
 
     Args:
         need: The open need.
+        directness: How direct the User wants the Companion to be.
 
     Returns:
-        All four for an unclear story or a counter-test. A missing Condition
-        never gets a Thought Experiment, and the state going in never a
-        "would it have gone differently if" either, since that would name a
-        state before the User has.
+        The Approaches in the order of that directness: least pushy first
+        for gentle and balanced, "would it have gone differently if" first
+        for direct, and never that one for gentle. A missing Condition never
+        gets a Thought Experiment, and the state going in never a "would it
+        have gone differently if" either, whatever the directness, since
+        that would name a state before the User has.
     """
+    allowed: tuple[ExplorationApproach, ...]
     if need.need != ExplorationNeed.MISSING_CONDITION:
-        return APPROACHES
-    if need.condition == Condition.STATE_GOING_IN:
-        return STATE_APPROACHES
-    return CONDITION_APPROACHES
+        allowed = APPROACHES
+    elif need.condition == Condition.STATE_GOING_IN:
+        allowed = STATE_APPROACHES
+    else:
+        allowed = CONDITION_APPROACHES
+    return tuple(
+        approach
+        for approach in APPROACH_ORDER_BY_DIRECTNESS[directness]
+        if approach in allowed
+    )
 
 
 def approach_after(
-    approach: ExplorationApproach, need: OpenNeed
+    approach: ExplorationApproach, need: OpenNeed, directness: Directness
 ) -> ExplorationApproach:
     """Name the Approach that comes after another, round again after the last.
 
     Args:
         approach: The Approach.
         need: The need it asks about.
+        directness: How direct the User wants the Companion to be.
 
     Returns:
-        The next, a little pushier, Approach the need may be asked by.
+        The next Approach the need may be asked by, in the order of that
+        directness. For an Approach that directness never uses (a try from
+        before the User changed it), the first allowed one that comes after
+        it in the balanced order.
     """
-    allowed = approaches_for(need)
+    allowed = approaches_for(need, directness)
+    if approach in allowed:
+        return allowed[(allowed.index(approach) + 1) % len(allowed)]
     later = APPROACHES[APPROACHES.index(approach) + 1 :]
     return next((other for other in later if other in allowed), allowed[0])
 
@@ -530,30 +581,34 @@ def next_approach(
     need: OpenNeed,
     tries: Sequence[ExplorationTry],
     asked_at: Mapping[UUID, datetime],
+    directness: Directness,
 ) -> ExplorationApproach:
-    """Pick how to ask about a need next, least pushy first.
+    """Pick how to ask about a need next, in the order of the User's directness.
 
     A try at the same need that came back with nothing moves on to the
     next Approach, round again after the last, so the next try is a
-    different Approach; after a useful one the same Approach is used again.
+    different Approach; after a useful one the same Approach is used again,
+    unless their directness no longer uses it.
 
     Args:
         need: The open need.
         tries: The Exploration's tries.
         asked_at: When each asked try's Curiosity was asked, by Curiosity ID.
+        directness: How direct the User wants the Companion to be.
 
     Returns:
         The Approach to use next; the first if none was tried at this need.
     """
+    allowed = approaches_for(need, directness)
     asked = [
         attempt for attempt in asked_in_order(tries, asked_at) if aims_at(attempt, need)
     ]
     if not asked:
-        return approaches_for(need)[0]
+        return allowed[0]
     last = asked[-1]
-    if last.outcome not in NOTHING_USEFUL:
+    if last.outcome not in NOTHING_USEFUL and last.approach in allowed:
         return last.approach
-    return approach_after(last.approach, need)
+    return approach_after(last.approach, need, directness)
 
 
 def try_outcome(
@@ -1190,7 +1245,7 @@ def next_try_for(
     )
     if len(closed) < len(waiting) or tried_here:
         return closed, None
-    approach = next_approach(top, its_tries, asked_at)
+    approach = next_approach(top, its_tries, asked_at, agenda.directness)
     thought_experiment = (
         thought_experiment_for(exploration, top, its_tries, agenda, numbers)
         if approach == ExplorationApproach.THOUGHT_EXPERIMENT
@@ -1200,7 +1255,7 @@ def next_try_for(
         approach == ExplorationApproach.THOUGHT_EXPERIMENT
         and thought_experiment is None
     ):
-        approach = approach_after(approach, top)
+        approach = approach_after(approach, top, agenda.directness)
     return closed, aimed_curiosity(
         exploration,
         top,
@@ -1286,19 +1341,23 @@ def pattern_scores(
     }
 
 
-def agenda_numbers(settings: PlatformSettings) -> AgendaNumbers:
-    """Read the Admin-set numbers the Agenda is kept with.
+def agenda_numbers(settings: PlatformSettings, directness: Directness) -> AgendaNumbers:
+    """Read the Admin-set numbers a User's Agenda is kept with.
 
     Args:
         settings: The platform settings.
+        directness: How direct the User wants the Companion to be, which
+            picks the wait and the tries before resting.
 
     Returns:
         The numbers.
     """
     return AgendaNumbers(
         size=settings.get(AGENDA_SIZE),
-        wait=settings.get(EXPLORATION_WAIT),
-        rest_after_tries=settings.get(EXPLORATION_REST_AFTER_TRIES),
+        wait=settings.get(EXPLORATION_WAIT_BY_DIRECTNESS[directness]),
+        rest_after_tries=settings.get(
+            EXPLORATION_REST_AFTER_TRIES_BY_DIRECTNESS[directness]
+        ),
         thought_experiments_per_week=settings.get(
             THOUGHT_EXPERIMENTS_PER_PATTERN_PER_WEEK
         ),
@@ -1396,8 +1455,9 @@ class AgendaKeeper:
                     starters_put=put_as_starters(
                         repositories.curiosities.list_starters(user.id)
                     ),
+                    directness=user.directness,
                 ),
-                agenda_numbers(snapshot.settings),
+                agenda_numbers(snapshot.settings, user.directness),
             )
         )
 

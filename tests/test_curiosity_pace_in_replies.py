@@ -1,6 +1,7 @@
 from datetime import timedelta
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
@@ -13,7 +14,7 @@ from tests.fakes import (
     ScriptedChatModel,
     reply_plan_answer,
 )
-from tests.telegram_helpers import connect_telegram, owner_headers
+from tests.telegram_helpers import auth_headers, connect_telegram, owner_headers
 from tests.test_admin_needs import need_named
 from tests.test_curiosities import (
     PRESENTATION,
@@ -230,6 +231,68 @@ def test_no_curiosity_is_offered_until_the_set_number_of_replies_has_passed(
 
     assert all(NONE_OFFERED in saw for saw in waiting)
     assert f"[1] {DESK}" in fourth
+
+
+@pytest.mark.parametrize(
+    ("directness", "replies_between"), [("gentle", 4), ("balanced", 3), ("direct", 2)]
+)
+def test_directness_sets_the_fewest_replies_between_curiosities(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+    directness: str,
+    replies_between: int,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    maya = auth_headers(auth_verifier, "user_maya")
+    client.patch("/api/me", json={"directness": directness}, headers=maya)
+    three_are_due(client, chat_model, clock, scheduler, seeded_settings)
+    set_settings(client, auth_verifier, {"curiosities_per_conversation": 5})
+    send(client, chat_model, clock, "hey you", **raise_first())
+
+    waiting = [
+        send(client, chat_model, clock, f"reply {number}")
+        for number in range(replies_between)
+    ]
+    after = send(client, chat_model, clock, "and one more")
+
+    assert all(NONE_OFFERED in saw for saw in waiting)
+    assert f"[1] {DESK}" in after
+
+
+def test_a_direct_users_spacing_still_doubles_after_brush_offs(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    maya = auth_headers(auth_verifier, "user_maya")
+    client.patch("/api/me", json={"directness": "direct"}, headers=maya)
+    three_are_due(client, chat_model, clock, scheduler, seeded_settings)
+    set_settings(client, auth_verifier, {"curiosities_per_conversation": 5})
+    send(client, chat_model, clock, "hey you", **raise_first())
+    send(client, chat_model, clock, "meh", curiosity_taken="brushed_off")
+    send(client, chat_model, clock, "hm")
+    send(client, chat_model, clock, "anyway", **raise_first())
+    send(client, chat_model, clock, "whatever", curiosity_taken="brushed_off")
+    end_current_conversation(chat_model, clock, scheduler, seeded_settings, [])
+    clock.advance(timedelta(hours=12))
+
+    waiting = [
+        send(client, chat_model, clock, text) for text in ("one", "two", "three")
+    ]
+    fourth = send(client, chat_model, clock, "four")
+
+    assert all(NONE_OFFERED in saw for saw in waiting)
+    assert f"[1] {CAT}" in fourth
 
 
 def test_the_replies_between_curiosities_count_across_conversations(

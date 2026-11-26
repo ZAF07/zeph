@@ -160,7 +160,16 @@ Each suspected Pattern on the Agenda has an **Exploration**. Code works out what
 
    A useful answer closes that value for good. For the state going in it closes every value, since the question is the same open one.
 
-How it asks is its **Approach**, least pushy first: a story follow-up, "would it have gone differently if…", a Thought Experiment (unclear stories only), "this week, notice…". After a try with nothing, the next try waits 3 days and uses the next Approach; after 4 in a row the Exploration rests.
+How it asks is its **Approach**. The order, the wait after a try with nothing and the tries before the Exploration rests follow how direct the User set Zeph to be (issue 40):
+
+| | Gentle | Balanced | Direct |
+|---|---|---|---|
+| Order of Approaches | story follow-up → Thought Experiment → "this week, notice…" | story follow-up → "would it have gone differently if…" → Thought Experiment → "notice" | "would it have gone differently if…" → story follow-up → Thought Experiment → "notice" |
+| Wait after a try with nothing | 5 days | 3 days | 2 days |
+| Rests after tries with nothing in a row | 3 | 4 | 5 |
+| Fewest replies between two Curiosities | 4 | 3 | 2 |
+
+A Thought Experiment is used for unclear stories only. A gentle User is never asked "would it have gone differently if…". The numbers are Admin-set. Whatever the setting: the spacing doubles after brush-offs, "drop it" rests the Exploration at once, nothing is asked while they are struggling, and never two Conversations in a row. A question already waiting when the User changes the setting is asked as written; the next one follows the new setting.
 
 For the state going in, Zeph only asks openly how they were doing. It never names a state and never asks "would it have gone differently if" about one.
 
