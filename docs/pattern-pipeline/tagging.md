@@ -28,7 +28,7 @@ One model call (`describe_conversation_to_tag` builds the input):
 | Today's date | To place stories in time |
 | The Life Threads the Conversation touched, numbered | So an Observation can be linked to its Thread |
 | Every Pattern Type in the catalog: definition, signs for and against with strength, look-alikes, what anyone would do, exclusions | What to tag against |
-| The fixed tag lists | Tags must come from them |
+| The fixed lists of the seven Conditions and the kinds of evidence | Tags must come from them |
 | The Conversation | What to read |
 | Unclear Observations Zeph asked about in it, numbered | So the model can settle them |
 | Thought Experiments put to the User in it, numbered | So an answer is marked as a "what if" answer |
@@ -61,7 +61,7 @@ If the answer can't be read (no `observations` list), it is asked once more. If 
 - A context line on what was going on
 - Who it was about
 - Life Thread number (optional)
-- Tags: relationship, power, setting, stance (each from its list, or empty)
+- Conditions: relationship, power, setting, stance, audience, stakes, state going in (each from its list, or empty)
 - Kind of evidence
 - Thought Experiment number, if it answers one
 - Ruled-out topic, and whether the User raised it
@@ -79,13 +79,34 @@ If the answer can't be read (no `observations` list), it is asked once more. If 
 | Unknown sign | Its sign isn't in the first Pattern Type's signs for (or against, if it's against) |
 | Quote not word for word | The quote isn't in one of the User's own texts |
 | Deleted by the User | The quote shares words with one the User deleted from this Conversation before (matched by a hash of the message and the quote's place in it; the words aren't kept) |
-| Tag off its list | A tag or the kind of evidence isn't from its list |
+| Tag off its list | A Condition or the kind of evidence isn't from its list. An empty Condition is fine |
 | Missing details | No context line, or no one it is about |
 | Repeat | Same Pattern Type, sign and quote as one already kept from this answer |
 
 **The quote check** (`find_quoted_text`): the quote must be inside one of the User's texts (text messages and photo captions only, never Zeph's texts or a photo's description), starting and ending on whole words. Only runs of spaces and curly quotes are evened out. A quote can't span two texts.
 
 How many were tagged and dropped goes into the Model Call Log (`tagging_shape`). The User's words never do.
+
+## The Conditions
+
+A **Condition** says under what circumstances a story happened. All seven come from closed lists in `core/models.py`, and `describe_tag_lists` writes the lists into the model's input from those enums.
+
+| Condition | Values | Filled when |
+|---|---|---|
+| relationship, power, setting, stance | See the enums | It is clear from the Conversation |
+| audience | one-to-one, group, in front of others (people watching who aren't part of it) | The User's own words say it |
+| stakes | low, high (something that matters to them could be lost) | The User's own words say it |
+| state going in | worn out, under pressure, low, steady | The User's own words say how they were **before** it happened |
+
+Rules for audience, stakes and state going in (ADR-0031):
+
+- **Never guessed.** Not said means empty. The prompt says so, and the Tagging Eval has "must be empty" cases.
+- **One value each.** When a story gives two, the one it leans on; empty when the model can't tell.
+- **State is before, not after.** "I was shattered after" leaves it empty. It is never read from how the User seems while telling the story.
+- **No state after a crisis.** When the User had a Safeguard Event at or after the Conversation's first message, code empties state on every Observation from it, whatever the model wrote (`had_safeguard_event`).
+- **Private.** They are stored on the Observation's row and go when it goes. "Things you said that Zeph kept" and the Admin pages show none of them.
+
+Nothing reads audience, stakes or state going in yet (issues 42 to 44).
 
 ## What code adds to a kept Observation
 
@@ -95,6 +116,7 @@ How many were tagged and dropped goes into the Model Call Log (`tagging_shape`).
 | Life Thread | From the number, or none if it names a Thread it wasn't shown |
 | Kind of evidence | Forced to "what if" answer if it names a Thought Experiment asked in the Conversation |
 | Situational | True when its tags fit one of the Pattern Type's `anyone_would_when` matches (`is_situational`). It then counts nothing |
+| State going in | Emptied when the Conversation had a Safeguard Event |
 | Excluded | True when an exclusion with `ignored` evidence applies to one of its Pattern Types now. It then counts nothing, ever |
 | Ruled-out topic | Kept only if the topic is on the Admin list |
 | Pattern Type versions | The catalog version at tagging time |
@@ -117,6 +139,7 @@ The differences from a normal tagging:
 - It skips any Observation already kept from that Conversation.
 - A quote the User deleted is never kept again, and nothing is kept for a Pattern Type they marked "never again" (the same checks as any tagging).
 - It doesn't touch exclusions, reactions, Predictions or settling.
+- State going in is emptied when the User had a Safeguard Event at any time since that Conversation started, not only in it.
 - New Observations are scored at once (cause `evidence_tagged_again`).
 
 ## Testing it
@@ -126,8 +149,9 @@ The differences from a normal tagging:
 
 ## Limits
 
-- Mood, time of day and kind of event aren't tagged (issue 23).
-- Only some Pattern Types have `anyone_would_when` matches. Where "anyone would" can't be put as tags (high stakes, a real crisis), nothing is ever situational.
+- Time of day and kind of event aren't tagged, on purpose (ADR-0031).
+- Audience, stakes and state going in are stored but not used yet: they don't narrow a Pattern, aim a question or make an Observation situational until issues 42 to 44.
+- Only some Pattern Types have `anyone_would_when` matches, and a match can't name stakes yet (issue 42). Where "anyone would" can't be put as tags (high stakes, a real crisis), nothing is ever situational.
 - A topic added to the ruled-out list doesn't reach Observations tagged before.
 - An exclusion flag stays until the User's next tagged Conversation.
 - A story that settles a Prediction is still tagged as an Observation, but it counts nothing for that shared Pattern (the outcome keeps its Conversation in `predictions.outcome_conversation_id`).
