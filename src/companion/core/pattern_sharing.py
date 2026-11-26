@@ -559,9 +559,9 @@ def describe_not_seen(not_seen: NotSeenYet | None) -> str:
         "One thing you don't know, to say right after the Pattern: so far "
         f"you have only heard about this {seen}, and you haven't heard how "
         f"it goes {unseen}. Say that in a sentence as something you "
-        "don't know (like “I've only heard about this in meetings. I don't "
-        "know if it's the same when it's just the two of you”), never as a "
-        "claim about them, and don't ask about it.\n"
+        f"don't know (like “I've only heard about this {seen}. I don't know "
+        f"if it's the same {unseen}”), never as a claim about them, and "
+        "don't ask about it.\n"
     )
 
 

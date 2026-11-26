@@ -436,6 +436,10 @@ def test_the_unseen_value_is_to_be_said_as_not_known_never_as_a_claim() -> None:
     assert "you have only heard about this in a group" in said
     assert "you haven't heard how it goes one-to-one" in said
     assert "as something you don't know" in said
+    assert (
+        "“I've only heard about this in a group. I don't know if it's the same "
+        "one-to-one”"
+    ) in said
     assert "never as a claim about them" in said
     assert "don't ask about it" in said
 
