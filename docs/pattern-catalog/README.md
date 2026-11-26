@@ -29,7 +29,8 @@ There are fifteen, three in each of five areas:
 | Relationships | REL.CHECK.SECURE, REL.DISTANCE.INDEP, REL.MOOD.FIX |
 
 All fifteen were written as drafts and approved by the owner (Zaf) on
-24 Nov 2026.
+24 Nov 2026. ACH.WORTH.PERF and CTRL.UNCERT.PLAN 0.4.0 (high stakes as an
+`anyone_would_when` tag) were approved on 26 Nov 2026.
 
 ## Where it lives
 
@@ -59,7 +60,7 @@ was last loaded. Zeph keeps replying either way.
 | `signs_against` | What counts **against** it. Same fields, IDs D1, D2…. | Same as signs; against Observations take points away. |
 | `look_alikes` | What it can be mistaken for. Either another `pattern_type` (by ID) or a `name` for something outside the catalog (e.g. healthy focus), with `tells_apart`. | The tagging model: when it can't tell two look-alikes apart it names both, and the Observation is unclear. |
 | `anyone_would` | When anyone would act this way, so it says nothing about the person. | The tagging model. |
-| `anyone_would_when` | Optional. The same, as situation tags: `relationship`, `power`, `setting`, `stance`. A match needs every tag it names. | Code: an Observation whose tags fit is situational and carries no weight. |
+| `anyone_would_when` | Optional. The same, as situation tags: `relationship`, `power`, `setting`, `stance`, `audience`, `stakes`, `state_going_in`. Each is a list of values from that tag's fixed list (e.g. `stakes: [high]`); a value outside it stops the load. A match needs every tag it names, and an Observation with one of those tags empty never fits. | Code: an Observation whose tags fit is situational and carries no weight. |
 | `exclusions` | When it must not be shared, and whether evidence from then is `ignored` or `counted_not_shared`. | The tagging model, which says which exclusions apply to a User now (from their open Life Threads and latest Day Summaries), and the ready gate: while one applies the Pattern is never ready, and with `ignored` the Observations tagged then carry no weight. |
 | `approved_wording` | The Pattern in warm, plain words, as Zeph's view. | Given to the Reply Plan, the reply, a Check-in that shares it and the tagging step (to read how they took it), once the Pattern is ready or told. A change applies from the next reply. |
 | `prediction_wordings` | A list of Predictions: each is one thing to notice next time, with a `{placeholder}` the model fills. Each tests a **different side** of the Pattern. At least one; write three. | Code picks one: the first when the Pattern is shared, then the first this User's Pattern hasn't had (once all were given, the one given longest ago). The reply or Check-in puts the User's own person or thing in the placeholder. The Prediction is kept as it was worded to them, with its number. |
@@ -187,7 +188,7 @@ the whole catalog.
 | A sign's `strength` | Scores shift on the next scoring (each Conversation end, or when evidence is deleted): scoring reads the strength from the current version, also for Observations tagged under an older one. |
 | A sign removed or its `id` changed | Observations that named it count nothing from the next scoring. The tagging step can't pick it any more. |
 | `definition`, `if` / `then` / `function`, signs' `text`, `look_alikes`, `anyone_would` | Changes what the tagging model looks for, from the next Conversation end. Past Observations are not tagged again. Run the Tagging Eval. |
-| `anyone_would_when` | Changes which new Observations are situational. Past ones keep how they were marked. |
+| `anyone_would_when` | Changes which new Observations are situational. Past ones keep how they were marked, so scoring counts them as before; the ready gate reads the current version, so there a past Observation that fits the new match stops counting. |
 | `exclusions` | Changes what the tagging step may flag, from the next Conversation end. An exclusion taken away stops applying at the User's next tagged Conversation. Observations already marked excluded stay so. |
 | `numbers.situations_needed` | The ready gate uses it from the next Conversation end; a ready Pattern that no longer has enough situations goes back to suspected. |
 | `approved_wording`, `prediction_wordings` | Used from the next time a Pattern is shared, followed up or given a new Prediction. A follow-up Curiosity already waiting keeps the words it was written with, and a Pattern already told keeps the wording it was told in (the User sees that wording on their Patterns tab). Keep the order of `prediction_wordings`: a Prediction remembers its place in the list, so moving one makes Zeph think a different one was given. Add new ones at the end. |

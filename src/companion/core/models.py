@@ -3134,19 +3134,26 @@ class SituationMatch:
     """One situation where anyone would act the same, as tags.
 
     A tag left empty matches any value. An Observation fits when, for every
-    tag given, its own value is one of those listed.
+    tag given, its own value is one of those listed; an Observation without
+    a value for a tag given never fits.
 
     Attributes:
         relationships: The relationships it covers.
         powers: The power positions it covers.
         settings: The settings it covers.
         stances: The stances it covers.
+        audiences: The audiences it covers.
+        stakes: The stakes it covers.
+        states: The states going in it covers.
     """
 
     relationships: tuple[Relationship, ...] = ()
     powers: tuple[Power, ...] = ()
     settings: tuple[SituationSetting, ...] = ()
     stances: tuple[Stance, ...] = ()
+    audiences: tuple[Audience, ...] = ()
+    stakes: tuple[Stakes, ...] = ()
+    states: tuple[StateGoingIn, ...] = ()
 
 
 @dataclass(frozen=True)

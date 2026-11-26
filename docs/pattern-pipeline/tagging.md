@@ -150,8 +150,9 @@ The differences from a normal tagging:
 ## Limits
 
 - Time of day and kind of event aren't tagged, on purpose (ADR-0031).
-- Audience, stakes and state going in are stored but not used yet: they don't narrow a Pattern, aim a question or make an Observation situational until issues 42 to 44.
-- Only some Pattern Types have `anyone_would_when` matches, and a match can't name stakes yet (issue 42). Where "anyone would" can't be put as tags (high stakes, a real crisis), nothing is ever situational.
+- Audience, stakes and state going in can make an Observation situational (a match may name them, issue 42), but they don't narrow a Pattern or aim a question until issues 43 and 44.
+- Only some Pattern Types have `anyone_would_when` matches. A match fits only a tag the Observation holds: a high-stakes story where the User never said what was at stake has stakes empty and is not situational.
+- Observations kept before issue 41 have no stakes tag, so they never fit a high-stakes match and keep their weight.
 - A topic added to the ruled-out list doesn't reach Observations tagged before.
 - An exclusion flag stays until the User's next tagged Conversation.
 - A story that settles a Prediction is still tagged as an Observation, but it counts nothing for that shared Pattern (the outcome keeps its Conversation in `predictions.outcome_conversation_id`).

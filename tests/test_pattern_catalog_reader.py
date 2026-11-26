@@ -9,6 +9,7 @@ import yaml
 
 from companion.adapters.pattern_catalog_seed import read_pattern_catalog_seed
 from companion.core.models import (
+    Audience,
     ExcludedEvidence,
     PatternArea,
     PatternType,
@@ -20,6 +21,8 @@ from companion.core.models import (
     SignStrength,
     SituationMatch,
     SituationSetting,
+    Stakes,
+    StateGoingIn,
 )
 from companion.core.pattern_catalog import (
     InvalidPatternCatalogError,
@@ -104,9 +107,13 @@ def test_the_fifteen_pattern_types_in_the_repo_are_approved_three_per_area() -> 
         ]
         assert len(in_area) == 3, area
     assert {
-        (pattern_type.status, pattern_type.approved_by, pattern_type.approved_on)
+        (pattern_type.status, pattern_type.approved_by)
         for pattern_type in pattern_types
-    } == {(PatternTypeStatus.APPROVED, "Zaf", date(2026, 11, 24))}
+    } == {(PatternTypeStatus.APPROVED, "Zaf")}
+    assert {pattern_type.approved_on for pattern_type in pattern_types} == {
+        date(2026, 11, 24),
+        date(2026, 11, 26),
+    }
 
 
 def test_every_look_alike_in_the_repo_is_named_back_by_the_other_pattern_type() -> None:
@@ -447,6 +454,49 @@ def test_anyone_would_when_is_read_as_tag_matches() -> None:
     )
 
 
+def test_anyone_would_when_reads_the_conditions_it_names() -> None:
+    [pattern_type] = read_pattern_types(
+        [
+            PatternTypeFile(
+                name="a.yaml",
+                content=changed(
+                    anyone_would_when=[
+                        {"stakes": ["high"]},
+                        {
+                            "audience": ["group", "in front of others"],
+                            "state_going_in": ["worn out"],
+                        },
+                    ]
+                ),
+            )
+        ]
+    )
+
+    assert pattern_type.anyone_would_when == (
+        SituationMatch(stakes=(Stakes.HIGH,)),
+        SituationMatch(
+            audiences=(Audience.GROUP, Audience.IN_FRONT_OF_OTHERS),
+            states=(StateGoingIn.WORN_OUT,),
+        ),
+    )
+
+
+@pytest.mark.parametrize("pattern_type_id", ["ACH.WORTH.PERF", "CTRL.UNCERT.PLAN"])
+def test_the_two_high_stakes_pattern_types_say_so_as_tags(
+    pattern_type_id: str,
+) -> None:
+    pattern_types = {
+        pattern_type.id: pattern_type
+        for pattern_type in read_pattern_types(
+            read_pattern_catalog_seed(PATTERN_CATALOG_DIR)
+        )
+    }
+
+    assert pattern_types[pattern_type_id].anyone_would_when == (
+        SituationMatch(stakes=(Stakes.HIGH,)),
+    )
+
+
 def test_anyone_would_when_may_be_left_out() -> None:
     [pattern_type] = read_pattern_types([PatternTypeFile(name="a.yaml", content=VALID)])
 
@@ -460,7 +510,22 @@ def test_anyone_would_when_may_be_left_out() -> None:
         (
             [{}],
             "a.yaml: anyone_would_when[1] needs at least one of relationship, "
-            "power, setting or stance.",
+            "power, setting, stance, audience, stakes or state_going_in.",
+        ),
+        (
+            [{"stakes": ["huge"]}],
+            "a.yaml: anyone_would_when[1].stakes has huge; each must be one of "
+            "low, high.",
+        ),
+        (
+            [{"audience": ["crowd"]}],
+            "a.yaml: anyone_would_when[1].audience has crowd; each must be one "
+            "of one-to-one, group, in front of others.",
+        ),
+        (
+            [{"state_going_in": ["tired"]}],
+            "a.yaml: anyone_would_when[1].state_going_in has tired; each must be "
+            "one of worn out, under pressure, low, steady.",
         ),
         (
             [{"relationship": ["boss"]}],

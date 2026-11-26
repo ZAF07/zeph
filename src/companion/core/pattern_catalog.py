@@ -7,6 +7,7 @@ from typing import Any
 
 from companion.core.errors import InvalidError
 from companion.core.models import (
+    Audience,
     CatalogPatternType,
     ExcludedEvidence,
     LookAlike,
@@ -24,12 +25,23 @@ from companion.core.models import (
     SignStrength,
     SituationMatch,
     SituationSetting,
+    Stakes,
     Stance,
+    StateGoingIn,
 )
 from companion.core.ports import PatternCatalogRepository
 
 PATTERN_TYPE_ID_SHAPE = re.compile(r"[A-Z][A-Z0-9]*(\.[A-Z][A-Z0-9]*)+")
 VERSION_SHAPE = re.compile(r"\d+\.\d+\.\d+")
+SITUATION_MATCH_FIELDS = (
+    "relationship",
+    "power",
+    "setting",
+    "stance",
+    "audience",
+    "stakes",
+    "state_going_in",
+)
 
 
 class InvalidPatternCatalogError(InvalidError):
@@ -444,13 +456,15 @@ def _read_anyone_would_when(fields: _Fields) -> tuple[SituationMatch, ...]:
             powers=group.optional_choices("power", Power),
             settings=group.optional_choices("setting", SituationSetting),
             stances=group.optional_choices("stance", Stance),
+            audiences=group.optional_choices("audience", Audience),
+            stakes=group.optional_choices("stakes", Stakes),
+            states=group.optional_choices("state_going_in", StateGoingIn),
         )
-        if not any(
-            group.has(field) for field in ("relationship", "power", "setting", "stance")
-        ):
+        if not any(group.has(field) for field in SITUATION_MATCH_FIELDS):
             fields.note(
-                f"anyone_would_when[{number}] needs at least one of relationship, "
-                "power, setting or stance."
+                f"anyone_would_when[{number}] needs at least one of "
+                f"{', '.join(SITUATION_MATCH_FIELDS[:-1])} or "
+                f"{SITUATION_MATCH_FIELDS[-1]}."
             )
         group.no_other_fields("a situation anyone would act the same in")
         matches.append(match)

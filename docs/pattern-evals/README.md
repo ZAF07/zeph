@@ -60,10 +60,10 @@ going in, one person inside a group, and high stakes said plainly.
     other than "anyone would" and the Conditions a case states are filled
     in (relationship, power, setting, stance and kind of evidence are only
     checked against their lists).
-  - "Anyone would" for ACH.WORTH.PERF and CTRL.UNCERT.PLAN: their "anyone
-    would" (high stakes, a real crisis) can't be written as tags, so code
-    never marks theirs situational. Those cases expect the step to say
-    nothing, or a sign against.
+  - "Anyone would" for ACH.WORTH.PERF and CTRL.UNCERT.PLAN when the story
+    doesn't say what is at stake: code marks theirs situational only when
+    the step tags stakes high (issue 42). A real crisis has no tag of its
+    own, so those cases expect the step to say nothing, or a sign against.
 
 #### Conditions: first results (26 Nov 2026)
 

@@ -331,6 +331,31 @@ def test_on_start_a_catalog_that_cannot_be_loaded_is_reported_and_the_last_kept(
     assert len(catalog(client, headers)) == 15
 
 
+def test_a_condition_outside_its_list_is_refused_and_the_last_catalog_kept(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    engine: Engine,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+    before = stored_versions(engine)
+    (tmp_path / "bad.yaml").write_text(
+        yaml.safe_dump({**VALID, "anyone_would_when": [{"stakes": ["huge"]}]})
+    )
+
+    load_pattern_catalog_or_keep_last(engine, tmp_path)
+
+    assert capsys.readouterr().err == (
+        "The Pattern Catalog can't be loaded. Nothing was changed.\n"
+        "- bad.yaml: anyone_would_when[1].stakes has huge; each must be one of "
+        "low, high.\n"
+        "The backend starts with the catalog as it was last loaded.\n"
+    )
+    assert stored_versions(engine) == before
+    assert len(catalog(client, headers)) == 15
+
+
 def test_a_pattern_type_taken_out_of_the_files_leaves_the_catalog_but_is_kept(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,

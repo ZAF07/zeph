@@ -23,6 +23,7 @@ from companion.core.models import (
     SignStrength,
     SituationSetting,
     SituationTags,
+    Stakes,
     TryOutcome,
 )
 from companion.core.observations import UserText
@@ -441,6 +442,29 @@ def test_stories_where_anyone_would_act_the_same_by_the_catalog_now_block() -> N
     assert facts.score.points >= BARS.points
     assert facts.score_without_situational == PatternScore(points=0, situations=0)
     assert ready_check(facts, BARS) == ReadyCheck.SITUATIONAL
+
+
+@pytest.mark.parametrize(
+    ("pattern_type_id", "strong_sign"), [(WORTH, "I1"), ("CTRL.UNCERT.PLAN", "I3")]
+)
+def test_high_stakes_stories_block_where_anyone_would_act_the_same_then(
+    pattern_type_id: str, strong_sign: str
+) -> None:
+    stories = [
+        replace(observation, pattern_type_id=pattern_type_id, sign_id=strong_sign)
+        for observation in three_stories_in_two_conversations()
+    ]
+    with_high_stakes = [
+        replace(observation, tags=replace(observation.tags, stakes=Stakes.HIGH))
+        for observation in stories
+    ]
+
+    facts = facts_of(with_high_stakes, pattern_type_id=pattern_type_id)
+
+    assert facts.score.points >= BARS.points
+    assert facts.score_without_situational == PatternScore(points=0, situations=0)
+    assert ready_check(facts, BARS) == ReadyCheck.SITUATIONAL
+    assert ready_check(facts_of(stories, pattern_type_id=pattern_type_id), BARS) is None
 
 
 def test_an_exclusion_a_recent_safeguard_event_or_a_ruled_out_topic_is_not_safe() -> (

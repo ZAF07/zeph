@@ -28,6 +28,7 @@ from tests.test_pattern_tagging import (
     MEI,
     TEXT,
     observation_entry,
+    observations_of,
     tagging_answer,
     turn_noticing_on,
 )
@@ -129,6 +130,33 @@ def test_a_first_observation_notices_a_pattern_and_logs_why(
     assert move.pattern_id == pattern.id
     assert move.conversation_id is not None
     assert (move.points, move.situations) == (pytest.approx(140), 1)
+
+
+def test_a_high_stakes_story_is_stored_situational_and_adds_no_points(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    user_id = turn_noticing_on(client, auth_verifier)
+
+    end_tagged_conversation(
+        client,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+        observation_entry(pattern_types=["ACH.WORTH.PERF"], sign="I1", stakes="high"),
+    )
+
+    [observation] = observations_of(client.engine, user_id)
+    assert observation.situational
+    [move] = moves_of(client.engine, user_id)
+    assert (move.points, move.situations) == (pytest.approx(0), 0)
 
 
 def test_two_situations_with_enough_score_make_it_suspected(

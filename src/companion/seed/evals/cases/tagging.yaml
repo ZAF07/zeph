@@ -1333,8 +1333,8 @@ cases:
         direction: for
         audience: group
 
-  # High stakes said plainly. Issue 42 turns these two into "anyone would"
-  # cases; until then they count like any other.
+  # High stakes said plainly: anyone would act the same, so situational
+  # (issue 42).
 
   - id: cond-high-stakes-visa-interview
     messages:
@@ -1349,6 +1349,7 @@ cases:
     observations:
       - pattern_type: ACH.WORTH.PERF
         direction: for
+        situational: true
         stakes: high
 
   - id: cond-high-stakes-mortgage-decision
@@ -1365,4 +1366,5 @@ cases:
     observations:
       - pattern_type: CTRL.UNCERT.PLAN
         direction: for
+        situational: true
         stakes: high

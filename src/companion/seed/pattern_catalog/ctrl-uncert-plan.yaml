@@ -3,12 +3,12 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: CTRL.UNCERT.PLAN
-version: 0.3.0
+version: 0.4.0
 area: control
 name: Control-seeking under uncertainty
 status: approved
 approved_by: Zaf
-approved_on: 2026-11-24
+approved_on: 2026-11-26
 
 definition: >-
   When outcomes are uncertain, the person responds by planning, checking,
@@ -82,6 +82,11 @@ look_alikes:
       people and how they feel about them
 
 anyone_would: A real crisis where control-seeking is adaptive
+
+# The same as tags, so code can tell: an Observation tagged high stakes is
+# situational and carries no weight.
+anyone_would_when:
+  - stakes: [high]
 
 exclusions:
   - text: Active health or safety emergency

@@ -385,6 +385,9 @@ def is_situational(tags: SituationTags, matches: Sequence[SituationMatch]) -> bo
                 (tags.power, match.powers),
                 (tags.setting, match.settings),
                 (tags.stance, match.stances),
+                (tags.audience, match.audiences),
+                (tags.stakes, match.stakes),
+                (tags.state_going_in, match.states),
             )
         )
         for match in matches
