@@ -97,13 +97,24 @@ def describe_where_it_shows(narrowings: Sequence[PatternNarrowing]) -> str:
 
     Returns:
         E.g. " It shows in a group; not one-to-one."; "" when it isn't
-        narrowed. A narrowing by the state going in adds the rule to say
-        it gently.
+        narrowed.
     """
-    shown = "".join(
+    return "".join(
         f" It shows {describe_narrowing(narrowing)}." for narrowing in narrowings
     )
+
+
+def describe_how_to_say_state(narrowings: Sequence[PatternNarrowing]) -> str:
+    """Write the rule for telling a User a narrowing by their state going in.
+
+    Args:
+        narrowings: The Pattern's kept narrowings.
+
+    Returns:
+        The rule to say it gently and never as a label, ending in a new
+        line; "" when no narrowing is by the state going in.
+    """
     names_state = any(
         narrowing.tag == Condition.STATE_GOING_IN for narrowing in narrowings
     )
-    return f"{shown} {STATE_GENTLY}" if names_state else shown
+    return f"{STATE_GENTLY}\n" if names_state else ""

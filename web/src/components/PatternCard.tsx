@@ -27,6 +27,22 @@ function outcomeSlot(outcome: PredictionOutcome | null): string {
 }
 
 /**
+ * Names the Copy slot that words one value of a Condition. A stored value
+ * such as "one-to-one" or "worn out" is spelt with underscores in the key.
+ *
+ * @param condition - The Condition.
+ * @param value - One of its values, as stored.
+ * @returns The slot's key, e.g. `memories.patterns.condition.audience.one_to_one`.
+ */
+function conditionValueSlot(
+  condition: PatternCondition,
+  value: string,
+): string {
+  const valueInKey = value.replace(/[^a-z]+/g, "_");
+  return `memories.patterns.condition.${condition}.${valueInKey}`;
+}
+
+/**
  * Puts where a Pattern shows and where it doesn't in words, from Copy. Who
  * the other person is reads "with …"; every other Condition reads as when.
  *
@@ -35,24 +51,21 @@ function outcomeSlot(outcome: PredictionOutcome | null): string {
  * @returns The line, e.g. "It shows in a group; not one-to-one."
  */
 function whereItShowsLine(copy: Copy, where: WhereItShows): string {
-  const words = (values: string[]) =>
+  const inWords = (values: string[]) =>
     values
       .map((value) =>
-        readCopy(
-          copy,
-          `memories.patterns.condition.${where.condition}.${value.replace(/[^a-z]+/g, "_")}`,
-        ),
+        readCopy(copy, conditionValueSlot(where.condition, value)),
       )
       .join(", ");
   if (conditionsAboutPeople.includes(where.condition)) {
     return fillCopy(copy, "memories.patterns.where_it_shows", {
-      shows_with: words(where.shows_with),
-      not_with: words(where.not_with),
+      shows_with: inWords(where.shows_with),
+      not_with: inWords(where.not_with),
     });
   }
   return fillCopy(copy, "memories.patterns.shows_when", {
-    shows_when: words(where.shows_with),
-    not_when: words(where.not_with),
+    shows_when: inWords(where.shows_with),
+    not_when: inWords(where.not_with),
   });
 }
 

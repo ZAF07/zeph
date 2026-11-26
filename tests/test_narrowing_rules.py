@@ -28,6 +28,7 @@ from companion.core.models import (
 from companion.core.narrowing_words import (
     STATE_GENTLY,
     WHERE_WORDS,
+    describe_how_to_say_state,
     describe_narrowing,
     describe_where_it_shows,
 )
@@ -304,13 +305,25 @@ def test_each_condition_is_said_in_its_own_plain_words() -> None:
 def test_the_state_going_in_is_said_gently_about_the_day_never_as_a_label() -> None:
     state = PatternNarrowing(Condition.STATE_GOING_IN, ("worn out",), ("steady",))
 
-    said = describe_where_it_shows([state])
-
-    assert said == (
+    assert describe_where_it_shows([state]) == (
         " It shows on days they were worn out; not on days they felt steady."
-        f" {STATE_GENTLY}"
     )
+    assert describe_how_to_say_state([state]) == f"{STATE_GENTLY}\n"
     assert "never as a label" in STATE_GENTLY
+    assert describe_how_to_say_state([]) == ""
+
+
+def test_a_shared_pattern_narrowed_by_state_tells_the_reply_to_say_it_gently() -> None:
+    observations = [
+        under("Priya", state=StateGoingIn.WORN_OUT),
+        under("Sam", state=StateGoingIn.WORN_OUT),
+        under("Ravi", AGAINST, state=StateGoingIn.STEADY),
+    ]
+
+    parts = describe_three_parts(to_share(observations))
+
+    assert "It shows on days they were worn out; not on days they felt steady." in parts
+    assert parts.count(STATE_GENTLY) == 1
 
 
 def missing_condition_try(condition: Condition, value: str) -> ExplorationTry:
@@ -420,7 +433,7 @@ def test_a_state_gap_is_never_handed_to_a_sharing_reply() -> None:
 def test_the_unseen_value_is_to_be_said_as_not_known_never_as_a_claim() -> None:
     said = describe_not_seen(NotSeenYet(Condition.AUDIENCE, "group", "one-to-one"))
 
-    assert "every story they told you about this was in a group" in said
+    assert "you have only heard about this in a group" in said
     assert "you haven't heard how it goes one-to-one" in said
     assert "as something you don't know" in said
     assert "never as a claim about them" in said

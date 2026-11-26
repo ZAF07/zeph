@@ -27,7 +27,11 @@ from companion.core.models import (
     ShareVia,
     UserSnapshot,
 )
-from companion.core.narrowing_words import describe_where_it_shows, where_words
+from companion.core.narrowing_words import (
+    describe_how_to_say_state,
+    describe_where_it_shows,
+    where_words,
+)
 from companion.core.observations import is_situational
 from companion.core.pattern_catalog import PatternCatalogService
 from companion.core.pattern_scoring import (
@@ -552,9 +556,9 @@ def describe_not_seen(not_seen: NotSeenYet | None) -> str:
     seen = where_words(not_seen.condition, not_seen.seen)
     unseen = where_words(not_seen.condition, not_seen.not_seen)
     return (
-        "One thing you don't know, to say right after the Pattern: every "
-        f"story they told you about this was {seen}, and you haven't heard "
-        f"how it goes {unseen}. Say that in a sentence as something you "
+        "One thing you don't know, to say right after the Pattern: so far "
+        f"you have only heard about this {seen}, and you haven't heard how "
+        f"it goes {unseen}. Say that in a sentence as something you "
         "don't know (like “I've only heard about this in meetings. I don't "
         "know if it's the same when it's just the two of you”), never as a "
         "claim about them, and don't ask about it.\n"
@@ -623,6 +627,7 @@ def describe_three_parts(to_share: PatternToShare) -> str:
         "1. The Pattern, in your own warm words, fitted to the people in "
         f"their life: {pattern_type.approved_wording}"
         f"{describe_where_it_shows(to_share.pattern.narrowings)}\n"
+        f"{describe_how_to_say_state(to_share.pattern.narrowings)}"
         f"{describe_not_seen(to_share.not_seen)}"
         "2. Their own words: quote two or three of these word for word, "
         "saying what each was about:\n"

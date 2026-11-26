@@ -260,7 +260,7 @@ def test_a_pattern_heard_about_only_in_a_group_is_shared_with_one_thing_not_seen
 
     section = told[told.index("Tell them this Pattern in this reply") :]
     assert "It shows with family, with friends; not with a partner." in section
-    assert "every story they told you about this was in a group" in section
+    assert "you have only heard about this in a group" in section
     assert "you haven't heard how it goes one-to-one" in section
     assert "as something you don't know" in section
     assert section.count("One thing you don't know") == 1
