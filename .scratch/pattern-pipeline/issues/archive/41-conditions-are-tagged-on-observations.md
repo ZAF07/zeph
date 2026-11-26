@@ -93,4 +93,4 @@ Estimates shown: S$0.04 for the first run; for the second, the app's S$0.22 and 
 ## Completion
 
 - Completed: 2026-11-26
-- Commit: <merge commit, filled in after the merge>
+- Commit: 7f079738 ("Merge pattern-41-conditions-tagged-on-observations: Conditions are tagged on Observations", the merge of pattern-41-conditions-tagged-on-observations into main; work commits cced8c7c, 2645c05d, 5af7a28b, 89742ae8, def38da8, 44e8318b)
