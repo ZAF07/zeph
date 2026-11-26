@@ -70,4 +70,4 @@ A Pattern Type's `anyone_would_when` can name audience, stakes and state, so cod
 ## Completion
 
 - Completed: 2026-11-26
-- Commit: <filled in after the merge>
+- Commit: d0861ccf ("Merge pattern-42-anyone-would-matches-conditions: \"anyone would act the same\" can match the new Conditions", the merge of pattern-42-anyone-would-matches-conditions into main; work commits 47b9723c, 526192ce, a92450c4)
