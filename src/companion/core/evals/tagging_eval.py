@@ -37,8 +37,8 @@ from companion.core.models import (
     CuriosityChanges,
     CuriositySensitivity,
     CuriosityState,
+    ExplorationApproach,
     ExplorationNeed,
-    ExplorationWay,
     MessageDirection,
     MessageKind,
     ModelStep,
@@ -143,7 +143,7 @@ def save_unclear_stories(
         if story.asked:
             question, why = aimed_question(
                 OpenNeed(ExplorationNeed.UNCLEAR, observation=observation),
-                ExplorationWay.STORY_FOLLOW_UP,
+                ExplorationApproach.STORY_FOLLOW_UP,
                 pattern_type,
             )
             asking.append(

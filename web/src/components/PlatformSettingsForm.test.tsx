@@ -112,6 +112,7 @@ const settings: AdminSettings = {
   ),
   exploration_wait_days: seeded(3),
   exploration_rest_after_tries: seeded(4),
+  condition_one_sided_stories: seeded(2),
   thought_experiments_per_pattern_per_week: seeded(1),
   pattern_ready_situations: seeded(3),
   pattern_ready_conversations: seeded(2),

@@ -1,5 +1,6 @@
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
+from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
@@ -10,32 +11,39 @@ from companion.core.agenda import (
     AgendaNumbers,
     OpenNeed,
     aimed_question,
-    next_way,
+    approaches_for,
+    describe_need,
+    next_approach,
     open_needs,
     plan_agenda,
     rank_explorations,
     tries_with_nothing,
     try_outcome,
 )
+from companion.core.condition_coverage import VALUES_TO_LEARN
 from companion.core.models import (
     AgendaChanges,
+    Audience,
     CatalogPattern,
+    Condition,
     Curiosity,
     CuriosityAim,
     CuriositySensitivity,
     CuriosityState,
     EvidenceKind,
     Exploration,
+    ExplorationApproach,
     ExplorationNeed,
     ExplorationState,
     ExplorationTry,
-    ExplorationWay,
     Observation,
     ObservationDirection,
     PatternState,
     Relationship,
     SituationSetting,
     SituationTags,
+    Stakes,
+    StateGoingIn,
     ThoughtExperiment,
     ThoughtExperimentDetails,
     ThreadReaction,
@@ -60,7 +68,11 @@ PATTERN_TYPES = {
     )
 }
 NUMBERS = AgendaNumbers(
-    size=3, wait=timedelta(days=3), rest_after_tries=4, thought_experiments_per_week=1
+    size=3,
+    wait=timedelta(days=3),
+    rest_after_tries=4,
+    thought_experiments_per_week=1,
+    one_sided_stories=2,
 )
 
 
@@ -73,6 +85,11 @@ def observation(
     conversation_id: UUID = EARLIER,
     tagged_at: datetime = NOW - timedelta(days=10),
     relationship: Relationship | None = Relationship.FAMILY,
+    audience: Audience | None = None,
+    stakes: Stakes | None = None,
+    state_going_in: StateGoingIn | None = None,
+    situational: bool = False,
+    excluded: bool = False,
 ) -> Observation:
     """A clear real story for CONF.AVOID.BELONG at home, unless changed."""
     return Observation(
@@ -89,13 +106,20 @@ def observation(
         thread_id=None,
         about="their sister",
         tags=SituationTags(
-            relationship=relationship, power=None, setting=setting, stance=None
+            relationship=relationship,
+            power=None,
+            setting=setting,
+            stance=None,
+            audience=audience,
+            stakes=stakes,
+            state_going_in=state_going_in,
         ),
         evidence_kind=EvidenceKind.REAL_STORY,
         second_pattern_type_id=second,
         second_pattern_type_version="0.1.0" if second else None,
-        situational=False,
+        situational=situational,
         tagged_at=tagged_at,
+        excluded=excluded,
     )
 
 
@@ -137,13 +161,14 @@ def exploration(
 def asked(
     of: Exploration,
     need: ExplorationNeed = ExplorationNeed.COUNTER_TEST,
-    way: ExplorationWay = ExplorationWay.STORY_FOLLOW_UP,
+    approach: ExplorationApproach = ExplorationApproach.STORY_FOLLOW_UP,
     days_ago: int = 5,
     conversation_id: UUID = EARLIER,
     reaction: ThreadReaction | None = ThreadReaction.ENGAGED,
     outcome: TryOutcome | None = TryOutcome.VAGUE,
     aimed_at: Observation | None = None,
-    part_of_life: SituationSetting | None = None,
+    condition: Condition | None = None,
+    condition_value: str | None = None,
     state: CuriosityState = CuriosityState.RAISED,
     thought_experiment: ThoughtExperiment | None = None,
 ) -> tuple[Curiosity, ExplorationTry]:
@@ -171,10 +196,11 @@ def asked(
         exploration_id=of.id,
         user_id=USER_ID,
         need=need,
-        way=way,
+        approach=approach,
         created_at=curiosity.created_at,
         observation_id=aimed_at.id if aimed_at else None,
-        part_of_life=part_of_life,
+        condition=condition,
+        condition_value=condition_value,
         outcome=outcome if raised_at else None,
         thought_experiment_id=thought_experiment.id if thought_experiment else None,
     )
@@ -233,37 +259,188 @@ def keep(
     )
 
 
-def test_unclear_stories_come_first_then_a_missing_part_then_a_counter_test() -> None:
-    older_unclear = observation(second=WORTH, days_ago=9)
-    newer_unclear = observation(second=WORTH, days_ago=2)
-    at_work = observation(setting=SituationSetting.WORK)
+def needs_of(
+    observations: list[Observation],
+    tries: list[ExplorationTry] | None = None,
+    one_sided_stories: int = 2,
+) -> list[OpenNeed]:
+    """The open needs of a Pattern with these Observations and tries."""
+    return open_needs(observations, tries or [], one_sided_stories)
 
-    needs = open_needs([older_unclear, at_work, newer_unclear], [])
+
+def group_story(days_ago: int = 0, **changes: Any) -> Observation:
+    """A clear story for the Pattern in a group, with nothing else tagged."""
+    return observation(
+        **{
+            "setting": None,
+            "relationship": None,
+            "audience": Audience.GROUP,
+            "days_ago": days_ago,
+            **changes,
+        }
+    )
+
+
+def test_unclear_stories_come_first_then_a_counter_test_then_a_condition() -> None:
+    older_unclear = observation(second=WORTH, days_ago=9, setting=None)
+    newer_unclear = observation(second=WORTH, days_ago=2, setting=None)
+    older_at_home = observation(days_ago=6)
+    newer_at_home = observation(days_ago=4)
+
+    needs = needs_of([older_unclear, older_at_home, newer_unclear, newer_at_home])
 
     assert needs == [
         OpenNeed(ExplorationNeed.UNCLEAR, observation=newer_unclear),
         OpenNeed(ExplorationNeed.UNCLEAR, observation=older_unclear),
-        OpenNeed(ExplorationNeed.MISSING_PART, part_of_life=SituationSetting.SOCIAL),
-        OpenNeed(ExplorationNeed.COUNTER_TEST, observation=at_work),
+        OpenNeed(ExplorationNeed.COUNTER_TEST, observation=newer_at_home),
+        OpenNeed(
+            ExplorationNeed.MISSING_CONDITION,
+            observation=newer_at_home,
+            condition=Condition.RELATIONSHIP,
+            value="friend",
+        ),
     ]
 
 
-def test_a_part_of_life_is_missing_only_while_another_is_seen() -> None:
-    nowhere = observation(setting=None)
-    everywhere = [
-        observation(setting=SituationSetting.HOME),
-        observation(setting=SituationSetting.WORK),
-        observation(setting=SituationSetting.SOCIAL),
+def missing(needs: list[OpenNeed]) -> list[tuple[Condition | None, str | None]]:
+    """The Condition and value of each missing-Condition need."""
+    return [
+        (need.condition, need.value)
+        for need in needs
+        if need.need == ExplorationNeed.MISSING_CONDITION
     ]
 
-    assert [need.need for need in open_needs([nowhere], [])] == [
-        ExplorationNeed.COUNTER_TEST
+
+def test_one_story_alone_is_not_one_sided() -> None:
+    assert missing(needs_of([group_story()])) == []
+
+
+def test_two_stories_sharing_a_value_open_a_need_for_a_value_not_seen() -> None:
+    assert missing(needs_of([group_story(1), group_story(2)])) == [
+        (Condition.AUDIENCE, "one-to-one")
     ]
-    assert [need.need for need in open_needs(everywhere, [])] == [
-        ExplorationNeed.COUNTER_TEST
+
+
+def test_the_admin_set_number_of_stories_makes_a_condition_one_sided() -> None:
+    stories = [group_story(1), group_story(2)]
+
+    assert missing(needs_of(stories, one_sided_stories=3)) == []
+    assert missing(needs_of([*stories, group_story(3)], one_sided_stories=3)) == [
+        (Condition.AUDIENCE, "one-to-one")
     ]
-    [missing, _] = open_needs([observation(setting=SituationSetting.HOME)], [])
-    assert missing.part_of_life == SituationSetting.WORK
+
+
+def test_two_stories_with_different_values_are_not_one_sided() -> None:
+    stories = [group_story(1), group_story(2, audience=Audience.ONE_TO_ONE)]
+
+    assert missing(needs_of(stories)) == []
+
+
+def test_a_value_already_seen_against_is_not_what_to_learn() -> None:
+    stories = [
+        group_story(1),
+        group_story(2),
+        group_story(
+            3, audience=Audience.ONE_TO_ONE, direction=ObservationDirection.AGAINST
+        ),
+    ]
+
+    assert missing(needs_of(stories)) == [(Condition.AUDIENCE, "in front of others")]
+
+
+def test_a_condition_with_every_value_seen_is_no_need() -> None:
+    stories = [
+        group_story(1, audience=None, stakes=Stakes.HIGH),
+        group_story(2, audience=None, stakes=Stakes.HIGH),
+        group_story(
+            3,
+            audience=None,
+            stakes=Stakes.LOW,
+            direction=ObservationDirection.AGAINST,
+        ),
+    ]
+
+    assert missing(needs_of(stories)) == []
+
+
+def test_of_two_one_sided_conditions_only_the_one_with_most_stories_is_a_need() -> None:
+    stories = [
+        group_story(1, stakes=Stakes.HIGH),
+        group_story(2, audience=None, stakes=Stakes.HIGH),
+        group_story(3, stakes=Stakes.HIGH),
+    ]
+
+    assert missing(needs_of(stories)) == [(Condition.STAKES, "low")]
+
+
+def test_a_tie_between_one_sided_conditions_goes_by_a_fixed_order() -> None:
+    stories = [
+        group_story(1, stakes=Stakes.HIGH, setting=SituationSetting.WORK),
+        group_story(2, stakes=Stakes.HIGH, setting=SituationSetting.WORK),
+    ]
+
+    assert missing(needs_of(stories)) == [(Condition.AUDIENCE, "one-to-one")]
+
+
+def test_home_work_and_social_are_asked_about_by_the_same_rule() -> None:
+    at_home = [
+        observation(days_ago=1, relationship=None),
+        observation(days_ago=2, relationship=None),
+    ]
+    seen_apart = [
+        observation(setting=SituationSetting.HOME, relationship=None),
+        observation(setting=SituationSetting.WORK, relationship=None),
+    ]
+
+    assert missing(needs_of(at_home)) == [(Condition.SETTING, "work")]
+    assert missing(needs_of(seen_apart)) == []
+    assert missing(needs_of([observation(relationship=None)])) == []
+
+
+def test_unclear_situational_and_excluded_stories_never_make_it_one_sided() -> None:
+    clear = group_story(1)
+    not_clear = [
+        group_story(2, second=WORTH),
+        group_story(3, situational=True),
+        group_story(4, excluded=True),
+    ]
+
+    assert missing(needs_of([clear, *not_clear])) == []
+
+
+def test_a_useful_try_closes_that_value_for_good_and_the_next_one_opens() -> None:
+    its = exploration(pattern())
+    stories = [group_story(1), group_story(2)]
+    _, useful = asked(
+        its,
+        need=ExplorationNeed.MISSING_CONDITION,
+        condition=Condition.AUDIENCE,
+        condition_value="one-to-one",
+        outcome=TryOutcome.USEFUL,
+    )
+    _, vague = asked(
+        its,
+        need=ExplorationNeed.MISSING_CONDITION,
+        condition=Condition.AUDIENCE,
+        condition_value="one-to-one",
+        outcome=TryOutcome.VAGUE,
+    )
+
+    assert missing(needs_of(stories, [vague])) == [(Condition.AUDIENCE, "one-to-one")]
+    assert missing(needs_of(stories, [useful])) == [
+        (Condition.AUDIENCE, "in front of others")
+    ]
+
+
+def test_a_state_need_starts_from_no_story() -> None:
+    worn_out = [
+        group_story(1, audience=None, state_going_in=StateGoingIn.WORN_OUT),
+        group_story(2, audience=None, state_going_in=StateGoingIn.WORN_OUT),
+    ]
+
+    [_, need] = needs_of(worn_out)
+
+    assert (need.condition, need.observation) == (Condition.STATE_GOING_IN, None)
 
 
 def test_the_counter_test_closes_with_evidence_against_or_a_useful_counter_test() -> (
@@ -275,64 +452,68 @@ def test_the_counter_test_closes_with_evidence_against_or_a_useful_counter_test(
     _, useful = asked(its, outcome=TryOutcome.USEFUL)
     _, vague = asked(its, outcome=TryOutcome.VAGUE)
 
-    assert open_needs([story, against], []) == []
-    assert open_needs([story], [useful]) == []
-    assert open_needs([story], [vague]) == [
+    assert needs_of([story, against]) == []
+    assert needs_of([story], [useful]) == []
+    assert needs_of([story], [vague]) == [
         OpenNeed(ExplorationNeed.COUNTER_TEST, observation=story)
     ]
 
 
-def test_each_try_at_a_need_moves_to_a_different_way_least_pushy_first() -> None:
+def test_each_try_at_a_need_moves_to_a_different_approach_least_pushy_first() -> None:
     its = exploration(pattern())
     need = OpenNeed(ExplorationNeed.COUNTER_TEST)
-    first = asked(its, way=ExplorationWay.STORY_FOLLOW_UP, days_ago=9)
-    second = asked(its, way=ExplorationWay.OTHER_PERSON, days_ago=5)
-    third = asked(its, way=ExplorationWay.THOUGHT_EXPERIMENT, days_ago=4)
-    fourth = asked(its, way=ExplorationWay.NOTICE_THIS_WEEK, days_ago=2)
+    first = asked(its, approach=ExplorationApproach.STORY_FOLLOW_UP, days_ago=9)
+    second = asked(its, approach=ExplorationApproach.WOULD_IT_DIFFER, days_ago=5)
+    third = asked(its, approach=ExplorationApproach.THOUGHT_EXPERIMENT, days_ago=4)
+    fourth = asked(its, approach=ExplorationApproach.NOTICE_THIS_WEEK, days_ago=2)
 
-    def way_after(*tried: tuple[Curiosity, ExplorationTry]) -> ExplorationWay:
-        return next_way(
+    def approach_after(*tried: tuple[Curiosity, ExplorationTry]) -> ExplorationApproach:
+        return next_approach(
             need,
             [attempt for _, attempt in tried],
             {c.id: c.raised_at for c, _ in tried if c.raised_at},
         )
 
-    assert way_after() == ExplorationWay.STORY_FOLLOW_UP
-    assert way_after(first) == ExplorationWay.OTHER_PERSON
-    assert way_after(first, second) == ExplorationWay.THOUGHT_EXPERIMENT
-    assert way_after(first, second, third) == ExplorationWay.NOTICE_THIS_WEEK
-    assert way_after(first, second, third, fourth) == ExplorationWay.STORY_FOLLOW_UP
-
-
-def test_after_a_useful_try_the_same_way_is_used_again() -> None:
-    its = exploration(pattern())
-    curiosity, useful = asked(
-        its, way=ExplorationWay.OTHER_PERSON, outcome=TryOutcome.USEFUL
+    assert approach_after() == ExplorationApproach.STORY_FOLLOW_UP
+    assert approach_after(first) == ExplorationApproach.WOULD_IT_DIFFER
+    assert approach_after(first, second) == ExplorationApproach.THOUGHT_EXPERIMENT
+    assert approach_after(first, second, third) == ExplorationApproach.NOTICE_THIS_WEEK
+    assert (
+        approach_after(first, second, third, fourth)
+        == ExplorationApproach.STORY_FOLLOW_UP
     )
 
-    way = next_way(
+
+def test_after_a_useful_try_the_same_approach_is_used_again() -> None:
+    its = exploration(pattern())
+    curiosity, useful = asked(
+        its, approach=ExplorationApproach.WOULD_IT_DIFFER, outcome=TryOutcome.USEFUL
+    )
+
+    approach = next_approach(
         OpenNeed(ExplorationNeed.COUNTER_TEST), [useful], {curiosity.id: NOW}
     )
 
-    assert way == ExplorationWay.OTHER_PERSON
+    assert approach == ExplorationApproach.WOULD_IT_DIFFER
 
 
-def test_a_try_at_another_need_does_not_move_this_ones_way() -> None:
+def test_a_try_at_another_need_does_not_move_this_ones_approach() -> None:
     its = exploration(pattern())
     story = observation(second=WORTH)
     curiosity, at_work = asked(
         its,
-        need=ExplorationNeed.MISSING_PART,
-        part_of_life=SituationSetting.WORK,
+        need=ExplorationNeed.MISSING_CONDITION,
+        condition=Condition.SETTING,
+        condition_value="work",
     )
 
-    way = next_way(
+    approach = next_approach(
         OpenNeed(ExplorationNeed.UNCLEAR, observation=story),
         [at_work],
         {curiosity.id: NOW},
     )
 
-    assert way == ExplorationWay.STORY_FOLLOW_UP
+    assert approach == ExplorationApproach.STORY_FOLLOW_UP
 
 
 @pytest.mark.parametrize(
@@ -409,9 +590,9 @@ def test_a_suspected_pattern_gets_an_exploration_and_an_aimed_curiosity() -> Non
     )
     assert "Conflict" not in curiosity.question + curiosity.why
     [attempt] = planned.new_tries
-    assert (attempt.need, attempt.way, attempt.observation_id) == (
+    assert (attempt.need, attempt.approach, attempt.observation_id) == (
         ExplorationNeed.UNCLEAR,
-        ExplorationWay.STORY_FOLLOW_UP,
+        ExplorationApproach.STORY_FOLLOW_UP,
         story.id,
     )
 
@@ -492,7 +673,9 @@ def test_new_evidence_from_the_conversation_makes_a_try_useful() -> None:
     assert judged.outcome == TryOutcome.USEFUL
 
 
-def test_after_a_try_with_nothing_the_next_is_a_different_way_after_the_wait() -> None:
+def test_after_a_try_with_nothing_the_next_is_a_different_approach_after_the_wait() -> (
+    None
+):
     suspected = pattern()
     story = observation(second=WORTH, days_ago=6)
     its = exploration(suspected)
@@ -509,9 +692,9 @@ def test_after_a_try_with_nothing_the_next_is_a_different_way_after_the_wait() -
     [curiosity] = planned.new_curiosities
     assert curiosity.not_before == date(2026, 11, 26)
     [attempt] = planned.new_tries
-    assert (attempt.need, attempt.way) == (
+    assert (attempt.need, attempt.approach) == (
         ExplorationNeed.UNCLEAR,
-        ExplorationWay.OTHER_PERSON,
+        ExplorationApproach.WOULD_IT_DIFFER,
     )
 
 
@@ -520,13 +703,13 @@ def test_after_a_useful_try_the_next_has_no_wait() -> None:
     its = exploration(suspected)
     tried = asked(
         its,
-        need=ExplorationNeed.MISSING_PART,
-        part_of_life=SituationSetting.WORK,
         outcome=TryOutcome.USEFUL,
         days_ago=1,
     )
 
-    [curiosity] = keep([suspected], [observation()], [its], [tried]).new_curiosities
+    stories = [group_story(2), group_story(3)]
+
+    [curiosity] = keep([suspected], stories, [its], [tried]).new_curiosities
 
     assert curiosity.not_before is None
 
@@ -536,8 +719,6 @@ def test_a_waiting_aimed_curiosity_for_the_top_need_is_left_alone() -> None:
     its = exploration(suspected)
     waiting = asked(
         its,
-        need=ExplorationNeed.MISSING_PART,
-        part_of_life=SituationSetting.WORK,
         state=CuriosityState.WAITING,
     )
 
@@ -555,8 +736,6 @@ def test_a_waiting_aimed_curiosity_no_longer_aimed_at_the_top_need_is_replaced()
     unclear = observation(second=WORTH)
     waiting = asked(
         its,
-        need=ExplorationNeed.MISSING_PART,
-        part_of_life=SituationSetting.WORK,
         state=CuriosityState.WAITING,
     )
 
@@ -579,8 +758,6 @@ def test_it_rests_after_the_tries_with_nothing_and_frees_its_place() -> None:
     )
     waiting = asked(
         next_in_line,
-        need=ExplorationNeed.MISSING_PART,
-        part_of_life=SituationSetting.WORK,
         state=CuriosityState.WAITING,
     )
 
@@ -649,28 +826,213 @@ def test_an_exploration_whose_pattern_is_no_longer_suspected_leaves_the_agenda()
     assert planned.new_curiosities == []
 
 
-@pytest.mark.parametrize("need", list(ExplorationNeed))
+CONDITION_NEEDS = [
+    OpenNeed(
+        ExplorationNeed.MISSING_CONDITION,
+        observation=None if condition == Condition.STATE_GOING_IN else observation(),
+        condition=condition,
+        value=value,
+    )
+    for condition, values in VALUES_TO_LEARN.items()
+    for value in values
+]
+
+
 @pytest.mark.parametrize(
-    "way", [way for way in ExplorationWay if way != ExplorationWay.THOUGHT_EXPERIMENT]
+    "open_need",
+    [
+        OpenNeed(ExplorationNeed.UNCLEAR, observation=observation()),
+        OpenNeed(ExplorationNeed.COUNTER_TEST, observation=observation()),
+        OpenNeed(ExplorationNeed.COUNTER_TEST),
+        *CONDITION_NEEDS,
+    ],
 )
 def test_every_aimed_question_is_written_by_code_without_the_pattern(
-    need: ExplorationNeed, way: ExplorationWay
+    open_need: OpenNeed,
 ) -> None:
     belong = PATTERN_TYPES[BELONG]
-    open_need = OpenNeed(
-        need,
-        observation=observation() if need != ExplorationNeed.MISSING_PART else None,
-        part_of_life=SituationSetting.WORK
-        if need == ExplorationNeed.MISSING_PART
-        else None,
+
+    for approach in approaches_for(open_need):
+        if approach == ExplorationApproach.THOUGHT_EXPERIMENT:
+            continue
+        question, why = aimed_question(open_need, approach, belong)
+
+        assert question.startswith(("Ask", "Go back"))
+        assert why
+        assert belong.name not in question + why + describe_need(open_need)
+        assert "I said yes again" not in question + why + describe_need(open_need)
+
+
+def test_a_condition_is_asked_by_three_approaches_and_never_a_thought_experiment() -> (
+    None
+):
+    its = exploration(pattern())
+    need = OpenNeed(
+        ExplorationNeed.MISSING_CONDITION,
+        observation=observation(),
+        condition=Condition.AUDIENCE,
+        value="one-to-one",
+    )
+    tried = [
+        asked(
+            its,
+            need=ExplorationNeed.MISSING_CONDITION,
+            condition=Condition.AUDIENCE,
+            condition_value="one-to-one",
+            approach=approach,
+            days_ago=days_ago,
+        )
+        for approach, days_ago in [
+            (ExplorationApproach.STORY_FOLLOW_UP, 9),
+            (ExplorationApproach.WOULD_IT_DIFFER, 6),
+            (ExplorationApproach.NOTICE_THIS_WEEK, 3),
+        ]
+    ]
+
+    def after(count: int) -> ExplorationApproach:
+        return next_approach(
+            need,
+            [attempt for _, attempt in tried[:count]],
+            {c.id: c.raised_at for c, _ in tried[:count] if c.raised_at},
+        )
+
+    assert [after(count) for count in range(4)] == [
+        ExplorationApproach.STORY_FOLLOW_UP,
+        ExplorationApproach.WOULD_IT_DIFFER,
+        ExplorationApproach.NOTICE_THIS_WEEK,
+        ExplorationApproach.STORY_FOLLOW_UP,
+    ]
+
+
+def test_the_would_it_differ_question_names_the_value_to_learn() -> None:
+    need = OpenNeed(
+        ExplorationNeed.MISSING_CONDITION,
+        observation=observation(),
+        condition=Condition.STAKES,
+        value="low",
     )
 
-    question, why = aimed_question(open_need, way, belong)
+    question, _ = aimed_question(
+        need, ExplorationApproach.WOULD_IT_DIFFER, PATTERN_TYPES[BELONG]
+    )
 
-    assert question.startswith(("Ask", "Go back"))
-    assert why
-    assert belong.name not in question + why
-    assert "I said yes again" not in question
+    assert question.endswith(
+        "Ask whether it would have gone differently if less had been riding on it."
+    )
+
+
+def test_a_state_gap_is_asked_openly_never_by_would_it_differ_and_names_no_state() -> (
+    None
+):
+    need = OpenNeed(
+        ExplorationNeed.MISSING_CONDITION,
+        condition=Condition.STATE_GOING_IN,
+        value="steady",
+    )
+    state_words = [
+        word for state in StateGoingIn for word in (state.value, "tired", "stress")
+    ]
+
+    assert approaches_for(need) == (
+        ExplorationApproach.STORY_FOLLOW_UP,
+        ExplorationApproach.NOTICE_THIS_WEEK,
+    )
+    for approach in approaches_for(need):
+        question, why = aimed_question(need, approach, PATTERN_TYPES[BELONG])
+        written = (question + why + describe_need(need)).lower()
+        assert "how they were doing going into it" in question
+        assert not [word for word in state_words if word in written]
+
+
+def test_a_one_sided_pattern_gets_an_aimed_question_once_it_was_counter_tested() -> (
+    None
+):
+    suspected = pattern()
+    its = exploration(suspected)
+    counter_test = asked(its, outcome=TryOutcome.USEFUL, days_ago=6)
+    newest = group_story(1)
+
+    planned = keep([suspected], [newest, group_story(2)], [its], [counter_test])
+
+    [curiosity] = planned.new_curiosities
+    [attempt] = planned.new_tries
+    assert (
+        attempt.need,
+        attempt.approach,
+        attempt.condition,
+        attempt.condition_value,
+        attempt.observation_id,
+    ) == (
+        ExplorationNeed.MISSING_CONDITION,
+        ExplorationApproach.STORY_FOLLOW_UP,
+        Condition.AUDIENCE,
+        "one-to-one",
+        newest.id,
+    )
+    assert "one-to-one, with just one other person" in curiosity.question
+    assert curiosity.not_before is None
+
+
+def condition_try(its: Exploration, **changes: Any) -> tuple[Curiosity, ExplorationTry]:
+    """A try at learning how it goes one-to-one, vague unless changed."""
+    return asked(
+        its,
+        **{
+            "need": ExplorationNeed.MISSING_CONDITION,
+            "condition": Condition.AUDIENCE,
+            "condition_value": "one-to-one",
+            **changes,
+        },
+    )
+
+
+def test_a_condition_try_with_nothing_leads_to_the_next_approach_after_the_wait() -> (
+    None
+):
+    suspected = pattern()
+    its = exploration(suspected)
+    tried = [
+        asked(its, outcome=TryOutcome.USEFUL, days_ago=9),
+        condition_try(its, days_ago=1),
+    ]
+
+    planned = keep([suspected], [group_story(3), group_story(4)], [its], tried)
+
+    [curiosity] = planned.new_curiosities
+    [attempt] = planned.new_tries
+    assert (attempt.approach, attempt.condition_value) == (
+        ExplorationApproach.WOULD_IT_DIFFER,
+        "one-to-one",
+    )
+    assert curiosity.not_before == TODAY + timedelta(days=2)
+
+
+def test_a_condition_is_never_asked_about_two_conversations_in_a_row() -> None:
+    suspected = pattern()
+    its = exploration(suspected)
+    tried = [
+        asked(its, outcome=TryOutcome.USEFUL, days_ago=9),
+        condition_try(its, days_ago=0, conversation_id=ENDED, outcome=None),
+    ]
+
+    planned = keep([suspected], [group_story(3), group_story(4)], [its], tried)
+
+    assert planned.new_curiosities == []
+
+
+def test_condition_tries_with_nothing_rest_the_exploration() -> None:
+    suspected = pattern()
+    its = exploration(suspected)
+    tried = [
+        asked(its, outcome=TryOutcome.USEFUL, days_ago=20),
+        *[condition_try(its, days_ago=days_ago) for days_ago in (12, 9, 6, 3)],
+    ]
+
+    planned = keep([suspected], [group_story(13), group_story(14)], [its], tried)
+
+    [changed] = planned.changed
+    assert changed.state == ExplorationState.RESTING
+    assert planned.new_curiosities == []
 
 
 def unclear_story_tried_twice(
@@ -682,14 +1044,14 @@ def unclear_story_tried_twice(
             its,
             need=ExplorationNeed.UNCLEAR,
             aimed_at=story,
-            way=ExplorationWay.STORY_FOLLOW_UP,
+            approach=ExplorationApproach.STORY_FOLLOW_UP,
             days_ago=10,
         ),
         asked(
             its,
             need=ExplorationNeed.UNCLEAR,
             aimed_at=story,
-            way=ExplorationWay.OTHER_PERSON,
+            approach=ExplorationApproach.WOULD_IT_DIFFER,
             days_ago=8,
         ),
     ]
@@ -710,9 +1072,9 @@ def test_after_another_person_an_unclear_story_gets_a_thought_experiment() -> No
     )
 
     [attempt] = planned.new_tries
-    assert (attempt.need, attempt.way, attempt.thought_experiment_id) == (
+    assert (attempt.need, attempt.approach, attempt.thought_experiment_id) == (
         ExplorationNeed.UNCLEAR,
-        ExplorationWay.THOUGHT_EXPERIMENT,
+        ExplorationApproach.THOUGHT_EXPERIMENT,
         worth_one.id,
     )
     [curiosity] = planned.new_curiosities
@@ -722,7 +1084,7 @@ def test_after_another_person_an_unclear_story_gets_a_thought_experiment() -> No
     assert PATTERN_TYPES[BELONG].name not in curiosity.question + curiosity.why
 
 
-def test_with_none_to_ask_the_next_way_is_used() -> None:
+def test_with_none_to_ask_the_next_approach_is_used() -> None:
     suspected = pattern()
     story = observation(second=WORTH, days_ago=12)
     its = exploration(suspected)
@@ -740,8 +1102,8 @@ def test_with_none_to_ask_the_next_way_is_used() -> None:
     )
 
     [attempt] = planned.new_tries
-    assert (attempt.way, attempt.thought_experiment_id) == (
-        ExplorationWay.NOTICE_THIS_WEEK,
+    assert (attempt.approach, attempt.thought_experiment_id) == (
+        ExplorationApproach.NOTICE_THIS_WEEK,
         None,
     )
 
@@ -756,14 +1118,14 @@ def test_never_more_than_the_admin_set_number_a_week_for_a_pattern() -> None:
             its,
             need=ExplorationNeed.UNCLEAR,
             aimed_at=story,
-            way=ExplorationWay.OTHER_PERSON,
+            approach=ExplorationApproach.WOULD_IT_DIFFER,
             days_ago=10,
         ),
         asked(
             its,
             need=ExplorationNeed.UNCLEAR,
             aimed_at=story,
-            way=ExplorationWay.THOUGHT_EXPERIMENT,
+            approach=ExplorationApproach.THOUGHT_EXPERIMENT,
             days_ago=4,
             outcome=TryOutcome.USEFUL,
             thought_experiment=asked_one,
@@ -781,8 +1143,8 @@ def test_never_more_than_the_admin_set_number_a_week_for_a_pattern() -> None:
         thought_experiments=options,
     )
 
-    assert limited.new_tries[0].way == ExplorationWay.NOTICE_THIS_WEEK
-    assert raised.new_tries[0].way == ExplorationWay.THOUGHT_EXPERIMENT
+    assert limited.new_tries[0].approach == ExplorationApproach.NOTICE_THIS_WEEK
+    assert raised.new_tries[0].approach == ExplorationApproach.THOUGHT_EXPERIMENT
     assert raised.new_tries[0].thought_experiment_id == options[1].id
 
 
@@ -790,8 +1152,8 @@ def test_a_counter_test_never_gets_a_thought_experiment() -> None:
     suspected = pattern()
     its = exploration(suspected)
     tried = [
-        asked(its, way=ExplorationWay.STORY_FOLLOW_UP, days_ago=10),
-        asked(its, way=ExplorationWay.OTHER_PERSON, days_ago=8),
+        asked(its, approach=ExplorationApproach.STORY_FOLLOW_UP, days_ago=10),
+        asked(its, approach=ExplorationApproach.WOULD_IT_DIFFER, days_ago=8),
     ]
 
     planned = keep(
@@ -803,9 +1165,9 @@ def test_a_counter_test_never_gets_a_thought_experiment() -> None:
     )
 
     [attempt] = planned.new_tries
-    assert (attempt.need, attempt.way) == (
+    assert (attempt.need, attempt.approach) == (
         ExplorationNeed.COUNTER_TEST,
-        ExplorationWay.NOTICE_THIS_WEEK,
+        ExplorationApproach.NOTICE_THIS_WEEK,
     )
 
 
@@ -818,7 +1180,7 @@ def test_a_waiting_thought_experiment_switched_off_or_archived_is_closed() -> No
         its,
         need=ExplorationNeed.UNCLEAR,
         aimed_at=story,
-        way=ExplorationWay.THOUGHT_EXPERIMENT,
+        approach=ExplorationApproach.THOUGHT_EXPERIMENT,
         state=CuriosityState.WAITING,
         thought_experiment=archived,
     )

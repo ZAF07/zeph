@@ -1013,8 +1013,9 @@ MADE_UP_OBSERVATION_FIELDS = [
     ),
     ShapeField(
         "setting",
-        "Part of life",
-        "Where it happened. The Agenda asks about a part of life not seen yet.",
+        "Setting",
+        "Where it happened. The Agenda asks about a setting not seen yet once "
+        "the stories are one-sided.",
         FieldKind.CHOICE,
         options=[
             ChoiceOption("home", "Home"),
@@ -1037,16 +1038,49 @@ MADE_UP_OBSERVATION_FIELDS = [
             ChoiceOption("stranger", "Stranger"),
         ],
     ),
+    ShapeField(
+        "audience",
+        "Audience",
+        "Who else was there. Leave empty when the story doesn't say.",
+        FieldKind.CHOICE,
+        options=[
+            ChoiceOption("one-to-one", "One-to-one"),
+            ChoiceOption("group", "Group"),
+            ChoiceOption("in front of others", "In front of others"),
+        ],
+    ),
+    ShapeField(
+        "stakes",
+        "Stakes",
+        "Whether something that matters to them could be lost. Leave empty "
+        "when the story doesn't say.",
+        FieldKind.CHOICE,
+        options=[ChoiceOption("low", "Low"), ChoiceOption("high", "High")],
+    ),
+    ShapeField(
+        "state_going_in",
+        "State going in",
+        "How they were before it happened. Leave empty when the story doesn't say.",
+        FieldKind.CHOICE,
+        options=[
+            ChoiceOption("worn out", "Worn out"),
+            ChoiceOption("under pressure", "Under pressure"),
+            ChoiceOption("low", "Low"),
+            ChoiceOption("steady", "Steady"),
+        ],
+    ),
 ]
 
 EXPLORATION_NEED_OPTIONS = [
     ChoiceOption("unclear", "An unclear story"),
-    ChoiceOption("missing_part", "A missing part of life"),
     ChoiceOption("counter_test", "A counter-test"),
+    ChoiceOption("missing_condition", "A missing Condition"),
 ]
 
 STORY_FOLLOW_UP_OPTION = ChoiceOption("story_follow_up", "Story follow-up")
-OTHER_PERSON_OPTION = ChoiceOption("other_person", "Would it differ with someone else")
+WOULD_IT_DIFFER_OPTION = ChoiceOption(
+    "would_it_differ", "Would it have gone differently"
+)
 NOTICE_THIS_WEEK_OPTION = ChoiceOption("notice_this_week", "Notice this week")
 
 MADE_UP_PATTERNS_FIELD = group_list_field(
@@ -1078,7 +1112,7 @@ MADE_UP_PATTERNS_FIELD = group_list_field(
             "tries",
             "Tries already made",
             "Aimed Curiosities Zeph already asked about it. The Agenda picks "
-            "the next way from the last one, waits after one with nothing "
+            "the next Approach from the last one, waits after one with nothing "
             "and never tries two Conversations in a row.",
             "Try",
             [
@@ -1093,14 +1127,14 @@ MADE_UP_PATTERNS_FIELD = group_list_field(
                     default="unclear",
                 ),
                 ShapeField(
-                    "way",
-                    "Way",
+                    "approach",
+                    "Approach",
                     "How it asked.",
                     FieldKind.CHOICE,
                     required=True,
                     options=[
                         STORY_FOLLOW_UP_OPTION,
-                        OTHER_PERSON_OPTION,
+                        WOULD_IT_DIFFER_OPTION,
                         NOTICE_THIS_WEEK_OPTION,
                     ],
                     default="story_follow_up",
@@ -1434,13 +1468,13 @@ UNDERSTANDING_EXPECT_FIELD = ShapeField(
             options=EXPLORATION_NEED_OPTIONS,
         ),
         ShapeField(
-            "aimed_way",
-            "Aimed way",
+            "aimed_approach",
+            "Aimed Approach",
             "Reply Plan: how the aimed Curiosity it brings up must ask.",
             FieldKind.CHOICE,
             options=[
                 STORY_FOLLOW_UP_OPTION,
-                OTHER_PERSON_OPTION,
+                WOULD_IT_DIFFER_OPTION,
                 ChoiceOption("thought_experiment", "A Thought Experiment"),
                 NOTICE_THIS_WEEK_OPTION,
             ],

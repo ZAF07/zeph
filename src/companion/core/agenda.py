@@ -3,28 +3,39 @@ from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 from uuid import UUID, uuid4
 
+from companion.core.condition_coverage import (
+    condition_value,
+    coverage_of,
+    is_clear,
+    missing_condition,
+)
 from companion.core.memory_retrieval import format_day
 from companion.core.models import (
     AgendaChanges,
+    Audience,
     CatalogPattern,
     CatalogPatternType,
+    Condition,
     Curiosity,
     CuriosityAim,
     CuriositySensitivity,
     CuriosityState,
     Exploration,
+    ExplorationApproach,
     ExplorationNeed,
     ExplorationState,
     ExplorationTry,
-    ExplorationWay,
     Feature,
     Observation,
     ObservationDirection,
     PatternState,
     PatternType,
     PlatformSettings,
+    Power,
     Relationship,
     SituationSetting,
+    Stakes,
+    Stance,
     ThoughtExperiment,
     ThreadReaction,
     TryOutcome,
@@ -41,6 +52,7 @@ from companion.core.pattern_scoring import (
 )
 from companion.core.platform_settings import (
     AGENDA_SIZE,
+    CONDITION_ONE_SIDED_STORIES,
     EXPLORATION_REST_AFTER_TRIES,
     EXPLORATION_WAIT,
     THOUGHT_EXPERIMENTS_PER_PATTERN_PER_WEEK,
@@ -55,40 +67,110 @@ from companion.core.thought_experiments import (
 )
 from companion.core.timing import users_today
 
-PARTS_OF_LIFE = (SituationSetting.HOME, SituationSetting.WORK, SituationSetting.SOCIAL)
-WAYS = (
-    ExplorationWay.STORY_FOLLOW_UP,
-    ExplorationWay.OTHER_PERSON,
-    ExplorationWay.THOUGHT_EXPERIMENT,
-    ExplorationWay.NOTICE_THIS_WEEK,
+APPROACHES = (
+    ExplorationApproach.STORY_FOLLOW_UP,
+    ExplorationApproach.WOULD_IT_DIFFER,
+    ExplorationApproach.THOUGHT_EXPERIMENT,
+    ExplorationApproach.NOTICE_THIS_WEEK,
 )
-NEED_ORDER = (
-    ExplorationNeed.UNCLEAR,
-    ExplorationNeed.MISSING_PART,
-    ExplorationNeed.COUNTER_TEST,
+CONDITION_APPROACHES = (
+    ExplorationApproach.STORY_FOLLOW_UP,
+    ExplorationApproach.WOULD_IT_DIFFER,
+    ExplorationApproach.NOTICE_THIS_WEEK,
+)
+STATE_APPROACHES = (
+    ExplorationApproach.STORY_FOLLOW_UP,
+    ExplorationApproach.NOTICE_THIS_WEEK,
 )
 NOTHING_USEFUL = frozenset({TryOutcome.VAGUE, TryOutcome.BRUSHED_OFF})
-PART_WORDS = {
-    SituationSetting.HOME: "at home",
-    SituationSetting.WORK: "at work",
-    SituationSetting.SOCIAL: "with friends",
+CONDITION_WORDS: Mapping[tuple[Condition, str], tuple[str, str]] = {
+    (Condition.AUDIENCE, Audience.ONE_TO_ONE.value): (
+        "one-to-one, with just one other person",
+        "it had been just the two of them",
+    ),
+    (Condition.AUDIENCE, Audience.GROUP.value): (
+        "in a group",
+        "it had been in a group",
+    ),
+    (Condition.AUDIENCE, Audience.IN_FRONT_OF_OTHERS.value): (
+        "with other people watching",
+        "other people had been watching",
+    ),
+    (Condition.STAKES, Stakes.LOW.value): (
+        "with little riding on it",
+        "less had been riding on it",
+    ),
+    (Condition.STAKES, Stakes.HIGH.value): (
+        "with a lot riding on it",
+        "more had been riding on it",
+    ),
+    (Condition.RELATIONSHIP, Relationship.FRIEND.value): (
+        "with a friend",
+        "it had been with a friend",
+    ),
+    (Condition.RELATIONSHIP, Relationship.COLLEAGUE.value): (
+        "with a colleague",
+        "it had been with a colleague",
+    ),
+    (Condition.RELATIONSHIP, Relationship.FAMILY.value): (
+        "with family",
+        "it had been with family",
+    ),
+    (Condition.RELATIONSHIP, Relationship.PARTNER.value): (
+        "with a partner",
+        "it had been with a partner",
+    ),
+    (Condition.POWER, Power.ABOVE.value): (
+        "with someone above them",
+        "it had been with someone above them",
+    ),
+    (Condition.POWER, Power.EQUAL.value): (
+        "with someone on their own level",
+        "it had been with someone on their own level",
+    ),
+    (Condition.POWER, Power.BELOW.value): (
+        "with someone who looks up to them or answers to them",
+        "it had been with someone who looks up to them or answers to them",
+    ),
+    (Condition.STANCE, Stance.SUPPORTIVE.value): (
+        "with the other person on their side",
+        "the other person had been on their side",
+    ),
+    (Condition.STANCE, Stance.NEUTRAL.value): (
+        "with the other person neither for nor against them",
+        "the other person had been neither for nor against them",
+    ),
+    (Condition.STANCE, Stance.HOSTILE.value): (
+        "with the other person against them",
+        "the other person had been against them",
+    ),
+    (Condition.SETTING, SituationSetting.HOME.value): (
+        "at home",
+        "it had happened at home",
+    ),
+    (Condition.SETTING, SituationSetting.WORK.value): (
+        "at work",
+        "it had happened at work",
+    ),
+    (Condition.SETTING, SituationSetting.SOCIAL.value): (
+        "out with friends",
+        "it had happened out with friends",
+    ),
 }
-PERSON_FOR_PART = {
-    SituationSetting.HOME: "family",
-    SituationSetting.WORK: "a colleague",
-    SituationSetting.SOCIAL: "a friend",
-}
+STATE_OPENLY = (
+    "Ask openly, and name no mood or state yourself: let them say how they were."
+)
 OTHER_PEOPLE = (
     (Relationship.FRIEND, "a friend"),
     (Relationship.COLLEAGUE, "a colleague"),
     (Relationship.FAMILY, "family"),
     (Relationship.PARTNER, "a partner"),
 )
-WAY_WORDS = {
-    ExplorationWay.STORY_FOLLOW_UP: "story follow-up",
-    ExplorationWay.OTHER_PERSON: "would it differ with someone else",
-    ExplorationWay.THOUGHT_EXPERIMENT: "a Thought Experiment",
-    ExplorationWay.NOTICE_THIS_WEEK: "notice this week",
+APPROACH_WORDS = {
+    ExplorationApproach.STORY_FOLLOW_UP: "story follow-up",
+    ExplorationApproach.WOULD_IT_DIFFER: "would it have gone differently",
+    ExplorationApproach.THOUGHT_EXPERIMENT: "a Thought Experiment",
+    ExplorationApproach.NOTICE_THIS_WEEK: "notice this week",
 }
 OUTCOME_WORDS = {
     TryOutcome.USEFUL: "useful",
@@ -104,13 +186,17 @@ class OpenNeed:
     Attributes:
         need: The kind of need.
         observation: The Observation it is about: the unclear one, or the
-            story a counter-test starts from; None otherwise.
-        part_of_life: The part of life not seen yet; None otherwise.
+            story a counter-test or a missing Condition starts from; None
+            otherwise, and always None for the state going in.
+        condition: The Condition whose stories are one-sided; None otherwise.
+        value: The value of it not seen yet, which is what to learn; None
+            otherwise.
     """
 
     need: ExplorationNeed
     observation: Observation | None = None
-    part_of_life: SituationSetting | None = None
+    condition: Condition | None = None
+    value: str | None = None
 
 
 @dataclass(frozen=True)
@@ -123,12 +209,15 @@ class AgendaNumbers:
         rest_after_tries: Tries with nothing in a row before resting.
         thought_experiments_per_week: The most Thought Experiments asked for
             one Pattern in 7 days.
+        one_sided_stories: Clear stories for a Pattern sharing one value of
+            a Condition before another value is worth asking about.
     """
 
     size: int
     wait: timedelta
     rest_after_tries: int
     thought_experiments_per_week: int
+    one_sided_stories: int
 
 
 @dataclass(frozen=True)
@@ -226,20 +315,84 @@ def counter_tested(
     )
 
 
-def open_needs(
+def closed_condition_values(
+    tries: Sequence[ExplorationTry],
+) -> set[tuple[Condition, str]]:
+    """Name the Condition values an Exploration already learned about.
+
+    Args:
+        tries: Its tries.
+
+    Returns:
+        Each Condition and value a missing-Condition try came back useful
+        for. Such a value is never asked about again.
+    """
+    return {
+        (attempt.condition, attempt.condition_value)
+        for attempt in tries
+        if attempt.need == ExplorationNeed.MISSING_CONDITION
+        and attempt.outcome == TryOutcome.USEFUL
+        and attempt.condition is not None
+        and attempt.condition_value is not None
+    }
+
+
+def missing_condition_need(
     observations: Sequence[Observation],
     tries: Sequence[ExplorationTry],
-) -> list[OpenNeed]:
-    """Work out what an Exploration still needs to learn from its Observations.
-
-    Unclear stories come first, newest first; then a part of life (home,
-    work, with friends) not seen yet while another is; then a counter-test,
-    open until an Observation against comes or a counter-test try was
-    useful.
+    one_sided_stories: int,
+) -> OpenNeed | None:
+    """Work out the one Condition value an Exploration should ask about.
 
     Args:
         observations: The Observations of its Pattern.
         tries: Its tries.
+        one_sided_stories: The Admin-set number of stories to be one-sided.
+
+    Returns:
+        The need, with the newest clear story for the Pattern that says the
+        Condition to start from (none for the state going in, which is
+        never asked about from a story that already says it); None when no
+        Condition is one-sided with a value left to learn.
+    """
+    missing = missing_condition(
+        coverage_of(observations), one_sided_stories, closed_condition_values(tries)
+    )
+    if missing is None:
+        return None
+    stories = [
+        observation
+        for observation in newest_first(observations)
+        if is_clear(observation)
+        and observation.direction == ObservationDirection.FOR
+        and condition_value(observation, missing.condition) is not None
+    ]
+    return OpenNeed(
+        ExplorationNeed.MISSING_CONDITION,
+        observation=(
+            None if missing.condition == Condition.STATE_GOING_IN else stories[0]
+        ),
+        condition=missing.condition,
+        value=missing.value,
+    )
+
+
+def open_needs(
+    observations: Sequence[Observation],
+    tries: Sequence[ExplorationTry],
+    one_sided_stories: int,
+) -> list[OpenNeed]:
+    """Work out what an Exploration still needs to learn from its Observations.
+
+    Unclear stories come first, newest first; then a counter-test, open
+    until an Observation against comes or a counter-test try was useful;
+    then a missing Condition: one value not seen yet of the Condition the
+    stories so far are most one-sided on.
+
+    Args:
+        observations: The Observations of its Pattern.
+        tries: Its tries.
+        one_sided_stories: The Admin-set number of stories to be one-sided.
 
     Returns:
         The open needs, in the order they are worked on.
@@ -249,10 +402,6 @@ def open_needs(
         for observation in newest_first(observations)
         if observation.unclear
     ]
-    seen = {observation.tags.setting for observation in observations}
-    missing = [part for part in PARTS_OF_LIFE if part not in seen]
-    if missing and len(missing) < len(PARTS_OF_LIFE):
-        needs.append(OpenNeed(ExplorationNeed.MISSING_PART, part_of_life=missing[0]))
     if not counter_tested(observations, tries):
         stories = [
             observation
@@ -265,30 +414,36 @@ def open_needs(
                 observation=stories[0] if stories else None,
             )
         )
+    missing = missing_condition_need(observations, tries, one_sided_stories)
+    if missing is not None:
+        needs.append(missing)
     return needs
 
 
 def aims_at(attempt: ExplorationTry, need: OpenNeed) -> bool:
     """Say whether a try aimed at this very need.
 
-    A counter-test is one need whichever story it starts from.
+    A counter-test is one need whichever story it starts from, and so is a
+    missing Condition's value.
 
     Args:
         attempt: The try.
         need: The open need.
 
     Returns:
-        True when it has the same kind and, except for a counter-test, the
-        same Observation or part of life.
+        True when it has the same kind and the same unclear Observation, or
+        the same Condition and value.
     """
     if attempt.need != need.need:
         return False
     if need.need == ExplorationNeed.COUNTER_TEST:
         return True
-    return (
-        attempt.observation_id == (need.observation.id if need.observation else None)
-        and attempt.part_of_life == need.part_of_life
-    )
+    if need.need == ExplorationNeed.MISSING_CONDITION:
+        return (attempt.condition, attempt.condition_value) == (
+            need.condition,
+            need.value,
+        )
+    return attempt.observation_id == (need.observation.id if need.observation else None)
 
 
 def tries_of(
@@ -324,16 +479,52 @@ def asked_in_order(
     )
 
 
-def next_way(
+def approaches_for(need: OpenNeed) -> tuple[ExplorationApproach, ...]:
+    """Name the Approaches a need may be asked by, least pushy first.
+
+    Args:
+        need: The open need.
+
+    Returns:
+        All four for an unclear story or a counter-test. A missing Condition
+        never gets a Thought Experiment, and the state going in never a
+        "would it have gone differently if" either, since that would name a
+        state before the User has.
+    """
+    if need.need != ExplorationNeed.MISSING_CONDITION:
+        return APPROACHES
+    if need.condition == Condition.STATE_GOING_IN:
+        return STATE_APPROACHES
+    return CONDITION_APPROACHES
+
+
+def approach_after(
+    approach: ExplorationApproach, need: OpenNeed
+) -> ExplorationApproach:
+    """Name the Approach that comes after another, round again after the last.
+
+    Args:
+        approach: The Approach.
+        need: The need it asks about.
+
+    Returns:
+        The next, a little pushier, Approach the need may be asked by.
+    """
+    allowed = approaches_for(need)
+    later = APPROACHES[APPROACHES.index(approach) + 1 :]
+    return next((other for other in later if other in allowed), allowed[0])
+
+
+def next_approach(
     need: OpenNeed,
     tries: Sequence[ExplorationTry],
     asked_at: Mapping[UUID, datetime],
-) -> ExplorationWay:
+) -> ExplorationApproach:
     """Pick how to ask about a need next, least pushy first.
 
     A try at the same need that came back with nothing moves on to the
-    next way, round again after the last, so the next try is a different
-    way; after a useful one the same way is used again.
+    next Approach, round again after the last, so the next try is a
+    different Approach; after a useful one the same Approach is used again.
 
     Args:
         need: The open need.
@@ -341,17 +532,17 @@ def next_way(
         asked_at: When each asked try's Curiosity was asked, by Curiosity ID.
 
     Returns:
-        The way to use next; the first if none was tried at this need.
+        The Approach to use next; the first if none was tried at this need.
     """
     asked = [
         attempt for attempt in asked_in_order(tries, asked_at) if aims_at(attempt, need)
     ]
     if not asked:
-        return WAYS[0]
+        return approaches_for(need)[0]
     last = asked[-1]
     if last.outcome not in NOTHING_USEFUL:
-        return last.way
-    return way_after(last.way)
+        return last.approach
+    return approach_after(last.approach, need)
 
 
 def try_outcome(
@@ -478,14 +669,65 @@ def describe_story(observation: Observation) -> str:
     )
 
 
+def condition_question(
+    need: OpenNeed, approach: ExplorationApproach, moment: str
+) -> tuple[str, str]:
+    """Write the question and why for a missing Condition's value.
+
+    The state going in is asked about openly: no state is ever named.
+
+    Args:
+        need: The missing-Condition need.
+        approach: Its Approach.
+        moment: The Pattern Type's situation, as "a moment like this: …".
+
+    Returns:
+        The question, as a plain instruction, and why Zeph wonders.
+    """
+    if need.condition is None or need.value is None:
+        raise ValueError("A missing-Condition need names a Condition and a value")
+    if need.condition == Condition.STATE_GOING_IN:
+        why = "Zeph doesn't know yet how they are doing going into these moments."
+        if approach == ExplorationApproach.NOTICE_THIS_WEEK:
+            return (
+                f"Ask them, lightly, to notice this week, in {moment}, how they "
+                f"were doing going into it. {STATE_OPENLY}",
+                why,
+            )
+        return (
+            f"Ask about a recent time, {moment}, and how they were doing going "
+            f"into it. {STATE_OPENLY}",
+            why,
+        )
+    where, if_it_had = CONDITION_WORDS[(need.condition, need.value)]
+    why = f"Zeph hasn't heard how this goes for them {where} yet."
+    if approach == ExplorationApproach.STORY_FOLLOW_UP:
+        return (
+            f"Ask about a recent time {where}, {moment}. What happened, and "
+            "what did they do?",
+            why,
+        )
+    if approach == ExplorationApproach.WOULD_IT_DIFFER and need.observation:
+        return (
+            f"Go back to {describe_story(need.observation)}. Ask whether it "
+            f"would have gone differently if {if_it_had}.",
+            why,
+        )
+    return (
+        f"Ask them, lightly, to notice this week whether it's the same {where}, "
+        f"in {moment}, and what they do then.",
+        why,
+    )
+
+
 def aimed_question(
-    need: OpenNeed, way: ExplorationWay, pattern_type: PatternType
+    need: OpenNeed, approach: ExplorationApproach, pattern_type: PatternType
 ) -> tuple[str, str]:
     """Write an aimed Curiosity's question and why, for the model to word.
 
     Args:
         need: The need it aims at.
-        way: How it asks.
+        approach: Its Approach: how it asks.
         pattern_type: The Pattern's Pattern Type, for its situation.
 
     Returns:
@@ -496,13 +738,13 @@ def aimed_question(
     story = describe_story(need.observation) if need.observation else ""
     if need.need == ExplorationNeed.UNCLEAR and need.observation is not None:
         why = "What drove it isn't clear yet, and how they answer would tell."
-        if way == ExplorationWay.STORY_FOLLOW_UP:
+        if approach == ExplorationApproach.STORY_FOLLOW_UP:
             return (
                 f"Go back to {story}. Ask what they did next, and what they "
                 "were most hoping would or wouldn't happen then.",
                 why,
             )
-        if way == ExplorationWay.OTHER_PERSON:
+        if approach == ExplorationApproach.WOULD_IT_DIFFER:
             return (
                 f"Go back to {story}. Ask whether it would have gone differently "
                 f"with someone else, like {other_person(need.observation)}.",
@@ -513,28 +755,10 @@ def aimed_question(
             "through their mind first, and what they do.",
             why,
         )
-    if need.need == ExplorationNeed.MISSING_PART and need.part_of_life is not None:
-        part = PART_WORDS[need.part_of_life]
-        why = f"Zeph hasn't heard how this goes for them {part} yet."
-        if way == ExplorationWay.STORY_FOLLOW_UP:
-            return (
-                f"Ask about a recent time {part}, {moment}. What happened, and "
-                "what did they do?",
-                why,
-            )
-        if way == ExplorationWay.OTHER_PERSON:
-            return (
-                f"Ask whether it goes the same way {part}, say with "
-                f"{PERSON_FOR_PART[need.part_of_life]}, in {moment}.",
-                why,
-            )
-        return (
-            f"Ask them, lightly, to notice this week {part} {moment}, and what "
-            "they do then.",
-            why,
-        )
+    if need.need == ExplorationNeed.MISSING_CONDITION:
+        return condition_question(need, approach, moment)
     why = "To learn when it doesn't happen, not only when it does."
-    if way == ExplorationWay.STORY_FOLLOW_UP:
+    if approach == ExplorationApproach.STORY_FOLLOW_UP:
         if need.observation is not None:
             return (
                 f"Go back to {story}. Ask whether there was a time in a similar "
@@ -547,7 +771,7 @@ def aimed_question(
             "from usual.",
             why,
         )
-    if way == ExplorationWay.OTHER_PERSON:
+    if approach == ExplorationApproach.WOULD_IT_DIFFER:
         if need.observation is not None:
             return (
                 f"Go back to {story}. Ask whether they would have done the same "
@@ -713,7 +937,7 @@ def next_state(
 def aimed_curiosity(
     exploration: Exploration,
     need: OpenNeed,
-    way: ExplorationWay,
+    approach: ExplorationApproach,
     pattern_type: PatternType,
     not_before: date | None,
     user_id: UUID,
@@ -725,13 +949,14 @@ def aimed_curiosity(
     Args:
         exploration: The Exploration.
         need: Its top open need.
-        way: How to ask.
+        approach: Its Approach: how to ask.
         pattern_type: Its Pattern's Pattern Type.
         not_before: The first day it may be asked; None for any day.
         user_id: The User.
         now: When it is written.
         thought_experiment: The Thought Experiment it puts to the User, for
-            that way; None otherwise. Its wording and sensitivity are used.
+            that Approach; None otherwise. Its wording and sensitivity are
+            used.
 
     Returns:
         The Curiosity, waiting, and its try, not yet asked.
@@ -739,7 +964,7 @@ def aimed_curiosity(
     question, why = (
         thought_experiment_question(thought_experiment)
         if thought_experiment
-        else aimed_question(need, way, pattern_type)
+        else aimed_question(need, approach, pattern_type)
     )
     curiosity = Curiosity(
         id=uuid4(),
@@ -763,10 +988,11 @@ def aimed_curiosity(
         exploration_id=exploration.id,
         user_id=user_id,
         need=need.need,
-        way=way,
+        approach=approach,
         created_at=now,
         observation_id=need.observation.id if need.observation else None,
-        part_of_life=need.part_of_life,
+        condition=need.condition,
+        condition_value=need.value,
         thought_experiment_id=thought_experiment.id if thought_experiment else None,
     )
 
@@ -921,7 +1147,9 @@ def next_try_for(
     waiting = [attempt for attempt in its_tries if attempt.curiosity_id in waiting_ids]
     pattern_type = agenda.pattern_types.get(exploration.pattern_type_id)
     needs = open_needs(
-        observations_of(exploration.pattern_type_id, agenda.observations), its_tries
+        observations_of(exploration.pattern_type_id, agenda.observations),
+        its_tries,
+        numbers.one_sided_stories,
     )
     top = needs[0] if needs else None
     if (
@@ -951,36 +1179,27 @@ def next_try_for(
     )
     if len(closed) < len(waiting) or tried_here:
         return closed, None
-    way = next_way(top, its_tries, asked_at)
+    approach = next_approach(top, its_tries, asked_at)
     thought_experiment = (
         thought_experiment_for(exploration, top, its_tries, agenda, numbers)
-        if way == ExplorationWay.THOUGHT_EXPERIMENT
+        if approach == ExplorationApproach.THOUGHT_EXPERIMENT
         else None
     )
-    if way == ExplorationWay.THOUGHT_EXPERIMENT and thought_experiment is None:
-        way = way_after(way)
+    if (
+        approach == ExplorationApproach.THOUGHT_EXPERIMENT
+        and thought_experiment is None
+    ):
+        approach = approach_after(approach, top)
     return closed, aimed_curiosity(
         exploration,
         top,
-        way,
+        approach,
         pattern_type,
         not_before_after(its_tries, asked_at, numbers.wait, agenda.time_zone),
         agenda.user_id,
         agenda.now,
         thought_experiment,
     )
-
-
-def way_after(way: ExplorationWay) -> ExplorationWay:
-    """Name the way that comes after another, round again after the last.
-
-    Args:
-        way: The way.
-
-    Returns:
-        The next, a little pushier, way.
-    """
-    return WAYS[(WAYS.index(way) + 1) % len(WAYS)]
 
 
 def thought_experiment_for(
@@ -992,7 +1211,7 @@ def thought_experiment_for(
 ) -> ThoughtExperiment | None:
     """Pick the Thought Experiment an Exploration's next try puts to the User.
 
-    Only an unclear need is tried this way, since a Thought Experiment tells
+    Only an unclear need is tried by this Approach, since a Thought Experiment tells
     two look-alike Pattern Types apart, and only while fewer than the
     Admin-set number were asked for its Pattern in the last 7 days.
 
@@ -1069,6 +1288,7 @@ def agenda_numbers(settings: PlatformSettings) -> AgendaNumbers:
         thought_experiments_per_week=settings.get(
             THOUGHT_EXPERIMENTS_PER_PATTERN_PER_WEEK
         ),
+        one_sided_stories=settings.get(CONDITION_ONE_SIDED_STORIES),
     )
 
 
@@ -1203,12 +1423,19 @@ def describe_need(need: OpenNeed) -> str:
         need: The open need.
 
     Returns:
-        E.g. "how it goes for them at work, not heard yet".
+        E.g. "how it goes for them at work, not heard yet". The state going
+        in is put openly, with no state named.
     """
     if need.need == ExplorationNeed.UNCLEAR and need.observation is not None:
         return f"what drove {describe_story(need.observation)}, still unclear"
-    if need.need == ExplorationNeed.MISSING_PART and need.part_of_life is not None:
-        return f"how it goes for them {PART_WORDS[need.part_of_life]}, not heard yet"
+    if need.condition == Condition.STATE_GOING_IN:
+        return (
+            "how they were doing going into it, asked openly and never naming "
+            "a mood or state yourself"
+        )
+    if need.condition is not None and need.value is not None:
+        where, _ = CONDITION_WORDS[(need.condition, need.value)]
+        return f"how it goes for them {where}, not heard yet"
     return "a time it didn't happen, when it might have"
 
 
@@ -1247,7 +1474,7 @@ def describe_agenda(entries: Sequence[AgendaEntry], time_zone: str | None) -> st
         )
         tries = "\n".join(
             f"  - {format_day(asked.curiosity.raised_at, time_zone)}, "
-            f"{WAY_WORDS[asked.attempt.way]}: {asked.curiosity.question} "
+            f"{APPROACH_WORDS[asked.attempt.approach]}: {asked.curiosity.question} "
             f"({outcome_words(asked.attempt.outcome)})"
             for asked in entry.earlier_tries
             if asked.curiosity.raised_at is not None
@@ -1362,6 +1589,7 @@ class AgendaReader:
                     open_needs(
                         observations_of(exploration.pattern_type_id, observations),
                         tries_of(exploration, tries),
+                        snapshot.settings.get(CONDITION_ONE_SIDED_STORIES),
                     )
                 ),
                 earlier_tries=tuple(

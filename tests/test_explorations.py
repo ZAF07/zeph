@@ -10,13 +10,14 @@ from sqlalchemy import Engine, text
 from companion.adapters.postgres.database import migrate
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.core.models import (
+    Condition,
     CuriosityAim,
     CuriosityState,
     Exploration,
+    ExplorationApproach,
     ExplorationNeed,
     ExplorationState,
     ExplorationTry,
-    ExplorationWay,
     TryOutcome,
 )
 from companion.core.timing import users_today
@@ -63,6 +64,7 @@ AGENDA_SETTINGS = (
     "agenda_size",
     "exploration_wait_days",
     "exploration_rest_after_tries",
+    "condition_one_sided_stories",
 )
 AGENDA_HEADER = "What you are exploring about them (the Agenda)"
 MEI_STORY_POINTER = "Go back to what they told you about Mei, their sister on"
@@ -166,9 +168,14 @@ def test_a_suspected_pattern_gets_an_exploration_and_an_aimed_curiosity(
     unclear = next(o for o in observations_of(client.engine, user_id) if o.unclear)
     assert curiosity.source_observation_id == unclear.id
     [attempt] = tries_of(client.engine, user_id)
-    assert (attempt.need, attempt.way, attempt.observation_id, attempt.outcome) == (
+    assert (
+        attempt.need,
+        attempt.approach,
+        attempt.observation_id,
+        attempt.outcome,
+    ) == (
         ExplorationNeed.UNCLEAR,
-        ExplorationWay.STORY_FOLLOW_UP,
+        ExplorationApproach.STORY_FOLLOW_UP,
         unclear.id,
         None,
     )
@@ -299,7 +306,7 @@ def test_an_answer_that_settles_the_unclear_story_is_tagged_clear_and_useful(
     assert curiosity.reaction is not None
 
 
-def test_never_two_conversations_in_a_row_and_a_try_with_nothing_waits_a_new_way(
+def test_never_two_conversations_in_a_row_and_a_try_with_nothing_waits_a_new_approach(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -337,9 +344,9 @@ def test_never_two_conversations_in_a_row_and_a_try_with_nothing_waits_a_new_way
     end_now(chat_model, clock, scheduler, seeded_settings)
 
     _, next_try = tries_of(client.engine, user_id)
-    assert (next_try.need, next_try.way) == (
+    assert (next_try.need, next_try.approach) == (
         ExplorationNeed.UNCLEAR,
-        ExplorationWay.OTHER_PERSON,
+        ExplorationApproach.WOULD_IT_DIFFER,
     )
     _, next_curiosity = aimed_of(client.engine, user_id)
     assert next_curiosity.question.startswith(MEI_STORY_POINTER)
@@ -497,6 +504,7 @@ def test_every_agenda_number_is_a_setting_with_a_hint_and_an_eval_override(
         "agenda_size": 3,
         "exploration_wait_days": 3,
         "exploration_rest_after_tries": 4,
+        "condition_one_sided_stories": 2,
     }
     assert all(settings[key]["hint"] for key in AGENDA_SETTINGS)
     assert set(AGENDA_SETTINGS) <= {setting["key"] for setting in choices["settings"]}
@@ -562,3 +570,152 @@ def test_no_agenda_is_kept_while_curiosities_is_off(
 
     assert explorations_of(client.engine, user_id) == []
     assert aimed_of(client.engine, user_id) == []
+
+
+def test_a_pattern_seen_only_in_a_group_gets_a_question_about_one_to_one(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    """The Pattern is held back from ready, so it stays on the Agenda."""
+    connect_telegram(client, auth_verifier, chat_channel)
+    user_id = turn_exploring_on(client, auth_verifier)
+    change_settings(client, auth_verifier, {"pattern_ready_situations": 9})
+    end_tagged_conversation(
+        client,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+        observation_entry(audience="group"),
+        {**CLEAR_WORK, "audience": "group"},
+    )
+    clock.advance(timedelta(days=1))
+    talk(
+        client,
+        chat_model,
+        clock,
+        "hey",
+        need="Think it through",
+        bring_up=[{"curiosity": 1, "how": "weave"}],
+    )
+    answer = "with the whole family there I just went along with it again"
+    talk(client, chat_model, clock, answer, curiosity_taken="engaged")
+    end_now(
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+        observations=[observation_entry(quote=answer, audience="group")],
+    )
+    [counter_test] = tries_of(client.engine, user_id)
+    assert (counter_test.need, counter_test.outcome) == (
+        ExplorationNeed.COUNTER_TEST,
+        TryOutcome.USEFUL,
+    )
+
+    clock.advance(timedelta(hours=5))
+    saw = talk(client, chat_model, clock, "back again")
+    end_now(chat_model, clock, scheduler, seeded_settings)
+
+    assert (
+        "Still to learn: how it goes for them one-to-one, with just one other "
+        "person, not heard yet." in saw
+    )
+    _, attempt = tries_of(client.engine, user_id)
+    assert (
+        attempt.need,
+        attempt.approach,
+        attempt.condition,
+        attempt.condition_value,
+    ) == (
+        ExplorationNeed.MISSING_CONDITION,
+        ExplorationApproach.STORY_FOLLOW_UP,
+        Condition.AUDIENCE,
+        "one-to-one",
+    )
+    _, curiosity = aimed_of(client.engine, user_id)
+    assert curiosity.state == CuriosityState.WAITING
+    assert curiosity.question.startswith(
+        "Ask about a recent time one-to-one, with just one other person"
+    )
+    assert "Softening disagreement" not in curiosity.question + curiosity.why
+
+
+def test_the_approach_migration_keeps_every_try_and_renames_stored_eval_cases(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+    database_url: str,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    user_id = turn_exploring_on(client, auth_verifier)
+    suspect_belonging(client, chat_model, clock, scheduler, seeded_settings)
+    old_case = {
+        "memory": {
+            "patterns": [{"tries": [{"need": "missing_part", "way": "other_person"}]}]
+        },
+        "messages": [
+            {"text": "hi", "expect": {"aimed_way": "story_follow_up"}},
+        ],
+    }
+
+    downgrade_to(database_url, "0110")
+    try:
+        with client.engine.begin() as connection:
+            connection.execute(
+                text(
+                    "UPDATE exploration_tries SET way = 'other_person', "
+                    "need = 'missing_part', part_of_life = 'work'"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO eval_cases (key, eval, content, edited, "
+                    "created_at, updated_at) VALUES ('an-admins-case', "
+                    "'understanding', CAST(:content AS JSONB), true, now(), now())"
+                ),
+                {"content": json.dumps(old_case)},
+            )
+    finally:
+        migrate(database_url)
+
+    [attempt] = tries_of(client.engine, user_id)
+    assert (
+        attempt.need,
+        attempt.approach,
+        attempt.condition,
+        attempt.condition_value,
+    ) == (
+        ExplorationNeed.MISSING_CONDITION,
+        ExplorationApproach.WOULD_IT_DIFFER,
+        Condition.SETTING,
+        "work",
+    )
+    with client.engine.begin() as connection:
+        content = connection.execute(
+            text("SELECT content FROM eval_cases WHERE key = 'an-admins-case'")
+        ).scalar_one()
+        connection.execute(text("DELETE FROM eval_cases WHERE key = 'an-admins-case'"))
+    assert content == {
+        "memory": {
+            "patterns": [
+                {
+                    "tries": [
+                        {"need": "missing_condition", "approach": "would_it_differ"}
+                    ]
+                }
+            ]
+        },
+        "messages": [
+            {"text": "hi", "expect": {"aimed_approach": "story_follow_up"}},
+        ],
+    }

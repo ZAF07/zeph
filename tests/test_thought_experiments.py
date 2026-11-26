@@ -11,7 +11,7 @@ from companion.adapters.postgres.database import migrate, seed_thought_experimen
 from companion.core.models import (
     CuriosityState,
     EvidenceKind,
-    ExplorationWay,
+    ExplorationApproach,
     TryOutcome,
 )
 from companion.core.thought_experiments import leading_flags
@@ -330,8 +330,8 @@ def test_the_thought_experiment_for_the_unclear_pair_is_asked_and_tagged_what_if
     team_plan = first_seeded(client, admin)
 
     *_, third = tries_of(client.engine, user_id)
-    assert (third.way, str(third.thought_experiment_id)) == (
-        ExplorationWay.THOUGHT_EXPERIMENT,
+    assert (third.approach, str(third.thought_experiment_id)) == (
+        ExplorationApproach.THOUGHT_EXPERIMENT,
         team_plan["id"],
     )
     *_, curiosity = aimed_of(client.engine, user_id)
