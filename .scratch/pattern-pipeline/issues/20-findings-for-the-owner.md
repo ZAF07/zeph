@@ -967,7 +967,6 @@ Settles from the sections above: 02 "Curiosity Check-ins ignore pace and backing
 - **Impact:** small: the instruction code writes already says to name no state. The line is a second guard.
 - **Suggested fix:** merge the two sentences in by hand after the deploy, with the other pending merges (`named_pattern`, `asked_for_patterns`).
 - **Corrected 26 Nov 2026:** not needed for the next deploy. Prod goes from migration 0078 to 0112 in one go, the old migrations wipe this prompt first, so the new seed text loads whole and no "Kept the stored" line is logged. See "Open now" in `docs/PROMPT_EDITS_AND_DEPLOYS_GUIDE.md`.
-- [ ] Owner merged the new Reply Plan prompt lines on production
 
 ## 40 — The directness setting also sets how Zeph asks (2026-11-26)
 
