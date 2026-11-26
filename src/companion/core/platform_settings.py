@@ -367,6 +367,7 @@ EXPLORATION_WAIT = Setting("exploration_wait_days", read_days)
 EXPLORATION_REST_AFTER_TRIES = Setting(
     "exploration_rest_after_tries", read_whole_number
 )
+CONDITION_ONE_SIDED_STORIES = Setting("condition_one_sided_stories", read_whole_number)
 THOUGHT_EXPERIMENTS_PER_PATTERN_PER_WEEK = Setting(
     "thought_experiments_per_pattern_per_week", read_whole_number
 )
@@ -1723,8 +1724,8 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         minimum=0,
         maximum=365,
         hint=(
-            "Days before an Exploration is tried again, a different way, after "
-            "an aimed Curiosity came back vague or brushed off."
+            "Days before an Exploration is tried again, by a different "
+            "Approach, after an aimed Curiosity came back vague or brushed off."
         ),
     ),
     EditableSetting(
@@ -1737,6 +1738,19 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
             "After this many tries in a row with nothing useful, an Exploration "
             "rests and frees its place on the Agenda. A new Observation for its "
             "Pattern wakes it."
+        ),
+    ),
+    EditableSetting(
+        CONDITION_ONE_SIDED_STORIES.key,
+        "Stories that make a Condition one-sided",
+        SettingKind.WHOLE_NUMBER,
+        minimum=2,
+        maximum=50,
+        hint=(
+            "Zeph asks about a Condition (who was there, the stakes, the "
+            "setting and so on) only once this many clear stories for a "
+            "suspected Pattern share one value of it, and another value was "
+            "never seen. Higher means Zeph asks about Conditions later."
         ),
     ),
     EditableSetting(

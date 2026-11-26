@@ -875,6 +875,59 @@ Settles from the sections above: 02 "Curiosity Check-ins ignore pace and backing
 - **Suggested fix:** the owner decides what each should expect now ("nothing", or "for · situational" with stakes high), following `docs/pattern-evals/adding-tagging-cases.md`.
 - [ ] Owner corrected the two `ctrl-anyone-` cases
 
+## 43 — Zeph asks about a missing Condition (2026-11-26)
+
+### A missing Condition is only asked about while the Pattern is held back from ready
+
+- **Kind:** decision for the owner
+- **What:** the counter-test comes before the missing Condition (D6), and a Pattern that passes the ready gate leaves the Agenda. So once the counter-test is answered, Zeph asks about a Condition only if another check (situations, Conversations, score…) still holds the Pattern back.
+- **Impact:** for a Pattern with plenty of evidence the Condition question is never asked; the gap is then only said when sharing (issue 44).
+- **Suggested fix:** leave it and see in real use. If Conditions should be learned before sharing, add a ready check "nothing one-sided left to ask", or put the missing Condition ahead of the counter-test. An hour or two; the owner's call.
+
+### Relationship and setting will be the usual one-sided Condition
+
+- **Kind:** risk
+- **What:** only the Condition with the most stories behind it is a need. Relationship and setting are tagged on nearly every story; audience, stakes and state only when said. On a tie the order is audience, stakes, relationship, power, stance, setting, state (my choice; the issue said "a fixed order").
+- **Impact:** audience, stakes and state are asked about mostly when relationship and setting are already mixed.
+- **Suggested fix:** leave it, or prefer the three newer Conditions outright. Minutes (`CONDITION_ORDER` and the pick in `missing_condition`).
+
+### One Condition can be asked about several times
+
+- **Kind:** decision for the owner
+- **What:** a useful try closes one value. If the stories stay one-sided, the next unseen value of the same Condition opens (friend, then colleague, then partner). When a Condition has nothing left, the next most one-sided Condition becomes the need. State is the exception: one useful try closes every state, since the question is the same.
+- **Impact:** more questions about Conditions over weeks than "one at a time" may suggest, still inside the usual limits (wait, rest, never two Conversations in a row).
+- **Suggested fix:** leave it, or close the whole Condition after one useful try. Minutes.
+
+### A "would it have gone differently" answer is weak evidence only if the model says so
+
+- **Kind:** known limit
+- **What:** code forces "what if" only for an answer to a numbered Thought Experiment. An answer to "would it have gone differently if…" is a "what if" answer when the tagging model marks it so.
+- **Impact:** such an answer could be kept as a real story and count in full.
+- **Suggested fix:** show the tagging step the "would it differ" questions asked in the Conversation, numbered like Thought Experiments, so code can force the kind. About an hour.
+
+### The Reply Plan often doesn't pick the aimed Curiosity on a light opener
+
+- **Kind:** owner task
+- **What:** in Eval Runs `8a0bf7b9` and `fda65a7a`, on "kind of bored, talk to me" only deepseek-flash asked the one-to-one question; Haiku, Opus and deepseek-pro asked about the evening. In the running app flash asked it on the same opener.
+- **Impact:** none on correctness: code wrote the right question each time. It shows how often the model takes the moment, which differs by model.
+- **Suggested fix:** the owner corrects the three drafted cases (which opener, which rules), and uses Repeats before reading much into one run.
+- [ ] Owner corrected the three `agenda-condition-` and `agenda-state-` cases
+
+### The Judge's "never names a pattern" rule fails ordinary lines
+
+- **Kind:** owner task
+- **What:** it failed "that happens a lot" (Haiku) and a question about what a "nothing" night turns into (flash, first run).
+- **Impact:** false fails on Agenda cases.
+- **Suggested fix:** tighten the rule's wording in `understanding.yaml` so it is about Zeph claiming a tendency of theirs. Minutes.
+
+### The production Reply Plan prompt will be kept, without the new line
+
+- **Kind:** owner task
+- **What:** migration 0111 reloads `reply_plan_prompt` unless edited. Production's is edited, so it stays and the log says "Kept the stored reply_plan_prompt". The new seed text says "Approach" and "When it says to ask openly how they were doing, never offer a mood or state yourself".
+- **Impact:** small: the instruction code writes already says to name no state. The line is a second guard.
+- **Suggested fix:** merge the two sentences in by hand after the deploy, with the other pending merges (`named_pattern`, `asked_for_patterns`).
+- [ ] Owner merged the new Reply Plan prompt lines on production
+
 ## Comments
 
 ### 25 Nov 2026 — first triage with the owner (sections 01 to 19)

@@ -3372,7 +3372,7 @@ ASKS_THE_AIMED_CURIOSITY = {
     "agenda_shown": True,
     "aimed_raised": True,
     "aimed_need": "unclear",
-    "aimed_way": "story_follow_up",
+    "aimed_approach": "story_follow_up",
     "aimed_pattern_type": "CONF.AVOID.BELONG",
 }
 
@@ -3440,7 +3440,7 @@ def test_an_understanding_case_s_agenda_and_aimed_curiosity_are_written_by_real_
         ("Reply Plan · agenda shown", True, "was shown the Agenda"),
         ("Reply Plan · aimed curiosity", True, "brought up the aimed Curiosity"),
         ("Reply Plan · aimed need", True, "aimed at an unclear story"),
-        ("Reply Plan · aimed way", True, "asked by story follow-up"),
+        ("Reply Plan · aimed Approach", True, "asked by story follow-up"),
         ("Reply Plan · aimed pattern type", True, "for CONF.AVOID.BELONG"),
     ]
     [reply_plan] = chat_model.reply_plan_calls
@@ -3481,7 +3481,7 @@ def test_an_understanding_case_fails_on_the_reply_plan_when_the_aim_is_left(
             "brought up no aimed Curiosity, expected aimed at an unclear story",
         ),
         (
-            "Reply Plan · aimed way",
+            "Reply Plan · aimed Approach",
             False,
             "brought up no aimed Curiosity, expected asked by story follow-up",
         ),
@@ -3505,11 +3505,11 @@ def test_a_try_already_made_lets_the_real_agenda_pick_a_thought_experiment(
         engine,
         agenda_case(
             "what-if",
-            {"aimed_raised": True, "aimed_way": "thought_experiment"},
+            {"aimed_raised": True, "aimed_approach": "thought_experiment"},
             tries=[
                 {
                     "need": "unclear",
-                    "way": "other_person",
+                    "approach": "would_it_differ",
                     "outcome": "vague",
                     "days_ago": 5,
                 }
@@ -3539,7 +3539,7 @@ def test_a_try_already_made_lets_the_real_agenda_pick_a_thought_experiment(
     assert result["outcome"] == "pass", result
     seen = chat_model.reply_plan_calls[-1].history[0].text
     assert wording in seen
-    assert "8 Nov 2026, would it differ with someone else: Go back to" in seen
+    assert "8 Nov 2026, would it have gone differently: Go back to" in seen
     assert "(vague)" in seen
 
 
@@ -3565,7 +3565,7 @@ def test_no_aimed_curiosity_waits_right_after_a_try_or_once_asked_to_drop(
             tries=[
                 {
                     "need": "unclear",
-                    "way": "story_follow_up",
+                    "approach": "story_follow_up",
                     "outcome": outcome,
                     "days_ago": days_ago,
                 }

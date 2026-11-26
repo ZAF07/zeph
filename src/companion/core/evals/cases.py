@@ -6,15 +6,18 @@ from typing import Any
 
 from companion.core.evals.case_shapes import InvalidFormError, read_time_of_day
 from companion.core.models import (
+    Audience,
     CuriositySensitivity,
+    ExplorationApproach,
     ExplorationNeed,
-    ExplorationWay,
     HowSure,
     MoveResult,
     MoveRole,
     ObservationDirection,
     Relationship,
     SituationSetting,
+    Stakes,
+    StateGoingIn,
     ThreadReaction,
     TryOutcome,
 )
@@ -24,7 +27,7 @@ AGENDA_EXPECTATIONS = (
     "agenda_shown",
     "aimed_raised",
     "aimed_need",
-    "aimed_way",
+    "aimed_approach",
     "aimed_pattern_type",
 )
 
@@ -353,8 +356,12 @@ class EvalObservation:
         second_pattern_type: The look-alike Pattern Type it couldn't be told
             apart from, which makes it unclear; None when it is clear.
         thread: The title of the Life Thread it belongs to; None for none.
-        setting: The part of life it happened in; None if not known.
+        setting: Where it happened; None if not known.
         relationship: Who the other person is to them; None if not known.
+        audience: Who else was there; None if not known.
+        stakes: Whether something that matters to them could be lost; None
+            if not known.
+        state_going_in: How they were before it happened; None if not known.
     """
 
     quote: str
@@ -367,6 +374,9 @@ class EvalObservation:
     thread: str | None = None
     setting: SituationSetting | None = None
     relationship: Relationship | None = None
+    audience: Audience | None = None
+    stakes: Stakes | None = None
+    state_going_in: StateGoingIn | None = None
 
 
 @dataclass(frozen=True)
@@ -375,7 +385,7 @@ class EvalTry:
 
     Attributes:
         need: What it aimed at.
-        way: How it asked.
+        approach: Its Approach: how it asked.
         outcome: How it came back.
         asked_to_drop: Whether the person asked Zeph to drop it, which the
             real Agenda code then rests the Exploration for.
@@ -383,7 +393,7 @@ class EvalTry:
     """
 
     need: ExplorationNeed
-    way: ExplorationWay
+    approach: ExplorationApproach
     outcome: TryOutcome
     asked_to_drop: bool = False
     days_ago: int = 1
@@ -489,7 +499,7 @@ class UnderstandingExpectations:
         aimed_raised: Whether it must bring up an aimed Curiosity, one the
             Agenda code wrote for an Exploration.
         aimed_need: The need that aimed Curiosity must aim at.
-        aimed_way: The way it must ask.
+        aimed_approach: The Approach it must ask by.
         aimed_pattern_type: The ID of the Pattern Type it must be for.
         asked_why: Whether it must gently ask why they feel as they do.
         knowledge: Whether it must choose Knowledge documents to search.
@@ -517,7 +527,7 @@ class UnderstandingExpectations:
     agenda_shown: bool | None = None
     aimed_raised: bool | None = None
     aimed_need: ExplorationNeed | None = None
-    aimed_way: ExplorationWay | None = None
+    aimed_approach: ExplorationApproach | None = None
     aimed_pattern_type: str = ""
     asked_why: bool | None = None
     knowledge: bool | None = None
@@ -877,13 +887,17 @@ def to_eval_observation(entry: dict[str, Any]) -> EvalObservation:
     Args:
         entry: `quote`, `sign`, `direction`, `context` and `about`, and
             optionally `days_ago`, `second_pattern_type`, `thread`,
-            `setting` and `relationship`.
+            `setting`, `relationship`, `audience`, `stakes` and
+            `state_going_in`.
 
     Returns:
         The Observation.
     """
     setting = entry.get("setting")
     relationship = entry.get("relationship")
+    audience = entry.get("audience")
+    stakes = entry.get("stakes")
+    state_going_in = entry.get("state_going_in")
     return EvalObservation(
         quote=entry["quote"],
         sign=entry["sign"].strip(),
@@ -895,6 +909,9 @@ def to_eval_observation(entry: dict[str, Any]) -> EvalObservation:
         thread=entry.get("thread") or None,
         setting=SituationSetting(setting) if setting else None,
         relationship=Relationship(relationship) if relationship else None,
+        audience=Audience(audience) if audience else None,
+        stakes=Stakes(stakes) if stakes else None,
+        state_going_in=StateGoingIn(state_going_in) if state_going_in else None,
     )
 
 
@@ -902,7 +919,7 @@ def to_eval_try(entry: dict[str, Any]) -> EvalTry:
     """Read a try already made, as written in the case.
 
     Args:
-        entry: `need`, `way` and `outcome` (useful, vague, brushed_off or
+        entry: `need`, `approach` and `outcome` (useful, vague, brushed_off or
             asked_to_drop), and optionally `days_ago`.
 
     Returns:
@@ -911,7 +928,7 @@ def to_eval_try(entry: dict[str, Any]) -> EvalTry:
     asked_to_drop = entry["outcome"] == ASKED_TO_DROP
     return EvalTry(
         need=ExplorationNeed(entry["need"]),
-        way=ExplorationWay(entry["way"]),
+        approach=ExplorationApproach(entry["approach"]),
         outcome=(
             TryOutcome.BRUSHED_OFF if asked_to_drop else TryOutcome(entry["outcome"])
         ),
@@ -1059,8 +1076,10 @@ def to_understanding_message(entry: dict[str, Any]) -> UnderstandingMessage:
                 if expect.get("aimed_need")
                 else None
             ),
-            aimed_way=(
-                ExplorationWay(expect["aimed_way"]) if expect.get("aimed_way") else None
+            aimed_approach=(
+                ExplorationApproach(expect["aimed_approach"])
+                if expect.get("aimed_approach")
+                else None
             ),
             aimed_pattern_type=(expect.get("aimed_pattern_type") or "").strip(),
             asked_why=expect.get("asked_why"),
@@ -1272,7 +1291,7 @@ def require_agenda_checkable(case: UnderstandingCase) -> None:
                 {
                     f"{expect_path}.{name}": "Expects no aimed Curiosity, so "
                     "leave this empty."
-                    for name in ("aimed_need", "aimed_way", "aimed_pattern_type")
+                    for name in ("aimed_need", "aimed_approach", "aimed_pattern_type")
                     if getattr(expect, name) not in (None, "")
                 }
             )

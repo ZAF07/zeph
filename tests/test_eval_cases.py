@@ -410,7 +410,7 @@ def test_an_invalid_save_is_refused_with_a_message_per_field(
                             "tries": [
                                 {
                                     "need": "unclear",
-                                    "way": "thought_experiment",
+                                    "approach": "thought_experiment",
                                     "outcome": "vague",
                                     "days_ago": 3,
                                 }
@@ -419,7 +419,7 @@ def test_an_invalid_save_is_refused_with_a_message_per_field(
                     ]
                 }
             },
-            "memory.patterns.0.tries.0.way",
+            "memory.patterns.0.tries.0.approach",
             "Pick one of: Story follow-up",
         ),
         (

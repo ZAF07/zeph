@@ -859,14 +859,15 @@ exploration_tries = Table(
         index=True,
     ),
     Column("need", Text, nullable=False),
-    Column("way", Text, nullable=False),
+    Column("approach", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column(
         "observation_id",
         Uuid,
         ForeignKey("observations.id", ondelete="SET NULL"),
     ),
-    Column("part_of_life", Text),
+    Column("condition", Text),
+    Column("condition_value", Text),
     Column("outcome", Text),
     Column(
         "thought_experiment_id",

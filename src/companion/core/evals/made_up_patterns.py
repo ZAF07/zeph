@@ -45,7 +45,10 @@ from companion.core.models import (
 )
 from companion.core.observations import is_situational
 from companion.core.pattern_catalog import PatternCatalogService
-from companion.core.platform_settings import CURIOSITY_REPLIES_BETWEEN
+from companion.core.platform_settings import (
+    CONDITION_ONE_SIDED_STORIES,
+    CURIOSITY_REPLIES_BETWEEN,
+)
 from companion.core.ports import Repositories
 from companion.core.timing import users_today
 
@@ -67,7 +70,7 @@ class AimedAt:
 
     Attributes:
         pattern_type_id: Its Exploration's Pattern Type.
-        attempt: Its try: the need it aims at and the way it asks.
+        attempt: Its try: the need it aims at and its Approach.
     """
 
     pattern_type_id: str
@@ -219,6 +222,9 @@ def to_observation(
         power=None,
         setting=made_up.setting,
         stance=None,
+        audience=made_up.audience,
+        stakes=made_up.stakes,
+        state_going_in=made_up.state_going_in,
     )
     return Observation(
         id=uuid4(),
@@ -361,6 +367,7 @@ def asked_try(
     earlier: Sequence[ExplorationTry],
     conversation_id: UUID,
     asked_at: datetime,
+    one_sided_stories: int,
 ) -> tuple[Curiosity, ExplorationTry]:
     """Write a try already made, with the aimed Curiosity that asked it.
 
@@ -375,6 +382,8 @@ def asked_try(
         earlier: The Exploration's tries before this one.
         conversation_id: The ended Conversation it was asked in.
         asked_at: When it was asked.
+        one_sided_stories: The Admin-set number of stories that make a
+            Condition one-sided.
 
     Returns:
         The Curiosity, raised, and its try. A try they asked to drop isn't
@@ -387,7 +396,7 @@ def asked_try(
     need = next(
         (
             open_need
-            for open_need in open_needs(observations, earlier)
+            for open_need in open_needs(observations, earlier, one_sided_stories)
             if open_need.need == made_up.need
         ),
         None,
@@ -399,7 +408,7 @@ def asked_try(
     curiosity, attempt = aimed_curiosity(
         exploration,
         need,
-        made_up.way,
+        made_up.approach,
         pattern_type,
         None,
         exploration.user_id,
@@ -451,6 +460,9 @@ def save_tries_made(
         pattern.pattern_type_id,
         repositories.observations.list_for_user(pattern.user_id),
     )
+    one_sided_stories = repositories.platform_settings.load().get(
+        CONDITION_ONE_SIDED_STORIES
+    )
     curiosities: list[Curiosity] = []
     tries: list[ExplorationTry] = []
     for made_up_try in oldest_first:
@@ -464,6 +476,7 @@ def save_tries_made(
             tries,
             conversation_id,
             asked_at,
+            one_sided_stories,
         )
         curiosities.append(curiosity)
         tries.append(attempt)

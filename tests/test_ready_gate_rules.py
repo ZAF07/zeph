@@ -7,9 +7,9 @@ import pytest
 from companion.adapters.pattern_catalog_seed import read_pattern_catalog_seed
 from companion.core.models import (
     EvidenceKind,
+    ExplorationApproach,
     ExplorationNeed,
     ExplorationTry,
-    ExplorationWay,
     NarrowingTag,
     Observation,
     ObservationDirection,
@@ -153,7 +153,7 @@ def useful_counter_test() -> ExplorationTry:
         exploration_id=uuid4(),
         user_id=uuid4(),
         need=ExplorationNeed.COUNTER_TEST,
-        way=ExplorationWay.OTHER_PERSON,
+        approach=ExplorationApproach.WOULD_IT_DIFFER,
         created_at=NOW - timedelta(days=3),
         outcome=TryOutcome.USEFUL,
     )

@@ -21,11 +21,14 @@ An **Observation** is one piece of evidence for or against a Pattern, taken from
 | Power | above, equal, below |
 | Setting | home, work, social, online |
 | Other person's stance | supportive, neutral, hostile |
+| Audience | one-to-one, group, in front of others |
+| Stakes | low, high |
+| State going in | worn out, under pressure, low, steady |
 | Kind of evidence | real story, reported habit, "what if" answer, own opinion |
 
 If the model can't tell two look-alike Pattern Types apart, it names both and the Observation is **unclear**.
 
-Mood, time of day and the kind of event are not tagged yet (issue 23).
+Relationship, power, setting, stance, audience, stakes and state going in are the Observation's **Conditions**. Each is filled only when the User's story says it. Time of day and the kind of event are not tagged (ADR 0031).
 
 ### Lifecycle
 
@@ -144,12 +147,33 @@ Confirmed, contested and shared-then-closed Patterns never move again.
 
 Every move is written to `pattern_moves`: from, to, the cause, the score and situations at the time, and the check that blocked it, if any. It holds no words of the User's, and is removed only by Delete My Data or Account Deletion.
 
+## What Zeph asks about a suspected Pattern
+
+Each suspected Pattern on the Agenda has an **Exploration**. Code works out what it still needs, in this order, and writes one aimed question for the first:
+
+1. **An unclear story**, newest first.
+2. **A counter-test**, until an Observation against comes or a counter-test question came back useful.
+3. **A missing Condition.** Code counts, per Condition and value, the clear stories for and against (the coverage table: not unclear, not situational, not excluded; never stored). A value is worth asking about only when:
+   - at least 2 clear stories for the Pattern say that Condition and all share one value ("Stories that make a Condition one-sided"),
+   - another value of it has no clear story, for or against,
+   - it is the Condition with the most such stories. Ties go in this order: audience, stakes, relationship, power, stance, setting, state going in.
+
+   A useful answer closes that value for good. For the state going in it closes every value, since the question is the same open one.
+
+How it asks is its **Approach**, least pushy first: a story follow-up, "would it have gone differently if…", a Thought Experiment (unclear stories only), "this week, notice…". After a try with nothing, the next try waits 3 days and uses the next Approach; after 4 in a row the Exploration rests.
+
+For the state going in, Zeph only asks openly how they were doing. It never names a state and never asks "would it have gone differently if" about one.
+
+A Pattern that becomes ready leaves the Agenda, so a missing Condition is asked about only while something else still holds the Pattern back from ready.
+
 ## Where it lives in code
 
 | What | File |
 |---|---|
 | Tagging and checks | `src/companion/core/observations.py` |
 | Scoring and states | `src/companion/core/pattern_scoring.py` |
+| Explorations, needs and Approaches | `src/companion/core/agenda.py` |
+| The coverage table | `src/companion/core/condition_coverage.py` |
 | Ready gate | `src/companion/core/ready_gate.py` |
 | Sharing and reactions | `src/companion/core/pattern_sharing.py` |
 | Predictions and confirming | `src/companion/core/predictions.py` |

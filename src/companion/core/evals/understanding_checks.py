@@ -1,7 +1,7 @@
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 
-from companion.core.agenda import WAY_WORDS
+from companion.core.agenda import APPROACH_WORDS
 from companion.core.evals.cases import UnderstandingExpectations
 from companion.core.evals.made_up_patterns import AimedAt
 from companion.core.models import ExplorationNeed
@@ -11,8 +11,8 @@ RECALL_STEP = "Recall"
 REPLY_PLAN_STEP = "Reply Plan"
 NEED_WORDS = {
     ExplorationNeed.UNCLEAR: "an unclear story",
-    ExplorationNeed.MISSING_PART: "a missing part of life",
     ExplorationNeed.COUNTER_TEST: "a counter-test",
+    ExplorationNeed.MISSING_CONDITION: "a missing Condition",
 }
 NO_AIMED_CURIOSITY = "brought up no aimed Curiosity"
 
@@ -366,7 +366,7 @@ def check_agenda(
 
     Returns:
         One outcome per check: the Agenda shown, the aimed Curiosity brought
-        up, then its need, way and Pattern Type.
+        up, then its need, Approach and Pattern Type.
     """
     checks = []
     aimed = observed.aimed_raised
@@ -398,12 +398,12 @@ def check_agenda(
                 [f"aimed at {NEED_WORDS[aim.attempt.need]}" for aim in aimed],
             )
         )
-    if expect.aimed_way is not None:
+    if expect.aimed_approach is not None:
         checks.append(
             check_aim(
-                "aimed way",
-                f"asked by {WAY_WORDS[expect.aimed_way]}",
-                [f"asked by {WAY_WORDS[aim.attempt.way]}" for aim in aimed],
+                "aimed Approach",
+                f"asked by {APPROACH_WORDS[expect.aimed_approach]}",
+                [f"asked by {APPROACH_WORDS[aim.attempt.approach]}" for aim in aimed],
             )
         )
     if expect.aimed_pattern_type:

@@ -1,6 +1,6 @@
 # Conditions narrow a Pattern; they are never counted, and never asked for to fill a blank
 
-Status: accepted (pattern-pipeline issue 23). Built so far: the Conditions are tagged, checked and stored (issue 41), and "anyone would" can match them (issue 42). Not built: asking, narrowing and sharing (issues 43 and 44). Builds on ADR-0024.
+Status: accepted (pattern-pipeline issue 23). Built so far: the Conditions are tagged, checked and stored (issue 41), "anyone would" can match them (issue 42), and Zeph asks about a missing Condition (issue 43). Not built: narrowing and sharing (issue 44). Builds on ADR-0024.
 
 Zeph follows Mischel and Shoda (1995): a person is known by their "if situation, then behaviour" signature, and the situation that matters is what it means to them (who was there, what was at stake), not the room or the clock. Until now an Observation's tags, and so a Pattern's narrowing and Zeph's questions, varied almost only the person. We now tag more Conditions (audience, stakes and the User's state going in, beside relationship, power, stance and setting) and use them for one job: to say when a Pattern Type's "if" sets the Pattern off for this User and when it doesn't ("with people above you, in a group; not one-to-one"). The owner's aim is self-awareness, not proof: the rules below keep what Zeph claims honest and keep it from interrogating. Every decision, with its reason, is in `.scratch/pattern-pipeline/issues/23-situations-vary-on-more-than-people.md` (archived when built).
 

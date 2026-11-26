@@ -31,17 +31,17 @@ All of this is code. The model only words the question in the reply.
    suspected Pattern on their Agenda that has an **unclear** story: one the
    tagging step noted under two look-alike Pattern Types because it couldn't
    tell which.
-2. **Its turn.** An Exploration tries the least pushy ways first: a follow-up
-   on the story, then "would it have gone differently with someone else?",
+2. **Its turn.** An Exploration tries the least pushy Approaches first: a follow-up
+   on the story, then "would it have gone differently if…?",
    then a Thought Experiment, then "this week, notice when…". Zeph moves on
-   to the next way only after a try came back vague or brushed off. Other
-   needs (a part of life not heard yet, a counter-test) skip the Thought
-   Experiment way.
+   to the next Approach only after a try came back vague or brushed off.
+   Other needs (a counter-test, a missing Condition) skip the Thought
+   Experiment.
 3. **Which one.** Code takes the look-alike pair with the most unclear
    stories for that Pattern, and picks the oldest Thought Experiment for that
    pair that is on, not archived, and never put to this User before. If that
    pair has none left, it tries the next pair. If none is left at all, Zeph
-   uses the next way instead.
+   uses the next Approach instead.
 4. **How often.** Never more than "Thought Experiments per Pattern a week"
    (Platform settings → Patterns, start 1) for one Pattern in 7 days. One
    waiting to be asked counts.

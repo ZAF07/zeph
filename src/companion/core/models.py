@@ -3102,6 +3102,18 @@ class StateGoingIn(StrEnum):
     STEADY = "steady"
 
 
+class Condition(StrEnum):
+    """The Conditions an Observation can hold, named as on `SituationTags`."""
+
+    RELATIONSHIP = "relationship"
+    POWER = "power"
+    STANCE = "stance"
+    SETTING = "setting"
+    AUDIENCE = "audience"
+    STAKES = "stakes"
+    STATE_GOING_IN = "state_going_in"
+
+
 @dataclass(frozen=True)
 class SituationTags:
     """The Conditions an Observation happened under, as tags from the fixed lists.
@@ -3674,15 +3686,15 @@ class ExplorationNeed(StrEnum):
     """What an Exploration still needs to learn, in the order it is worked on."""
 
     UNCLEAR = "unclear"
-    MISSING_PART = "missing_part"
     COUNTER_TEST = "counter_test"
+    MISSING_CONDITION = "missing_condition"
 
 
-class ExplorationWay(StrEnum):
-    """How an aimed Curiosity asks, least pushy first."""
+class ExplorationApproach(StrEnum):
+    """An Approach: how an aimed Curiosity asks, least pushy first."""
 
     STORY_FOLLOW_UP = "story_follow_up"
-    OTHER_PERSON = "other_person"
+    WOULD_IT_DIFFER = "would_it_differ"
     THOUGHT_EXPERIMENT = "thought_experiment"
     NOTICE_THIS_WEEK = "notice_this_week"
 
@@ -3704,26 +3716,30 @@ class ExplorationTry:
         exploration_id: The Exploration it is for.
         user_id: The User it is about.
         need: The need it aims at.
-        way: How it asks.
+        approach: Its Approach: how it asks.
         created_at: When code wrote it.
-        observation_id: The Observation it aims at, for an unclear story or
-            a counter-test on a story; None otherwise.
-        part_of_life: The part of life it aims at, for a missing one; None
+        observation_id: The Observation it aims at, for an unclear story, or
+            the story a counter-test or a missing Condition starts from;
+            None otherwise.
+        condition: The Condition it aims at, for a missing one; None
             otherwise.
+        condition_value: The value of that Condition it is to learn about,
+            from the Condition's list; None otherwise.
         outcome: How it came back; None until the Conversation it was asked
             in ends. When and where it was asked are its Curiosity's.
         thought_experiment_id: The Thought Experiment it puts to the User,
-            for that way; None otherwise.
+            for that Approach; None otherwise.
     """
 
     curiosity_id: UUID
     exploration_id: UUID
     user_id: UUID
     need: ExplorationNeed
-    way: ExplorationWay
+    approach: ExplorationApproach
     created_at: datetime
     observation_id: UUID | None = None
-    part_of_life: SituationSetting | None = None
+    condition: Condition | None = None
+    condition_value: str | None = None
     outcome: TryOutcome | None = None
     thought_experiment_id: UUID | None = None
 

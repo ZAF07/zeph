@@ -339,6 +339,11 @@ const fieldSections: {
         unit: "tries",
       },
       {
+        key: "condition_one_sided_stories",
+        label: "Stories that make a Condition one-sided",
+        unit: "stories",
+      },
+      {
         key: "thought_experiments_per_pattern_per_week",
         label: "Thought Experiments per Pattern a week",
         unit: "a week",

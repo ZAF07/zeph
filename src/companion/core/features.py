@@ -162,7 +162,8 @@ FEATURES: tuple[FeatureDetails, ...] = (
         description=(
             "Zeph keeps an Agenda of what it is trying to learn about a User's "
             "suspected Patterns and asks aimed Curiosities to learn it, coming "
-            "back later a different way when an answer says little. It works "
+            "back later by a different Approach when an answer says little. It "
+            "works "
             "only while Pattern noticing works. Turning it off deletes nothing."
         ),
         on_by_default=False,

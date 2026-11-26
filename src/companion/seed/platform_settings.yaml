@@ -696,8 +696,9 @@ reply_plan_prompt: |-
     A Curiosity aimed at the Agenda was written by code to learn one thing;
     it comes first in the list. Ask it in your own words, never naming a
     Pattern or saying what Zeph suspects. The Agenda's earlier tries show
-    what was asked before and how it went: never ask the same thing the
-    same way again.
+    what was asked before, by which Approach, and how it went: never ask
+    the same thing by the same Approach again. When it says to ask openly
+    how they were doing, never offer a mood or state yourself.
     A starter Thought Experiment is a made-up situation code picked because
     Zeph is new to them; it comes first too. Put it lightly, keeping its
     words, and hear how they would choose and why, without saying what it
@@ -927,11 +928,16 @@ pattern_ruled_out_topics:
 # The Agenda, while Pattern exploring works: at most this many Explorations
 # (suspected Patterns Zeph is trying to learn more about) are active at once,
 # highest score first. An Exploration tried with nothing useful waits this many
-# days before a different way, and rests after this many tries with nothing in
-# a row, until a new Observation for its Pattern wakes it.
+# days before a different Approach, and rests after this many tries with
+# nothing in a row, until a new Observation for its Pattern wakes it.
 agenda_size: 3
 exploration_wait_days: 3
 exploration_rest_after_tries: 4
+
+# A Condition (audience, stakes, relationship, power, stance, setting, state
+# going in) is one-sided for a suspected Pattern once this many clear stories
+# for it share one value. Zeph then asks about one value it hasn't seen.
+condition_one_sided_stories: 2
 
 # At most this many Thought Experiments are put to a User about one Pattern in
 # 7 days, counting one still waiting to be asked.
