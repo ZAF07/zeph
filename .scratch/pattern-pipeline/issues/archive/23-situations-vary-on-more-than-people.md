@@ -181,4 +181,4 @@ Issues 41, 42, 43 and 44 are built, checked in the running app and archived in `
 ## Completion
 
 - Completed: 2026-11-26
-- Commit: <merge commit, filled in after the merge>
+- Commit: 5113b328 ("Merge pattern-44-narrowing-every-condition: narrowing and sharing use every Condition", the merge that archived this file with issue 44; issues 41, 42 and 43 merged as 7f079738, d0861ccf and 72b6532c)

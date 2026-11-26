@@ -85,4 +85,4 @@ A Pattern can be narrowed by any Condition, with guards so it can still be shown
 ## Completion
 
 - Completed: 2026-11-26
-- Commit: <merge commit, filled in after the merge>
+- Commit: 5113b328 ("Merge pattern-44-narrowing-every-condition: narrowing and sharing use every Condition", the merge of pattern-44-narrowing-every-condition into main; work commits 7cf4f5bf, d8463034, 4e89eedf, 0673550b)
