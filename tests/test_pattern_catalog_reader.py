@@ -110,6 +110,11 @@ def test_the_fifteen_pattern_types_in_the_repo_are_approved_three_per_area() -> 
         (pattern_type.status, pattern_type.approved_by)
         for pattern_type in pattern_types
     } == {(PatternTypeStatus.APPROVED, "Zaf")}
+    assert {
+        pattern_type.id
+        for pattern_type in pattern_types
+        if pattern_type.approved_on == date(2026, 11, 26)
+    } == {"ACH.WORTH.PERF", "CTRL.UNCERT.PLAN"}
     assert {pattern_type.approved_on for pattern_type in pattern_types} == {
         date(2026, 11, 24),
         date(2026, 11, 26),
@@ -511,6 +516,10 @@ def test_anyone_would_when_may_be_left_out() -> None:
             [{}],
             "a.yaml: anyone_would_when[1] needs at least one of relationship, "
             "power, setting, stance, audience, stakes or state_going_in.",
+        ),
+        (
+            [{"stakes": []}],
+            "a.yaml: anyone_would_when[1].stakes must list at least one value.",
         ),
         (
             [{"stakes": ["huge"]}],

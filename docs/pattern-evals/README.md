@@ -82,6 +82,19 @@ The ten `cond-` cases, one try each.
 - The run's estimate (S$0.22) priced every Variant at the live model; the real total was about S$0.90.
 - Ten cases, one try: a first look, not a score. The owner still corrects the drafts.
 
+#### High stakes as "anyone would": first result (26 Nov 2026)
+
+Run `50e37290`, live model, five cases, one try, S$0.03 (estimate S$0.02).
+
+- `cond-high-stakes-visa-interview` and `cond-high-stakes-mortgage-decision`
+  passed: stakes tagged high, so code marked them situational (issue 42).
+- `ctrl-anyone-dad-in-hospital` and `ctrl-anyone-flood-evacuation` failed as
+  they did before: the step kept a "for" (hospital) or nothing (flood) where
+  the case expects a sign against. The hospital "for" was tagged high stakes
+  and so marked situational: it now counts for nothing.
+- `ach-anyone-lost-big-bid` got no answer from the provider and wasn't run
+  again.
+
 #### Unclear stories an aimed Curiosity asked about
 
 A Tagging case can also give unclear Observations the made-up User already

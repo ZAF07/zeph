@@ -81,8 +81,6 @@ anyone_would: >-
   Disappointment after a real, costly setback, or preparing hard where the
   stakes are high
 
-# The same as tags, so code can tell: an Observation tagged high stakes is
-# situational and carries no weight.
 anyone_would_when:
   - stakes: [high]
 

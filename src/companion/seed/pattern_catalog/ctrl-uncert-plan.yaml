@@ -83,8 +83,6 @@ look_alikes:
 
 anyone_would: A real crisis where control-seeking is adaptive
 
-# The same as tags, so code can tell: an Observation tagged high stakes is
-# situational and carries no weight.
 anyone_would_when:
   - stakes: [high]
 

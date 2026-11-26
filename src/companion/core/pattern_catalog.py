@@ -228,6 +228,9 @@ class _Fields:
         ):
             self.note(f"{field} must be a list.")
             return ()
+        if not value:
+            self.note(f"{field} must list at least one value.")
+            return ()
         allowed = [choice.value for choice in choices]
         wrong = [item for item in value if item not in allowed]
         if wrong:
@@ -462,9 +465,8 @@ def _read_anyone_would_when(fields: _Fields) -> tuple[SituationMatch, ...]:
         )
         if not any(group.has(field) for field in SITUATION_MATCH_FIELDS):
             fields.note(
-                f"anyone_would_when[{number}] needs at least one of "
-                f"{', '.join(SITUATION_MATCH_FIELDS[:-1])} or "
-                f"{SITUATION_MATCH_FIELDS[-1]}."
+                f"anyone_would_when[{number}] needs at least one of relationship, "
+                "power, setting, stance, audience, stakes or state_going_in."
             )
         group.no_other_fields("a situation anyone would act the same in")
         matches.append(match)

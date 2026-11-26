@@ -375,7 +375,8 @@ def is_situational(tags: SituationTags, matches: Sequence[SituationMatch]) -> bo
 
     Returns:
         True when the tags fit one of them: for each tag it gives, the
-        Observation's value is one of those listed.
+        Observation's value is one of those listed. An Observation with no
+        value for a tag it gives never fits.
     """
     return any(
         all(

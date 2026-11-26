@@ -106,7 +106,7 @@ Rules for audience, stakes and state going in (ADR-0031):
 - **No state after a crisis.** When the User had a Safeguard Event at or after the Conversation's first message, code empties state on every Observation from it, whatever the model wrote (`had_safeguard_event`).
 - **Private.** They are stored on the Observation's row and go when it goes. "Things you said that Zeph kept" and the Admin pages show none of them.
 
-Nothing reads audience, stakes or state going in yet (issues 42 to 44).
+An `anyone_would_when` match can name audience, stakes and state going in (issue 42). Nothing else reads them yet (issues 43 and 44).
 
 ## What code adds to a kept Observation
 
