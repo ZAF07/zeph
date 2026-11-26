@@ -832,7 +832,7 @@
     },
     {
       "id": "CTRL.UNCERT.PLAN",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "area": "control",
       "name": "Control-seeking under uncertainty",
       "definition": "When outcomes are uncertain, the person responds by planning, checking, gathering information or taking over. The discomfort comes from not knowing, and acting on it brings relief even when it changes nothing.",
@@ -937,7 +937,7 @@
       },
       "status": "approved",
       "approved_by": "Zaf",
-      "approved_on": "2026-11-24",
+      "approved_on": "2026-11-26",
       "loaded_at": "2026-11-24T09:00:00Z",
       "other_versions": []
     },
@@ -1135,7 +1135,7 @@
     },
     {
       "id": "ACH.WORTH.PERF",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "area": "achievement",
       "name": "Performance-contingent self-worth",
       "definition": "The person's sense of worth rises and falls with how well they perform. Falling short is felt as a verdict on the self, not on the work. High standards alone do not qualify; the marker is self-judgement after a miss.",
@@ -1240,7 +1240,7 @@
       },
       "status": "approved",
       "approved_by": "Zaf",
-      "approved_on": "2026-11-24",
+      "approved_on": "2026-11-26",
       "loaded_at": "2026-11-24T09:00:00Z",
       "other_versions": []
     },

@@ -60,10 +60,10 @@ going in, one person inside a group, and high stakes said plainly.
     other than "anyone would" and the Conditions a case states are filled
     in (relationship, power, setting, stance and kind of evidence are only
     checked against their lists).
-  - "Anyone would" for ACH.WORTH.PERF and CTRL.UNCERT.PLAN: their "anyone
-    would" (high stakes, a real crisis) can't be written as tags, so code
-    never marks theirs situational. Those cases expect the step to say
-    nothing, or a sign against.
+  - "Anyone would" for ACH.WORTH.PERF and CTRL.UNCERT.PLAN when the story
+    doesn't say what is at stake: code marks theirs situational only when
+    the step tags stakes high (issue 42). A real crisis has no tag of its
+    own, so those cases expect the step to say nothing, or a sign against.
 
 #### Conditions: first results (26 Nov 2026)
 
@@ -81,6 +81,19 @@ The ten `cond-` cases, one try each.
 - **Second run:** no Condition was wrong on any of the three models. The two fails were not about Conditions: flash wrote "hers" in a context line (`cond-state-worn-out-before-call`), and Opus called `cond-high-stakes-visa-interview` unclear between ACH.WORTH.PERF and CTRL.UNCERT.PLAN.
 - The run's estimate (S$0.22) priced every Variant at the live model; the real total was about S$0.90.
 - Ten cases, one try: a first look, not a score. The owner still corrects the drafts.
+
+#### High stakes as "anyone would": first result (26 Nov 2026)
+
+Run `50e37290`, live model, five cases, one try, S$0.03 (estimate S$0.02).
+
+- `cond-high-stakes-visa-interview` and `cond-high-stakes-mortgage-decision`
+  passed: stakes tagged high, so code marked them situational (issue 42).
+- `ctrl-anyone-dad-in-hospital` and `ctrl-anyone-flood-evacuation` failed as
+  they did before: the step kept a "for" (hospital) or nothing (flood) where
+  the case expects a sign against. The hospital "for" was tagged high stakes
+  and so marked situational: it now counts for nothing.
+- `ach-anyone-lost-big-bid` got no answer from the provider and wasn't run
+  again.
 
 #### Unclear stories an aimed Curiosity asked about
 

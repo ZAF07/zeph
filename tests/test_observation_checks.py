@@ -325,7 +325,7 @@ def test_two_pattern_types_make_an_unclear_observation() -> None:
 
     assert observation.unclear
     assert observation.second_pattern_type_id == "ACH.WORTH.PERF"
-    assert observation.second_pattern_type_version == "0.3.0"
+    assert observation.second_pattern_type_version == "0.4.0"
 
 
 def test_tags_that_do_not_apply_may_be_left_empty() -> None:
@@ -383,6 +383,36 @@ def test_an_observation_with_tags_anyone_would_act_on_is_situational() -> None:
     assert [observation.situational for observation in planned.kept] == [True, True]
 
 
+@pytest.mark.parametrize("pattern_type_id", ["ACH.WORTH.PERF", "CTRL.UNCERT.PLAN"])
+def test_a_high_stakes_story_of_a_pattern_type_that_says_so_is_situational(
+    pattern_type_id: str,
+) -> None:
+    planned = plan_observations(
+        [
+            entry(
+                pattern_types=[pattern_type_id],
+                sign="I1",
+                stakes="high",
+                quote="I said yes to Mei again",
+            ),
+            entry(
+                pattern_types=[pattern_type_id],
+                sign="I1",
+                stakes="low",
+                quote="and then I stewed on it all night",
+            ),
+            entry(pattern_types=[pattern_type_id], sign="I1", quote="It’s fine"),
+        ],
+        context(),
+    )
+
+    assert [observation.situational for observation in planned.kept] == [
+        True,
+        False,
+        False,
+    ]
+
+
 @pytest.mark.parametrize(
     ("matches", "tags", "situational"),
     [
@@ -405,6 +435,51 @@ def test_an_observation_with_tags_anyone_would_act_on_is_situational() -> None:
         (
             (SituationMatch(powers=(Power.ABOVE,), settings=(SituationSetting.WORK,)),),
             SituationTags(None, Power.ABOVE, SituationSetting.WORK, Stance.HOSTILE),
+            True,
+        ),
+        (
+            (SituationMatch(stakes=(Stakes.HIGH,)),),
+            SituationTags(None, None, None, None, stakes=Stakes.HIGH),
+            True,
+        ),
+        (
+            (SituationMatch(stakes=(Stakes.HIGH,)),),
+            SituationTags(Relationship.STRANGER, Power.ABOVE, None, None),
+            False,
+        ),
+        (
+            (SituationMatch(stakes=(Stakes.HIGH,)),),
+            SituationTags(None, None, None, None, stakes=Stakes.LOW),
+            False,
+        ),
+        (
+            (SituationMatch(audiences=(Audience.GROUP, Audience.IN_FRONT_OF_OTHERS)),),
+            SituationTags(None, None, None, None, audience=Audience.GROUP),
+            True,
+        ),
+        (
+            (SituationMatch(audiences=(Audience.GROUP,)),),
+            SituationTags(None, None, None, None, stakes=Stakes.HIGH),
+            False,
+        ),
+        (
+            (SituationMatch(states=(StateGoingIn.WORN_OUT,)),),
+            SituationTags(None, None, None, None, state_going_in=StateGoingIn.WORN_OUT),
+            True,
+        ),
+        (
+            (SituationMatch(states=(StateGoingIn.WORN_OUT,)),),
+            SituationTags(None, None, None, None),
+            False,
+        ),
+        (
+            (SituationMatch(powers=(Power.ABOVE,), stakes=(Stakes.HIGH,)),),
+            SituationTags(None, Power.ABOVE, None, None),
+            False,
+        ),
+        (
+            (SituationMatch(powers=(Power.ABOVE,), stakes=(Stakes.HIGH,)),),
+            SituationTags(None, Power.ABOVE, None, None, stakes=Stakes.HIGH),
             True,
         ),
     ],

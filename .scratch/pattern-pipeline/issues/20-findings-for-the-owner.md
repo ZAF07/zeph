@@ -837,6 +837,44 @@ Settles from the sections above: 02 "Curiosity Check-ins ignore pace and backing
 - **Impact:** an Admin reading their own trace, or a developer on a local stack, sees a state. Other Users' calls keep no content, as before.
 - **Suggested fix:** none needed unless content is ever kept for real Users.
 
+## 42 — "Anyone would act the same" can match the new Conditions (2026-11-26)
+
+### A sign against told with high stakes also counts for nothing
+
+- **Kind:** decision for the owner
+- **What:** a match makes an Observation situational whether it is for or against (the rule as before). CTRL.UNCERT.PLAN's sign against D2 is "plans heavily only where the stakes are concrete", so most D2 stories will be tagged high stakes and carry no weight.
+- **Impact:** D2 rarely counts against the Pattern any more. That may be right (a crisis says nothing about the person either way), but D2 is then nearly a dead sign.
+- **Suggested fix:** leave it, or reword D2 in a later version so it is about calm in a low-stakes unknown. Minutes; a new version and the owner's approval.
+
+### A guessed "high" stakes now takes a story's weight away
+
+- **Kind:** risk
+- **What:** stakes high makes an ACH.WORTH.PERF or CTRL.UNCERT.PLAN Observation weightless. If the tagging prompt on production was edited and so lacks the "never guess" rule (see issue 41's finding above), guessed stakes now cost real evidence.
+- **Impact:** those two Patterns could stay unnoticed for a User whose stories the model calls high stakes unsaid.
+- **Suggested fix:** the same check as issue 41's finding, before Pattern noticing is on: after the deploy, look for "Kept the stored pattern_tagging_prompt" in the backend log and merge the seed text in by hand.
+
+### Scoring and the ready gate can differ on a story kept under 0.3.0
+
+- **Kind:** known limit
+- **What:** scoring reads the `situational` mark stored with the Observation; the ready gate reads the catalog now. A high-stakes story kept under 0.3.0 (between issue 41 and this deploy) stays unmarked, so scoring counts it and the gate does not.
+- **Impact:** small: only stories tagged in that gap. The Pattern can reach "suspected" on it but is stopped at the gate's "situational" check.
+- **Suggested fix:** none now. If it matters later, one script can mark stored Observations again by the current catalog.
+
+### "A real crisis" still has no tag
+
+- **Kind:** known limit
+- **What:** CTRL.UNCERT.PLAN's "anyone would" is "a real crisis". Only high stakes is a tag, and only when the User says what could be lost.
+- **Impact:** a crisis story that doesn't say the stakes keeps its weight, unless an exclusion applies.
+- **Suggested fix:** none; the tagging model is still told "anyone would" in words.
+
+### The two older CTRL "anyone would" cases still fail, and one case errored
+
+- **Kind:** owner task
+- **What:** in Eval Run `50e37290`, `ctrl-anyone-dad-in-hospital` kept a "for" (I2) where the case expects "against", and `ctrl-anyone-flood-evacuation` kept nothing. Both failed before this issue too (run `4352910b`). The new rule did mark the hospital "for" situational, so it now counts for nothing. `ach-anyone-lost-big-bid` got no answer from the provider and was not run again.
+- **Impact:** none on Users. The two cases expect something the model doesn't do.
+- **Suggested fix:** the owner decides what each should expect now ("nothing", or "for · situational" with stakes high), following `docs/pattern-evals/adding-tagging-cases.md`.
+- [ ] Owner corrected the two `ctrl-anyone-` cases
+
 ## Comments
 
 ### 25 Nov 2026 — first triage with the owner (sections 01 to 19)

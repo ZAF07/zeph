@@ -3,12 +3,12 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: ACH.WORTH.PERF
-version: 0.3.0
+version: 0.4.0
 area: achievement
 name: Performance-contingent self-worth
 status: approved
 approved_by: Zaf
-approved_on: 2026-11-24
+approved_on: 2026-11-26
 
 definition: >-
   The person's sense of worth rises and falls with how well they perform.
@@ -80,6 +80,9 @@ look_alikes:
 anyone_would: >-
   Disappointment after a real, costly setback, or preparing hard where the
   stakes are high
+
+anyone_would_when:
+  - stakes: [high]
 
 exclusions:
   - text: Active burnout or job loss in the last month
