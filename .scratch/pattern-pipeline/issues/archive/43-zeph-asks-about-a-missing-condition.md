@@ -110,4 +110,4 @@ About S$0.47 in all. In every run code wrote the right aimed Curiosity and no re
 ## Completion
 
 - Completed: 2026-11-26
-- Commit: <to be filled in after the merge>
+- Commit: 72b6532c ("Merge pattern-43-missing-condition-need: Zeph asks about a missing Condition", the merge of pattern-43-missing-condition-need into main; work commits 120e7063, 53224ce0, 78fd3a10, 346693d4)
