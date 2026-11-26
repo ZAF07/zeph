@@ -8,7 +8,7 @@ Status: completed
 
 ## What to build
 
-Each User's chat work goes on that User's queue, which runs on a fixed message pool kept apart from the web pool (ADR-0018). A heavy texter then uses about one thread, not one per text, and chat load can't freeze the Dashboard.
+Each User's chat work goes on that User's queue, which runs on a fixed message pool kept apart from the web pool (ADR-0032). A heavy texter then uses about one thread, not one per text, and chat load can't freeze the Dashboard.
 
 - **A new port: User work queue.** Core hands it a piece of work for a User. It promises:
   - each User's work runs one piece at a time, in the order it arrived;
@@ -47,7 +47,7 @@ None - can start immediately. The last load-test criterion needs issue 03 merged
 
 ## Comments
 
-- 2026-11-23, plan: since this issue was written, message pipeline issue 03 changed the handler: a text is checked even while a reply is written, and can drop it until any of it is sent (ADR-0018 consequences). So "a text sent during a reply is checked after that reply" no longer matches today's code. To keep today's behaviour, the queue takes a key, and each User has two lines on it: their texts to check (keyed by Telegram sender, so `/start`, sticker adding and everything else a sender sends run in order there too) and their replies to write. Each line runs one piece at a time, in order, like the two locks it replaces. A heavy texter holds at most two threads. The webhook calls the handler directly; the handler only adds to the queue.
+- 2026-11-23, plan: since this issue was written, message pipeline issue 03 changed the handler: a text is checked even while a reply is written, and can drop it until any of it is sent (ADR-0032 consequences). So "a text sent during a reply is checked after that reply" no longer matches today's code. To keep today's behaviour, the queue takes a key, and each User has two lines on it: their texts to check (keyed by Telegram sender, so `/start`, sticker adding and everything else a sender sends run in order there too) and their replies to write. Each line runs one piece at a time, in order, like the two locks it replaces. A heavy texter holds at most two threads. The webhook calls the handler directly; the handler only adds to the queue.
 
 - 2026-11-23, built: port `UserWorkQueue` (`core/ports.py`), adapter `ThreadPoolUserWorkQueue` (`adapters/user_work_queue.py`; one turn in the pool per key at a time, so a heavy texter can't keep a thread from others), `FakeUserWorkQueue` (`tests/fakes.py`; runs at once, keeps per-key order, can hold work), `InlineUserWorkQueue` for Evals. Setting `MESSAGE_POOL_SIZE` (default 50) in `config.py`, `.env.example` and passed through `docker-compose.yml` (one line, needed so it can be tuned). The webhook calls the handler directly; no more `BackgroundTasks`. The timer only adds "answer" to the User's replies line.
 - 2026-11-23, checks: `ruff check`, `ruff format --check` (574 files), `mypy src` (206 files, no issues), `pytest` 1508 passed. Contract test `test_user_work_queues_run_each_keys_work_in_order_one_at_a_time` passes for the thread pool and the fake (`pytest -m contract -k user_work_queues`).

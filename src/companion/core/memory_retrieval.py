@@ -42,10 +42,10 @@ class RecalledMemory:
 
 
 def shared_photos_group(description: str) -> MemoryCategory:
-    """Make the "Shared Photos" group the Understanding picks like a category.
+    """Make the "Shared Photos" group the Reply Plan picks like a category.
 
     Shared Photos have no Memory Category, so they are offered to the
-    Understanding as one extra category, after the real ones.
+    Reply Plan as one extra category, after the real ones.
 
     Args:
         description: The Admin-set description of Shared Photos.
@@ -218,7 +218,7 @@ class SavedMemory:
         summaries: The newest Day Summaries, newest first.
         shared_photos: The User's Shared Photos; empty when Photo Viewing
             doesn't work for them.
-        pickable: The categories the Understanding may pick: active ones
+        pickable: The categories the Reply Plan may pick: active ones
             with items that aren't "always include", then the "Shared
             Photos" group when the User has Shared Photos.
         portrait: The User Portrait; "" if they have none.
@@ -272,7 +272,7 @@ class MemoryRetrieval:
             snapshot: The User being answered.
 
         Returns:
-            Their saved memory, and the categories the Understanding may pick.
+            Their saved memory, and the categories the Reply Plan may pick.
         """
         user_id = snapshot.user.id
         settings = snapshot.settings
@@ -320,16 +320,16 @@ class MemoryRetrieval:
         """Pick out what the Companion remembers that matters for the message.
 
         The User Portrait goes first. Memory Items from every "always include"
-        category go in, plus those from the categories the Understanding
+        category go in, plus those from the categories the Reply Plan
         picked, plus the newest Day Summaries, plus older Summaries
         found by meaning. All the User's Shared Photos go in when the
-        Understanding picked "Shared Photos". A picked name that isn't one of
+        Reply Plan picked "Shared Photos". A picked name that isn't one of
         the pickable categories is ignored.
 
         Args:
             snapshot: The User being answered.
             saved: Their saved memory, read for this reply.
-            picked_categories: The names of the categories the Understanding
+            picked_categories: The names of the categories the Reply Plan
                 picked, in any case.
             look_up_past: The Understanding's phrases to search older
                 Summaries with; none searches nothing.

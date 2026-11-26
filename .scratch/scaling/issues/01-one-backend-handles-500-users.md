@@ -9,7 +9,7 @@ We expect about 500 signed-up Users: 25–50 chatting at once, some sending many
 - Every message waiting for its User's turn holds a web thread (40 in total, shared with the Dashboard). A few heavy texters can use them all and freeze every chat and the Dashboard.
 - The tick (ended Conversations, Portrait rewrites, Check-ins) handles each item one by one, each often waiting on a model call. A big tick makes Check-ins late.
 
-Design decided in ADR-0018. Running 2+ backends is parked in issue 02.
+Design decided in ADR-0032. Running 2+ backends is parked in issue 02.
 
 ## Next
 
@@ -28,7 +28,7 @@ Blocked by the tick speed-up in `.scratch/check-in-job/` (mainly issue 05, Check
 - Crisis checks keep today's order: a text sent during a reply is checked after that reply. Changing that is its own issue, if wanted.
 - Load test fakes only the chat model (sleeps 3–8s) and Telegram sending. Postgres, the local embedder, the pools and the webhook endpoint stay real. Runs on the worktree's stack.
 - Order: (1) `make load-test` plus a baseline run on today's code, (2) per-User queue plus message pool, (3) parallel tick items. Rerun after each slice and record the numbers here. Skip any fix the baseline shows isn't needed.
-- Decision recorded in ADR-0018. Next: `/to-prd` then `/to-issues`.
+- Decision recorded in ADR-0032. Next: `/to-prd` then `/to-issues`.
 
 ### 23 Nov 2026 — triage, blocked on the tick
 
