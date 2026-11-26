@@ -2258,8 +2258,10 @@
       max_length: 400
       text: >-
         How soon and how plainly Zeph tells you what it thinks is really going
-        on. Whatever you pick, Zeph gives its view when you ask, and takes extra
-        care when things are hard.
+        on, and how it asks you things. Gentle asks less often and leaves more
+        time between questions; direct asks sooner and more to the point.
+        Whatever you pick, Zeph gives its view when you ask, backs off when
+        you’d rather not answer, and takes extra care when things are hard.
     - key: account.directness.gentle
       name: "How direct Zeph is: gentle level"
       max_length: 20

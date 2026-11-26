@@ -339,13 +339,33 @@ const fieldSections: {
         unit: "at once",
       },
       {
-        key: "exploration_wait_days",
-        label: "Wait after a try with nothing",
+        key: "exploration_wait_days_gentle",
+        label: "Wait after a try with nothing: gentle",
         unit: "days",
       },
       {
+        key: "exploration_wait_days",
+        label: "Wait after a try with nothing: balanced",
+        unit: "days",
+      },
+      {
+        key: "exploration_wait_days_direct",
+        label: "Wait after a try with nothing: direct",
+        unit: "days",
+      },
+      {
+        key: "exploration_rest_after_tries_gentle",
+        label: "Tries with nothing before resting: gentle",
+        unit: "tries",
+      },
+      {
         key: "exploration_rest_after_tries",
-        label: "Tries with nothing before resting",
+        label: "Tries with nothing before resting: balanced",
+        unit: "tries",
+      },
+      {
+        key: "exploration_rest_after_tries_direct",
+        label: "Tries with nothing before resting: direct",
         unit: "tries",
       },
       {
@@ -419,8 +439,18 @@ const fieldSections: {
         unit: "waiting",
       },
       {
+        key: "curiosity_replies_between_gentle",
+        label: "Fewest replies between Curiosities: gentle",
+        unit: "replies",
+      },
+      {
         key: "curiosity_replies_between",
-        label: "Fewest replies between Curiosities",
+        label: "Fewest replies between Curiosities: balanced",
+        unit: "replies",
+      },
+      {
+        key: "curiosity_replies_between_direct",
+        label: "Fewest replies between Curiosities: direct",
         unit: "replies",
       },
       {

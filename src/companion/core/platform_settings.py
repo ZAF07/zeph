@@ -288,6 +288,12 @@ CURIOSITIES_PER_CONVERSATION = Setting(
 )
 CURIOSITIES_WAITING_LIMIT = Setting("curiosities_waiting_limit", read_whole_number)
 CURIOSITY_REPLIES_BETWEEN = Setting("curiosity_replies_between", read_whole_number)
+CURIOSITY_REPLIES_BETWEEN_GENTLE = Setting(
+    "curiosity_replies_between_gentle", read_whole_number
+)
+CURIOSITY_REPLIES_BETWEEN_DIRECT = Setting(
+    "curiosity_replies_between_direct", read_whole_number
+)
 CURIOSITIES_PER_REPLY = Setting("curiosities_per_reply", read_whole_number)
 CURIOSITY_HELD_WHEN_ASKING_WHY = Setting("curiosity_held_when_asking_why", read_on_off)
 FOLLOW_UPS_PER_CONVERSATION = Setting("follow_ups_per_conversation", read_whole_number)
@@ -366,8 +372,16 @@ PATTERN_OTHER_SIDE_THINKING = Setting("pattern_other_side_thinking", read_on_off
 PATTERN_OTHER_SIDE_PROMPT = Setting("pattern_other_side_prompt", read_text)
 AGENDA_SIZE = Setting("agenda_size", read_whole_number)
 EXPLORATION_WAIT = Setting("exploration_wait_days", read_days)
+EXPLORATION_WAIT_GENTLE = Setting("exploration_wait_days_gentle", read_days)
+EXPLORATION_WAIT_DIRECT = Setting("exploration_wait_days_direct", read_days)
 EXPLORATION_REST_AFTER_TRIES = Setting(
     "exploration_rest_after_tries", read_whole_number
+)
+EXPLORATION_REST_AFTER_TRIES_GENTLE = Setting(
+    "exploration_rest_after_tries_gentle", read_whole_number
+)
+EXPLORATION_REST_AFTER_TRIES_DIRECT = Setting(
+    "exploration_rest_after_tries_direct", read_whole_number
 )
 CONDITION_ONE_SIDED_STORIES = Setting("condition_one_sided_stories", read_whole_number)
 THOUGHT_EXPERIMENTS_PER_PATTERN_PER_WEEK = Setting(
@@ -1745,25 +1759,72 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
     ),
     EditableSetting(
         EXPLORATION_WAIT.key,
-        "Wait after a try with nothing",
+        "Wait after a try with nothing: balanced",
         SettingKind.WHOLE_NUMBER,
         minimum=0,
         maximum=365,
         hint=(
-            "Days before an Exploration is tried again, by a different "
-            "Approach, after an aimed Curiosity came back vague or brushed off."
+            "For a User set to balanced. Days before an Exploration is tried "
+            "again, by a different Approach, after an aimed Curiosity came "
+            "back vague or brushed off."
+        ),
+    ),
+    EditableSetting(
+        EXPLORATION_WAIT_GENTLE.key,
+        "Wait after a try with nothing: gentle",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=365,
+        hint=(
+            "The same wait for a User set to gentle. Longer leaves them more "
+            "room between questions about a suspected Pattern."
+        ),
+    ),
+    EditableSetting(
+        EXPLORATION_WAIT_DIRECT.key,
+        "Wait after a try with nothing: direct",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=365,
+        hint=(
+            "The same wait for a User set to direct. Shorter means Zeph comes "
+            "back to a suspected Pattern sooner."
         ),
     ),
     EditableSetting(
         EXPLORATION_REST_AFTER_TRIES.key,
-        "Tries with nothing before resting",
+        "Tries with nothing before resting: balanced",
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=50,
         hint=(
-            "After this many tries in a row with nothing useful, an Exploration "
-            "rests and frees its place on the Agenda. A new Observation for its "
-            "Pattern wakes it."
+            "For a User set to balanced. After this many tries in a row with "
+            "nothing useful, an Exploration rests and frees its place on the "
+            "Agenda. A new Observation for its Pattern wakes it."
+        ),
+    ),
+    EditableSetting(
+        EXPLORATION_REST_AFTER_TRIES_GENTLE.key,
+        "Tries with nothing before resting: gentle",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=50,
+        hint=(
+            "The same number for a User set to gentle. Lower means Zeph gives "
+            "up sooner. Asking Zeph to drop it rests an Exploration at once, "
+            "whatever the setting."
+        ),
+    ),
+    EditableSetting(
+        EXPLORATION_REST_AFTER_TRIES_DIRECT.key,
+        "Tries with nothing before resting: direct",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=50,
+        hint=(
+            "The same number for a User set to direct. Higher means Zeph "
+            "keeps trying longer. Asking Zeph to drop it rests an Exploration "
+            "at once, whatever the setting."
         ),
     ),
     EditableSetting(
@@ -1917,13 +1978,38 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
     ),
     EditableSetting(
         CURIOSITY_REPLIES_BETWEEN.key,
-        "Fewest replies between Curiosities",
+        "Fewest replies between Curiosities: balanced",
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=50,
         hint=(
-            "How many replies must pass after a Curiosity is raised, in any "
-            "Conversation, before another is offered to the Reply Plan."
+            "For a User set to balanced. How many replies must pass after a "
+            "Curiosity is raised, in any Conversation, before another is "
+            "offered to the Reply Plan."
+        ),
+    ),
+    EditableSetting(
+        CURIOSITY_REPLIES_BETWEEN_GENTLE.key,
+        "Fewest replies between Curiosities: gentle",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=50,
+        hint=(
+            "The same number for a User set to gentle. Higher means Zeph's "
+            "own questions come further apart. It still doubles while Zeph "
+            "backs off after brush-offs."
+        ),
+    ),
+    EditableSetting(
+        CURIOSITY_REPLIES_BETWEEN_DIRECT.key,
+        "Fewest replies between Curiosities: direct",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=50,
+        hint=(
+            "The same number for a User set to direct. Lower means Zeph's own "
+            "questions come closer together. It still doubles while Zeph "
+            "backs off after brush-offs."
         ),
     ),
     EditableSetting(

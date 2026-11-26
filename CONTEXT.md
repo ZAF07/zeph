@@ -21,7 +21,7 @@ The AI conversational partner a User talks to.
 _Avoid_: Bot, assistant, agent
 
 **Persona**:
-The Companion's voice and character — human in style, honest that it is an AI. Managed by Admins. It has two parts that Admins tune apart: its voice (how it talks) and its Outlook. In the MVP there is one Persona and Users never pick a style: the Companion adapts to how each User messages (they set only how direct its Read is). After the MVP there will be several Personas (e.g. mindfulness, Buddhist philosophy, Japanese philosophy), and Users choose one from those their plan includes.
+The Companion's voice and character — human in style, honest that it is an AI. Managed by Admins. It has two parts that Admins tune apart: its voice (how it talks) and its Outlook. In the MVP there is one Persona and Users never pick a style: the Companion adapts to how each User messages (they set only how direct it is, with its Read and with its questions). After the MVP there will be several Personas (e.g. mindfulness, Buddhist philosophy, Japanese philosophy), and Users choose one from those their plan includes.
 _Avoid_: System prompt, personality, character
 
 **Outlook**:
@@ -137,7 +137,7 @@ The web app where Users manage their account, preferences and privacy, and where
 _Avoid_: Portal, web app, console
 
 **Chat Setting Change**:
-A change to one of a User's settings made by telling the Companion in plain words instead of on the Dashboard: pausing or resuming Check-ins, Check-in frequency, quiet hours, User Memory on or off, Photo Viewing on or off, how direct the Companion is with its Read, time zone, forgetting a Memory Item or Life Thread, or Delete My Data. The Dashboard marks each such setting "Changed in chat" until it is next changed there; a forgotten Memory Item or Life Thread is simply gone, so there is nothing left to mark.
+A change to one of a User's settings made by telling the Companion in plain words instead of on the Dashboard: pausing or resuming Check-ins, Check-in frequency, quiet hours, User Memory on or off, Photo Viewing on or off, how direct the Companion is with its Read and its questions, time zone, forgetting a Memory Item or Life Thread, or Delete My Data. The Dashboard marks each such setting "Changed in chat" until it is next changed there; a forgotten Memory Item or Life Thread is simply gone, so there is nothing left to mark.
 _Avoid_: Chat command, slash command, bot setting
 
 **Admin Setting Change**:
@@ -237,7 +237,7 @@ The Companion's ongoing effort on one of a User's Patterns: what it still needs 
 _Avoid_: Investigation, case, probe plan
 
 **Approach**:
-How an Exploration asks for what it still needs, least pushy first: a follow-up on a story the User is telling, "would it have gone differently if…", a Thought Experiment, or "this week, notice when…". After a try that got nothing, the next try uses a different Approach. A missing Condition is never asked about by a Thought Experiment, and the state going in only by a story follow-up or a "notice", asked openly with no state named. *(Called "way" until 26 Nov 2026, when pattern-pipeline issue 43 renamed it in the code, the stored tries and the Evals.)*
+How an Exploration asks for what it still needs, least pushy first: a follow-up on a story the User is telling, "would it have gone differently if…", a Thought Experiment, or "this week, notice when…". After a try that got nothing, the next try uses a different Approach. A missing Condition is never asked about by a Thought Experiment, and the state going in only by a story follow-up or a "notice", asked openly with no state named. How direct the User set the Companion to be changes the order: gentle never gets "would it have gone differently if…", direct gets it first; it also sets how long the Companion waits after a try that got nothing, how many such tries before the Exploration rests, and the fewest replies between two Curiosities (Admin-set numbers, one per setting; pattern-pipeline issue 40, ADR-0033). The backing-off rules are the same for everyone. *(Called "way" until 26 Nov 2026, when pattern-pipeline issue 43 renamed it in the code, the stored tries and the Evals.)*
 _Avoid_: Way, method, technique, question style
 
 **Agenda**:

@@ -510,7 +510,9 @@ describe("AccountSettings", () => {
       within(levels).getByRole("button", { name: "Balanced" }),
     ).toHaveAttribute("aria-pressed", "true");
     expect(
-      within(section).getByText(/How soon and how plainly Zeph tells you/),
+      within(section).getByText(
+        /what it thinks is really going on, and how it asks you things/,
+      ),
     ).toBeInTheDocument();
   });
 

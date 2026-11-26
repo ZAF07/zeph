@@ -112,8 +112,12 @@ const settings: AdminSettings = {
     3,
     "How many of a User's suspected Patterns Zeph explores at once.",
   ),
+  exploration_wait_days_gentle: seeded(5),
   exploration_wait_days: seeded(3),
+  exploration_wait_days_direct: seeded(2),
+  exploration_rest_after_tries_gentle: seeded(3),
   exploration_rest_after_tries: seeded(4),
+  exploration_rest_after_tries_direct: seeded(5),
   condition_one_sided_stories: seeded(2),
   thought_experiments_per_pattern_per_week: seeded(1),
   pattern_ready_situations: seeded(3),
@@ -154,7 +158,9 @@ const settings: AdminSettings = {
   ),
   curiosities_waiting_limit: seeded(10),
   curiosity_check_ins_per_week: seeded(1),
+  curiosity_replies_between_gentle: seeded(4),
   curiosity_replies_between: seeded(3),
+  curiosity_replies_between_direct: seeded(2),
   follow_ups_per_conversation: seeded(3),
   curiosity_brush_offs_to_back_off: seeded(2),
   curiosity_back_off_days: seeded(3),
@@ -487,20 +493,29 @@ describe("PlatformSettingsForm", () => {
     const user = userEvent.setup();
     renderWithQueries(<PlatformSettingsForm />);
     const between = await screen.findByLabelText(
-      "Fewest replies between Curiosities",
+      "Fewest replies between Curiosities: balanced",
+    );
+    const betweenForDirect = screen.getByLabelText(
+      "Fewest replies between Curiosities: direct",
     );
     const followUps = screen.getByLabelText(
       "Most follow-up questions per Conversation",
     );
     const brushOffs = screen.getByLabelText("Brush-offs before backing off");
     const days = screen.getByLabelText("Days of doubled spacing");
+    expect(
+      screen.getByLabelText("Fewest replies between Curiosities: gentle"),
+    ).toHaveValue(4);
     expect(between).toHaveValue(3);
+    expect(betweenForDirect).toHaveValue(2);
     expect(followUps).toHaveValue(3);
     expect(brushOffs).toHaveValue(2);
     expect(days).toHaveValue(3);
 
     await user.clear(between);
     await user.type(between, "4");
+    await user.clear(betweenForDirect);
+    await user.type(betweenForDirect, "1");
     await user.clear(followUps);
     await user.type(followUps, "2");
     await user.clear(brushOffs);
@@ -511,6 +526,7 @@ describe("PlatformSettingsForm", () => {
 
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
       curiosity_replies_between: 4,
+      curiosity_replies_between_direct: 1,
       follow_ups_per_conversation: 2,
       curiosity_brush_offs_to_back_off: 3,
       curiosity_back_off_days: 5,
@@ -551,11 +567,28 @@ describe("PlatformSettingsForm", () => {
     const user = userEvent.setup();
     renderWithQueries(<PlatformSettingsForm />);
     const size = await screen.findByLabelText("Explorations on the Agenda");
-    const wait = screen.getByLabelText("Wait after a try with nothing");
-    const rest = screen.getByLabelText("Tries with nothing before resting");
+    const wait = screen.getByLabelText(
+      "Wait after a try with nothing: balanced",
+    );
+    const waitForGentle = screen.getByLabelText(
+      "Wait after a try with nothing: gentle",
+    );
+    const rest = screen.getByLabelText(
+      "Tries with nothing before resting: balanced",
+    );
     expect(size).toHaveValue(3);
+    expect(waitForGentle).toHaveValue(5);
     expect(wait).toHaveValue(3);
+    expect(
+      screen.getByLabelText("Wait after a try with nothing: direct"),
+    ).toHaveValue(2);
+    expect(
+      screen.getByLabelText("Tries with nothing before resting: gentle"),
+    ).toHaveValue(3);
     expect(rest).toHaveValue(4);
+    expect(
+      screen.getByLabelText("Tries with nothing before resting: direct"),
+    ).toHaveValue(5);
     expect(screen.getByRole("region", { name: "Patterns" })).toContainElement(
       size,
     );
@@ -567,12 +600,15 @@ describe("PlatformSettingsForm", () => {
 
     await user.clear(size);
     await user.type(size, "2");
+    await user.clear(waitForGentle);
+    await user.type(waitForGentle, "7");
     await user.clear(rest);
     await user.type(rest, "5");
     await user.click(screen.getByRole("button", { name: "Save settings" }));
 
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
       agenda_size: 2,
+      exploration_wait_days_gentle: 7,
       exploration_rest_after_tries: 5,
     });
   });

@@ -62,9 +62,16 @@ CLEAR_WORK = observation_entry(
 )
 AGENDA_SETTINGS = (
     "agenda_size",
+    "exploration_wait_days_gentle",
     "exploration_wait_days",
+    "exploration_wait_days_direct",
+    "exploration_rest_after_tries_gentle",
     "exploration_rest_after_tries",
+    "exploration_rest_after_tries_direct",
     "condition_one_sided_stories",
+    "curiosity_replies_between_gentle",
+    "curiosity_replies_between",
+    "curiosity_replies_between_direct",
 )
 AGENDA_HEADER = "What you are exploring about them (the Agenda)"
 MEI_STORY_POINTER = "Go back to what they told you about Mei, their sister on"
@@ -502,9 +509,16 @@ def test_every_agenda_number_is_a_setting_with_a_hint_and_an_eval_override(
 
     assert {key: settings[key]["value"] for key in AGENDA_SETTINGS} == {
         "agenda_size": 3,
+        "exploration_wait_days_gentle": 5,
         "exploration_wait_days": 3,
+        "exploration_wait_days_direct": 2,
+        "exploration_rest_after_tries_gentle": 3,
         "exploration_rest_after_tries": 4,
+        "exploration_rest_after_tries_direct": 5,
         "condition_one_sided_stories": 2,
+        "curiosity_replies_between_gentle": 4,
+        "curiosity_replies_between": 3,
+        "curiosity_replies_between_direct": 2,
     }
     assert all(settings[key]["hint"] for key in AGENDA_SETTINGS)
     assert set(AGENDA_SETTINGS) <= {setting["key"] for setting in choices["settings"]}

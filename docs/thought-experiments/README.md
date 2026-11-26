@@ -35,6 +35,9 @@ All of this is code. The model only words the question in the reply.
    on the story, then "would it have gone differently if…?",
    then a Thought Experiment, then "this week, notice when…". Zeph moves on
    to the next Approach only after a try came back vague or brushed off.
+   A User who set Zeph to gentle is never asked "would it have gone
+   differently if…?", so the Thought Experiment comes second; one who set
+   it to direct gets "would it have gone differently if…?" first.
    Other needs (a counter-test, a missing Condition) skip the Thought
    Experiment.
 3. **Which one.** Code takes the look-alike pair with the most unclear
